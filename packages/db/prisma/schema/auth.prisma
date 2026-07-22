@@ -1,13 +1,36 @@
 model User {
-  id            String    @id
+  id            String   @id
   name          String
   email         String
-  emailVerified Boolean   @default(false)
+  emailVerified Boolean  @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // JustUs role (JUS-9 RBAC). One of: plaintiff | donor | attorney | administrator.
+  // Doubles as the Better Auth admin-plugin role field ("administrator" is an admin role).
+  role String @default("donor")
+
+  // Whether the user has completed the one-time post-sign-in onboarding
+  // (welcome + role selection). Gates access to the app until done.
+  onboarded Boolean @default(false)
+
+  // Attorney profile fields — only populated when role = attorney (captured at sign-up).
+  firmName     String?
+  barNumber    String?
+  jurisdiction String?
+
+  // Better Auth admin plugin: ban state (used here for account lockout too).
+  banned     Boolean?
+  banReason  String?
+  banExpires DateTime?
+
+  // Account lockout after repeated failed sign-ins (JUS-8).
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  sessions Session[]
+  accounts Account[]
 
   @@unique([email])
   @@map("user")
@@ -23,6 +46,9 @@ model Session {
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Better Auth admin plugin: set when an admin impersonates this session.
+  impersonatedBy String?
 
   @@unique([token])
   @@index([userId])
@@ -59,4 +85,15 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+// Better Auth rate limiting with `storage: "database"` (JUS-8).
+model RateLimit {
+  id          String @id
+  key         String
+  count       Int
+  lastRequest BigInt
+
+  @@index([key])
+  @@map("rateLimit")
 }

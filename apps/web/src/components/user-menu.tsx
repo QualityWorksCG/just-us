@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@just-us/ui/components/dropdown-menu";
 import { Skeleton } from "@just-us/ui/components/skeleton";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
@@ -23,11 +22,7 @@ export default function UserMenu() {
   }
 
   if (!session) {
-    return (
-      <Link href="/login">
-        <Button variant="outline">Sign In</Button>
-      </Link>
-    );
+    return null;
   }
 
   return (

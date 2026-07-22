@@ -1,0 +1,402 @@
+/* Extracted from JustUs Donation Platform prototype */
+
+/* JustUs Financial — webfonts (Google variable fonts, woff2, latin + latin-ext)
+   Each file is a variable font covering weights 400–800. */
+@font-face {
+  font-family: 'Libre Franklin';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/afaf4445.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Libre Franklin';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/839ae7cb.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("assets/e13a3321.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("assets/97d08b30.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/32cf32e9.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/24cede2f.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Schibsted Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/bc6b370b.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Schibsted Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/176c9469.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* JustUs Financial — color tokens
+   Warm paper + brass "civic gravitas" palette. All values oklch,
+   copied verbatim from the source prototype. */
+:root {
+  /* Surfaces */
+  --paper: oklch(0.975 0.008 85);        /* page background — warm off-white */
+  --surface: oklch(0.995 0.004 85);      /* cards, inputs, modals */
+  --surface-2: oklch(0.955 0.011 84);    /* recessed wells, chips, icon tiles */
+
+  /* Ink (text) */
+  --ink: oklch(0.26 0.012 70);           /* primary text; also dark bands/sidebar bg */
+  --ink-soft: oklch(0.42 0.012 65);      /* secondary text */
+  --muted: oklch(0.585 0.013 72);        /* tertiary text, labels, captions */
+
+  /* Lines */
+  --line: oklch(0.912 0.008 80);         /* default borders, dividers */
+  --line-strong: oklch(0.85 0.011 80);   /* input borders, emphasized rules */
+
+  /* Brass accent */
+  --accent: oklch(0.66 0.105 80);        /* primary actions, brandmark, progress */
+  --accent-ink: oklch(0.24 0.03 70);     /* text/icon on accent */
+  --accent-deep: oklch(0.47 0.085 68);   /* accent-toned text & icons on light */
+  --accent-wash: oklch(0.95 0.035 85);   /* accent tint backgrounds, AI blocks */
+
+  /* Semantic */
+  --success: oklch(0.52 0.08 155);
+  --info: oklch(0.5 0.085 245);
+  --warn: oklch(0.8 0.11 78);
+  --warn-deep: oklch(0.52 0.09 68);      /* text on warn washes */
+  --danger: oklch(0.53 0.135 25);
+
+  /* Semantic aliases */
+  --text-body: var(--ink);
+  --text-secondary: var(--ink-soft);
+  --text-caption: var(--muted);
+  --surface-card: var(--surface);
+  --surface-page: var(--paper);
+  --surface-inverse: var(--ink);         /* dark bands, sidebar */
+  --text-inverse: var(--paper);
+}
+
+/* JustUs Financial — typography tokens
+   One workhorse sans (Libre Franklin) doubles as display + body.
+   Spline Sans Mono is used for eyebrow labels, ordinals, tiny meta.
+   Hanken Grotesk & Schibsted Grotesk ship as alternate typefaces
+   (the prototype exposes them as theme tweaks). */
+:root {
+  --sans: 'Libre Franklin', system-ui, sans-serif; /* @kind font */
+  --display: 'Libre Franklin', system-ui, sans-serif; /* @kind font */
+  --mono: 'Spline Sans Mono', ui-monospace, monospace; /* @kind font */
+
+  /* Alternates (tweakable in source prototype) */
+  --sans-alt-1: 'Hanken Grotesk', system-ui, sans-serif; /* @kind font */
+  --sans-alt-2: 'Schibsted Grotesk', system-ui, sans-serif; /* @kind font */
+
+  /* Scale — exact values from the prototype (fractional px are intentional) */
+  --text-hero: clamp(36px, 5vw, 60px);   /* landing hero, weight 800, ls -0.03em, lh 1.04 */
+  --text-h1: 30px;                       /* PageHead title, 700, ls -0.02em, lh 1.15 */
+  --text-h2: 22px;                       /* SectionTitle, 700, ls -0.01em */
+  --text-h3: 16px;                       /* SubHead, 700, ls -0.01em */
+  --text-stat: 27px;                     /* Stat value, 700, tabular-nums */
+  --text-body: 14.5px;                   /* default UI copy */
+  --text-body-lg: 15px;                  /* long-form case copy, lh 1.7 */
+  --text-sm: 13.5px;
+  --text-caption: 12.5px;
+  --text-micro: 11.5px;                  /* uppercase micro labels, ls 0.04em */
+  --text-label: 12px;                    /* mono eyebrow labels, ls 0.08em, uppercase */
+}
+
+/* JustUs Financial — radii, shadows, motion
+   Exact values from the source prototype — do not snap to a grid. */
+:root {
+  /* Radii */
+  --radius-control: 9px;      /* buttons, inputs, selects, nav items */
+  --radius-chip: 6px;         /* Tag */
+  --radius-sm: 8px;           /* small icon buttons, tiles */
+  --radius-card-sm: 10px;     /* inline wells, notice rows */
+  --radius-card: 14px;        /* Card */
+  --radius-card-lg: 16px;     /* persona cards */
+  --radius-modal: 18px;       /* Modal, hero cards */
+  --radius-pill: 999px;       /* StatusPill, chips, avatars */
+
+  /* Shadows — warm-tinted, never pure black */
+  --shadow-rest: 0 1px 2px rgba(40, 30, 10, 0.04);              /* Card at rest */
+  --shadow-hover: 0 12px 30px -16px rgba(40, 30, 10, 0.28);     /* Card hover */
+  --shadow-float: 0 18px 40px -22px rgba(50, 38, 12, 0.34);     /* persona hover, chips */
+  --shadow-drop: 0 24px 60px -24px rgba(40, 30, 10, 0.4);       /* dropdowns, popovers */
+  --shadow-hero: 0 30px 70px -36px rgba(50, 38, 12, 0.4);       /* hero display cards */
+  --shadow-modal: 0 40px 90px -30px rgba(30, 20, 5, 0.55);      /* Modal */
+
+  /* Motion */
+  --ease-pop: cubic-bezier(0.2, 0.8, 0.3, 1); /* @kind other */
+  --ease-progress: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+  --dur-fast: 0.15s; /* @kind other */ /* hover color/background */
+  --dur-base: 0.18s; /* @kind other */ /* card lift */
+  --dur-pop: 0.22s; /* @kind other */ /* modal entrance */
+}
+
+@keyframes ju-pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
+@keyframes ju-spin { to { transform: rotate(360deg); } }
+@keyframes ju-slide { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* JustUs Financial — base element styles (from prototype shell) */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font-family: var(--sans); }
+input, textarea, select { font-family: var(--sans); }
+::selection { background: var(--accent-wash); }
+
+a { color: var(--accent-deep); }
+a:hover { color: var(--ink); }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Native controls */
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 5px; background: var(--line-strong); border-radius: 999px; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 999px; background: var(--accent); cursor: pointer; border: 2px solid var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+
+/* JustUs Financial — webfonts (Google variable fonts, woff2, latin + latin-ext)
+   Each file is a variable font covering weights 400–800. */
+@font-face {
+  font-family: 'Libre Franklin';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/afaf4445.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Libre Franklin';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/839ae7cb.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("assets/e13a3321.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("assets/97d08b30.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/32cf32e9.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/24cede2f.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Schibsted Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/bc6b370b.woff2") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Schibsted Grotesk';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("assets/176c9469.woff2") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* JustUs Financial — color tokens
+   Warm paper + brass "civic gravitas" palette. All values oklch,
+   copied verbatim from the source prototype. */
+:root {
+  /* Surfaces */
+  --paper: oklch(0.975 0.008 85);        /* page background — warm off-white */
+  --surface: oklch(0.995 0.004 85);      /* cards, inputs, modals */
+  --surface-2: oklch(0.955 0.011 84);    /* recessed wells, chips, icon tiles */
+
+  /* Ink (text) */
+  --ink: oklch(0.26 0.012 70);           /* primary text; also dark bands/sidebar bg */
+  --ink-soft: oklch(0.42 0.012 65);      /* secondary text */
+  --muted: oklch(0.585 0.013 72);        /* tertiary text, labels, captions */
+
+  /* Lines */
+  --line: oklch(0.912 0.008 80);         /* default borders, dividers */
+  --line-strong: oklch(0.85 0.011 80);   /* input borders, emphasized rules */
+
+  /* Brass accent */
+  --accent: oklch(0.66 0.105 80);        /* primary actions, brandmark, progress */
+  --accent-ink: oklch(0.24 0.03 70);     /* text/icon on accent */
+  --accent-deep: oklch(0.47 0.085 68);   /* accent-toned text & icons on light */
+  --accent-wash: oklch(0.95 0.035 85);   /* accent tint backgrounds, AI blocks */
+
+  /* Semantic */
+  --success: oklch(0.52 0.08 155);
+  --info: oklch(0.5 0.085 245);
+  --warn: oklch(0.8 0.11 78);
+  --warn-deep: oklch(0.52 0.09 68);      /* text on warn washes */
+  --danger: oklch(0.53 0.135 25);
+
+  /* Semantic aliases */
+  --text-body: var(--ink);
+  --text-secondary: var(--ink-soft);
+  --text-caption: var(--muted);
+  --surface-card: var(--surface);
+  --surface-page: var(--paper);
+  --surface-inverse: var(--ink);         /* dark bands, sidebar */
+  --text-inverse: var(--paper);
+}
+
+/* JustUs Financial — typography tokens
+   One workhorse sans (Libre Franklin) doubles as display + body.
+   Spline Sans Mono is used for eyebrow labels, ordinals, tiny meta.
+   Hanken Grotesk & Schibsted Grotesk ship as alternate typefaces
+   (the prototype exposes them as theme tweaks). */
+:root {
+  --sans: 'Libre Franklin', system-ui, sans-serif; /* @kind font */
+  --display: 'Libre Franklin', system-ui, sans-serif; /* @kind font */
+  --mono: 'Spline Sans Mono', ui-monospace, monospace; /* @kind font */
+
+  /* Alternates (tweakable in source prototype) */
+  --sans-alt-1: 'Hanken Grotesk', system-ui, sans-serif; /* @kind font */
+  --sans-alt-2: 'Schibsted Grotesk', system-ui, sans-serif; /* @kind font */
+
+  /* Scale — exact values from the prototype (fractional px are intentional) */
+  --text-hero: clamp(36px, 5vw, 60px);   /* landing hero, weight 800, ls -0.03em, lh 1.04 */
+  --text-h1: 30px;                       /* PageHead title, 700, ls -0.02em, lh 1.15 */
+  --text-h2: 22px;                       /* SectionTitle, 700, ls -0.01em */
+  --text-h3: 16px;                       /* SubHead, 700, ls -0.01em */
+  --text-stat: 27px;                     /* Stat value, 700, tabular-nums */
+  --text-body: 14.5px;                   /* default UI copy */
+  --text-body-lg: 15px;                  /* long-form case copy, lh 1.7 */
+  --text-sm: 13.5px;
+  --text-caption: 12.5px;
+  --text-micro: 11.5px;                  /* uppercase micro labels, ls 0.04em */
+  --text-label: 12px;                    /* mono eyebrow labels, ls 0.08em, uppercase */
+}
+
+/* JustUs Financial — radii, shadows, motion
+   Exact values from the source prototype — do not snap to a grid. */
+:root {
+  /* Radii */
+  --radius-control: 9px;      /* buttons, inputs, selects, nav items */
+  --radius-chip: 6px;         /* Tag */
+  --radius-sm: 8px;           /* small icon buttons, tiles */
+  --radius-card-sm: 10px;     /* inline wells, notice rows */
+  --radius-card: 14px;        /* Card */
+  --radius-card-lg: 16px;     /* persona cards */
+  --radius-modal: 18px;       /* Modal, hero cards */
+  --radius-pill: 999px;       /* StatusPill, chips, avatars */
+
+  /* Shadows — warm-tinted, never pure black */
+  --shadow-rest: 0 1px 2px rgba(40, 30, 10, 0.04);              /* Card at rest */
+  --shadow-hover: 0 12px 30px -16px rgba(40, 30, 10, 0.28);     /* Card hover */
+  --shadow-float: 0 18px 40px -22px rgba(50, 38, 12, 0.34);     /* persona hover, chips */
+  --shadow-drop: 0 24px 60px -24px rgba(40, 30, 10, 0.4);       /* dropdowns, popovers */
+  --shadow-hero: 0 30px 70px -36px rgba(50, 38, 12, 0.4);       /* hero display cards */
+  --shadow-modal: 0 40px 90px -30px rgba(30, 20, 5, 0.55);      /* Modal */
+
+  /* Motion */
+  --ease-pop: cubic-bezier(0.2, 0.8, 0.3, 1); /* @kind other */
+  --ease-progress: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+  --dur-fast: 0.15s; /* @kind other */ /* hover color/background */
+  --dur-base: 0.18s; /* @kind other */ /* card lift */
+  --dur-pop: 0.22s; /* @kind other */ /* modal entrance */
+}
+
+@keyframes ju-pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
+@keyframes ju-spin { to { transform: rotate(360deg); } }
+@keyframes ju-slide { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* JustUs Financial — base element styles (from prototype shell) */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font-family: var(--sans); }
+input, textarea, select { font-family: var(--sans); }
+::selection { background: var(--accent-wash); }
+
+a { color: var(--accent-deep); }
+a:hover { color: var(--ink); }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Native controls */
+input[type="range"] { -webkit-appearance: none; appearance: none; height: 5px; background: var(--line-strong); border-radius: 999px; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 999px; background: var(--accent); cursor: pointer; border: 2px solid var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+
+body { margin: 0; background: var(--paper); }
+    @keyframes ju-rise { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes ju-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes ju-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+    a { color: var(--accent-deep); text-decoration: none; }
+    a:hover { color: var(--ink); }

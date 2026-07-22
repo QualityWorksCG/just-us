@@ -12,13 +12,16 @@
   "scripts": {},
   "dependencies": {
     "@just-us/db": "workspace:*",
+    "@just-us/email": "workspace:*",
     "@just-us/env": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
+    "resend": "^6.11.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@just-us/config": "workspace:*",
+    "@types/react": "catalog:",
     "typescript": "catalog:"
   }
 }
