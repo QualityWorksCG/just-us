@@ -1,0 +1,24 @@
+{
+  "name": "@just-us/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@just-us/db": "workspace:*",
+    "@just-us/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@just-us/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

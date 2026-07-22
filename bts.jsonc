@@ -1,0 +1,31 @@
+// Better-T-Stack
+//
+// Website: https://www.better-t-stack.dev/
+// Stack Builder: https://www.better-t-stack.dev/new
+// Analytics: https://www.better-t-stack.dev/analytics
+// Showcase: https://www.better-t-stack.dev/showcase
+// Sponsor: https://github.com/sponsors/AmanVarshney01
+//
+// Add new addons with: bun create better-t-stack add
+// This file is safe to delete
+
+{
+  "$schema": "https://r2.better-t-stack.dev/schema.json",
+  "version": "3.36.5",
+  "createdAt": "2026-07-22T13:16:31.249Z",
+  "reproducibleCommand": "bun create better-t-stack@latest just-us --frontend next --backend self --runtime none --database postgres --orm prisma --api none --auth better-auth --payments none --addons turborepo biome evlog skills mcp --examples none --db-setup none --web-deploy vercel --server-deploy none --git --package-manager bun --install",
+  "database": "postgres",
+  "orm": "prisma",
+  "backend": "self",
+  "runtime": "none",
+  "frontend": ["next"],
+  "addons": ["turborepo", "biome", "evlog", "skills", "mcp"],
+  "examples": [],
+  "auth": "better-auth",
+  "payments": "none",
+  "packageManager": "bun",
+  "dbSetup": "none",
+  "api": "none",
+  "webDeploy": "vercel",
+  "serverDeploy": "none",
+}
