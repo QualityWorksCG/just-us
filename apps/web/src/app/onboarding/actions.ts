@@ -4,6 +4,7 @@ import { completeUserOnboarding } from "@just-us/auth/signup";
 import { z } from "zod";
 
 import { requireVerifiedSession } from "@/lib/auth-server";
+import { BAR_NUMBER_MESSAGE, isValidBarNumber } from "@/lib/validation";
 
 const onboardingSchema = z
 	.object({
@@ -31,6 +32,12 @@ const onboardingSchema = z
 					code: "custom",
 					path: ["barNumber"],
 					message: "Enter your bar number",
+				});
+			else if (!isValidBarNumber(val.barNumber))
+				ctx.addIssue({
+					code: "custom",
+					path: ["barNumber"],
+					message: BAR_NUMBER_MESSAGE,
 				});
 		}
 	});

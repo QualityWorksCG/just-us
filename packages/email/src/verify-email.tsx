@@ -18,7 +18,7 @@ interface VerifyEmailProps {
 	name?: string;
 }
 
-export const verifyEmailSubject = "Verify your email for just-us";
+export const verifyEmailSubject = "Verify your email for JustUs";
 
 VerifyEmail.PreviewProps = {
 	url: "https://example.com/verify?token=abc123",
@@ -27,11 +27,12 @@ VerifyEmail.PreviewProps = {
 
 export default function VerifyEmail({ url, name }: VerifyEmailProps) {
 	return (
-		<EmailShell preview="Verify your email to activate your just-us account">
+		<EmailShell preview="Verify your email to activate your JustUs account">
 			<Text style={heading}>Verify your email</Text>
 			<Text style={paragraph}>
 				{name ? `Hi ${name.split(" ")[0]},` : "Hi there,"} confirm this is your
-				email to activate your just-us account.
+				email to activate your JustUs account. You'll choose how you're joining
+				right after.
 			</Text>
 
 			<Section style={buttonSection}>

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { signUpAction } from "@/app/login/actions";
@@ -60,7 +60,21 @@ function Field({
 	);
 }
 
-export function AuthScreen({ initialMode = "create" }: { initialMode?: Mode }) {
+const MAGIC_LINK_ERRORS: Record<string, string> = {
+	new_user_signup_disabled:
+		"No account found for that email. Create an account first, then use the magic link to sign in.",
+	INVALID_TOKEN: "That sign-in link is invalid. Request a new one.",
+	EXPIRED_TOKEN: "That sign-in link has expired. Request a new one.",
+	ATTEMPTS_EXCEEDED: "That sign-in link was already used. Request a new one.",
+};
+
+export function AuthScreen({
+	initialMode = "signin",
+	initialError,
+}: {
+	initialMode?: Mode;
+	initialError?: string;
+}) {
 	const router = useRouter();
 	const ids = {
 		name: useId(),
@@ -74,6 +88,16 @@ export function AuthScreen({ initialMode = "create" }: { initialMode?: Mode }) {
 
 	const [mode, setMode] = useState<Mode>(initialMode);
 	const [pending, setPending] = useState(false);
+
+	// Surface a magic-link verification error redirected back to /login.
+	useEffect(() => {
+		if (initialError) {
+			toast.error(
+				MAGIC_LINK_ERRORS[initialError] ??
+					"That sign-in link could not be used. Request a new one.",
+			);
+		}
+	}, [initialError]);
 
 	// Create-account form state
 	const [name, setName] = useState("");
@@ -174,7 +198,11 @@ export function AuthScreen({ initialMode = "create" }: { initialMode?: Mode }) {
 		}
 		setPending(true);
 		await authClient.signIn.magicLink(
-			{ email: target, callbackURL: "/dashboard" },
+			{
+				email: target,
+				callbackURL: "/dashboard",
+				errorCallbackURL: "/login?mode=signin",
+			},
 			{
 				onSuccess: () => {
 					toast.success("Check your email for a one-time sign-in link.");
@@ -299,7 +327,7 @@ export function AuthScreen({ initialMode = "create" }: { initialMode?: Mode }) {
 
 					{/* Create / Sign in toggle */}
 					<div className="mb-6 grid grid-cols-2 gap-1 rounded-[11px] bg-surface-2 p-1">
-						{(["create", "signin"] as const).map((m) => (
+						{(["signin", "create"] as const).map((m) => (
 							<button
 								key={m}
 								type="button"
@@ -496,23 +524,29 @@ export function AuthScreen({ initialMode = "create" }: { initialMode?: Mode }) {
 						</form>
 					)}
 
-					<div className="my-6 flex items-center gap-3.5">
-						<span className="h-px flex-1 bg-border" />
-						<span className="text-[12px] text-muted-foreground">or</span>
-						<span className="h-px flex-1 bg-border" />
-					</div>
+					{/* Magic link is a returning-user convenience — sign-in only. On
+						sign-up it would bypass the password and skip the name. */}
+					{mode === "signin" && (
+						<>
+							<div className="my-6 flex items-center gap-3.5">
+								<span className="h-px flex-1 bg-border" />
+								<span className="text-[12px] text-muted-foreground">or</span>
+								<span className="h-px flex-1 bg-border" />
+							</div>
 
-					<Button
-						type="button"
-						variant="outline"
-						size="lg"
-						className="w-full"
-						onClick={handleMagicLink}
-						disabled={pending}
-					>
-						<Mail data-icon="inline-start" aria-hidden="true" />
-						Email me a one-time sign-in link
-					</Button>
+							<Button
+								type="button"
+								variant="outline"
+								size="lg"
+								className="w-full"
+								onClick={handleMagicLink}
+								disabled={pending}
+							>
+								<Mail data-icon="inline-start" aria-hidden="true" />
+								Email me a one-time sign-in link
+							</Button>
+						</>
+					)}
 
 					<p className="mt-6 text-center text-[12px] text-muted-foreground leading-relaxed">
 						By continuing you agree to our{" "}

@@ -18,7 +18,7 @@ interface MagicLinkEmailProps {
 	name?: string;
 }
 
-export const magicLinkSubject = "Your just-us sign-in link";
+export const magicLinkSubject = "Your JustUs sign-in link";
 
 MagicLinkEmail.PreviewProps = {
 	url: "https://example.com/magic?token=abc123",
@@ -27,8 +27,8 @@ MagicLinkEmail.PreviewProps = {
 
 export default function MagicLinkEmail({ url, name }: MagicLinkEmailProps) {
 	return (
-		<EmailShell preview="Your one-time sign-in link for just-us">
-			<Text style={heading}>Sign in to just-us</Text>
+		<EmailShell preview="Your one-time sign-in link for JustUs">
+			<Text style={heading}>Sign in to JustUs</Text>
 			<Text style={paragraph}>
 				{name ? `Hi ${name.split(" ")[0]},` : "Hi there,"} click the button
 				below to sign in. This link works once and expires shortly.

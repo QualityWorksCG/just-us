@@ -173,6 +173,11 @@ export function createAuth() {
 				adminRoles: ["administrator"],
 			}),
 			magicLink({
+				// Magic link is a returning-user sign-in convenience, not a signup
+				// path — accounts are created via the password form so we always
+				// capture a name. An unknown email that clicks the link is rejected
+				// (no silent passwordless account creation).
+				disableSignUp: true,
 				sendMagicLink: async ({ email, url }, ctx) => {
 					const name = (ctx?.body as { name?: string })?.name;
 					await sendMagicLinkEmail({ to: email, url, name });

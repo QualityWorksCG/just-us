@@ -18,7 +18,7 @@ interface ResetPasswordProps {
 	name?: string;
 }
 
-export const resetPasswordSubject = "Reset your just-us password";
+export const resetPasswordSubject = "Reset your JustUs password";
 
 ResetPasswordEmail.PreviewProps = {
 	url: "https://example.com/reset-password?token=abc123",
@@ -27,11 +27,11 @@ ResetPasswordEmail.PreviewProps = {
 
 export default function ResetPasswordEmail({ url, name }: ResetPasswordProps) {
 	return (
-		<EmailShell preview="Reset your just-us password">
+		<EmailShell preview="Reset your JustUs password">
 			<Text style={heading}>Reset your password</Text>
 			<Text style={paragraph}>
 				{name ? `Hi ${name.split(" ")[0]},` : "Hi there,"} we got a request to
-				reset the password on your just-us account. Choose a new one using the
+				reset the password on your JustUs account. Choose a new one using the
 				button below.
 			</Text>
 

@@ -21,6 +21,9 @@ export async function signUpBasic(input: SignUpInput, requestHeaders: Headers) {
 			name: input.name,
 			email: input.email,
 			password: input.password,
+			// Where the verification link lands after auto sign-in. Sends the user
+			// into the app; the onboarding guard routes them to /onboarding.
+			callbackURL: "/dashboard",
 		},
 		headers: requestHeaders,
 		asResponse: false,
