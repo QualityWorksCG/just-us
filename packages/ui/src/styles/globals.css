@@ -7,29 +7,52 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  JustUs design tokens — "civic gravitas"
-  Warm paper surfaces, brass accent, Libre Franklin + Spline Sans Mono.
-  Values adapted from the JustUs Donation Platform prototype.
+  JustUs design tokens — warm, humane litigation-crowdfunding brand.
+  Cream / espresso base, bronze gold reserved for actions, bright gold for
+  hopeful "moment" blocks, sage green for trust, espresso-dark for credibility.
+  Pairs Bricolage Grotesque (display) + Figtree (body).
 */
 :root {
-  /* Brand primitives */
-  --paper: oklch(0.975 0.008 85);
-  --surface: oklch(0.995 0.004 85);
-  --surface-2: oklch(0.955 0.011 84);
+  /* Neutrals */
+  --paper: #F4EDDF;        /* page background */
+  --paper-alt: #FBF8F1;    /* lighter alt background */
+  --surface: #FEFCF8;      /* cards */
+  --surface-2: #ECE3D1;    /* recessed neutral fill (tracks, chips) */
 
-  --ink: oklch(0.26 0.012 70);
-  --ink-soft: oklch(0.42 0.012 65);
-  --ink-muted: oklch(0.585 0.013 72);
+  /* Text */
+  --ink: #231A11;          /* primary */
+  --ink-soft: #5E5240;     /* secondary */
+  --ink-muted: #8A7C67;    /* muted */
 
-  --line: oklch(0.912 0.008 80);
-  --line-strong: oklch(0.85 0.011 80);
+  /* Borders */
+  --line: #E7DBC6;
+  --line-strong: #D8C9AE;
 
-  --brass: oklch(0.66 0.105 80);
-  --brass-ink: oklch(0.24 0.03 70);
-  --brass-deep: oklch(0.47 0.085 68);
-  --brass-wash: oklch(0.95 0.035 85);
+  /* Bronze gold — ACTIONS ONLY (CTAs, links, eyebrows) */
+  --brass: #9C7526;        /* action fill + text on light */
+  --brass-ink: #2A2016;    /* text on bronze */
+  --brass-deep: #7E5F1E;   /* eyebrow / link / text on soft gold */
+  --brass-wash: #EADFC6;   /* bronze soft fill */
+  --brass-on-dark: #B98F3E;/* bronze for use on dark backgrounds */
 
-  --success: oklch(0.52 0.08 155);
+  /* Bright gold — hopeful full-bleed "moment" blocks (use sparingly) */
+  --gold-bright: #EBC15E;
+  --gold-bright-ink: #3A2E17;
+
+  /* Green — trust / verified / togetherness */
+  --success: #5F7A54;      /* the green */
+  --green-soft: #E2E9D4;   /* soft green fill */
+  --green-deep: #3D5137;   /* text on soft green */
+  --green-on: #F3F6EC;     /* text on solid green */
+  --green-on-dark: #A6C58F;/* sage for use on dark backgrounds */
+
+  /* Espresso-dark sections — credibility */
+  --dark: #2A2016;         /* dark section bg */
+  --dark-deep: #211A11;    /* footer bg */
+  --dark-card: #352A1D;    /* cards on dark */
+  --dark-fg: #F2E9D8;      /* text on dark */
+  --dark-fg-soft: #C3B295; /* secondary text on dark */
+
   --info: oklch(0.5 0.085 245);
   --warn: oklch(0.8 0.11 78);
   --warn-deep: oklch(0.52 0.09 68);
@@ -69,8 +92,8 @@
   --card-foreground: var(--ink);
   --popover: var(--surface);
   --popover-foreground: var(--ink);
-  --primary: var(--brass);
-  --primary-foreground: var(--brass-ink);
+  --primary: #8A6820;      /* deeper bronze so white button text clears AA */
+  --primary-foreground: #FEFCF8; /* near-white — reads far better than dark ink */
   --secondary: var(--surface-2);
   --secondary-foreground: var(--ink);
   --muted: var(--surface-2);
@@ -97,23 +120,33 @@
 }
 
 .dark {
-  --paper: oklch(0.18 0.01 70);
-  --surface: oklch(0.22 0.01 70);
-  --surface-2: oklch(0.28 0.012 70);
+  --paper: #211A11;
+  --paper-alt: #2A2016;
+  --surface: #2A2016;
+  --surface-2: #352A1D;
 
-  --ink: oklch(0.96 0.006 85);
-  --ink-soft: oklch(0.82 0.01 80);
-  --ink-muted: oklch(0.68 0.012 75);
+  --ink: #F2E9D8;
+  --ink-soft: #C3B295;
+  --ink-muted: #9C8E77;
 
   --line: oklch(1 0 0 / 10%);
   --line-strong: oklch(1 0 0 / 16%);
 
-  --brass: oklch(0.72 0.11 80);
-  --brass-ink: oklch(0.22 0.03 70);
-  --brass-deep: oklch(0.82 0.08 78);
-  --brass-wash: oklch(0.3 0.04 75);
+  --brass: #B98F3E;
+  --brass-ink: #211A11;
+  --brass-deep: #C9A25A;
+  --brass-wash: #3A2E1B;
+  --brass-on-dark: #C9A25A;
 
-  --success: oklch(0.68 0.1 155);
+  --gold-bright: #EBC15E;
+  --gold-bright-ink: #3A2E17;
+
+  --success: #8CA87E;
+  --green-soft: #33402B;
+  --green-deep: #CBDBBB;
+  --green-on: #F3F6EC;
+  --green-on-dark: #A6C58F;
+
   --info: oklch(0.68 0.09 245);
   --warn: oklch(0.78 0.11 78);
   --warn-deep: oklch(0.88 0.08 78);
@@ -155,11 +188,12 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-libre-franklin), "Libre Franklin", system-ui, sans-serif;
-  --font-display: var(--font-libre-franklin), "Libre Franklin", system-ui, sans-serif;
-  --font-mono: var(--font-spline-sans-mono), "Spline Sans Mono", ui-monospace, monospace;
+  --font-sans: var(--font-figtree), "Figtree", system-ui, sans-serif;
+  --font-display: var(--font-bricolage), "Bricolage Grotesque", system-ui, sans-serif;
+  --font-mono: var(--font-figtree), "Figtree", system-ui, sans-serif;
 
   --color-paper: var(--paper);
+  --color-paper-alt: var(--paper-alt);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-ink: var(--ink);
@@ -171,7 +205,19 @@
   --color-brass-ink: var(--brass-ink);
   --color-brass-deep: var(--brass-deep);
   --color-brass-wash: var(--brass-wash);
+  --color-brass-on-dark: var(--brass-on-dark);
+  --color-gold-bright: var(--gold-bright);
+  --color-gold-bright-ink: var(--gold-bright-ink);
   --color-success: var(--success);
+  --color-green-soft: var(--green-soft);
+  --color-green-deep: var(--green-deep);
+  --color-green-on: var(--green-on);
+  --color-green-on-dark: var(--green-on-dark);
+  --color-dark: var(--dark);
+  --color-dark-deep: var(--dark-deep);
+  --color-dark-card: var(--dark-card);
+  --color-dark-fg: var(--dark-fg);
+  --color-dark-fg-soft: var(--dark-fg-soft);
   --color-info: var(--info);
   --color-warn: var(--warn);
   --color-warn-deep: var(--warn-deep);
@@ -250,6 +296,27 @@
   }
 }
 
+@keyframes ju-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+/* Gentle looping float for floating hero cards. */
+.ju-float {
+  animation: ju-float 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ju-float {
+    animation: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -259,5 +326,9 @@
   }
   html {
     @apply font-sans;
+  }
+  h1,
+  h2 {
+    @apply font-display;
   }
 }

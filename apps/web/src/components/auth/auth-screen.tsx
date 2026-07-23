@@ -241,7 +241,14 @@ export function AuthScreen({
 			{/* Left — brand panel */}
 			<aside className="relative hidden flex-col justify-center overflow-hidden bg-[radial-gradient(900px_600px_at_82%_-8%,color-mix(in_oklch,var(--brass)_30%,transparent),transparent_62%),radial-gradient(700px_520px_at_-8%_108%,color-mix(in_oklch,var(--brass)_16%,transparent),transparent_58%),linear-gradient(158deg,color-mix(in_oklch,var(--ink)_94%,var(--brass-deep)),color-mix(in_oklch,var(--ink)_62%,var(--brass-deep))_58%,color-mix(in_oklch,var(--ink)_42%,var(--brass-deep)))] px-8 py-12 text-paper lg:flex xl:px-14">
 				<div className="mx-auto flex min-h-0 w-full max-w-[520px] flex-col">
-					<div className="mb-9 flex items-center gap-4">
+					<Link
+						href="/"
+						className="mb-8 inline-flex items-center gap-1.5 self-start font-bold text-[13px] text-paper/60 transition-colors hover:text-paper/95"
+					>
+						<ChevronLeft className="size-4" aria-hidden="true" />
+						Back to home
+					</Link>
+					<div className="mb-9 flex items-center gap-3">
 						<Link href="/" className="flex items-center gap-3">
 							<Brandmark size={32} />
 							<span className="leading-none">
@@ -252,13 +259,6 @@ export function AuthScreen({
 									Justice, crowdfunded
 								</span>
 							</span>
-						</Link>
-						<Link
-							href="/"
-							className="ml-auto inline-flex items-center gap-1.5 font-bold text-[13px] text-paper/60 transition-colors hover:text-paper/95"
-						>
-							<ChevronLeft className="size-3.5" aria-hidden="true" />
-							Back
 						</Link>
 					</div>
 
