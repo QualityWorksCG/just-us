@@ -2,7 +2,7 @@
 
 import type { Role } from "@just-us/auth";
 import { cn } from "@just-us/ui/lib/utils";
-import { Bell, ExternalLink, LogOut } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -108,13 +108,6 @@ export function AppShell({
 							</span>
 						</span>
 					</div>
-					<Link
-						href="/"
-						className="flex items-center gap-3 rounded-[9px] px-3 py-2 font-semibold text-[13px] text-paper/60 transition-colors hover:bg-paper/10 hover:text-paper/90"
-					>
-						<ExternalLink className="size-4 shrink-0" aria-hidden="true" />
-						View public site
-					</Link>
 					<button
 						type="button"
 						onClick={signOut}
@@ -135,12 +128,6 @@ export function AppShell({
 					</Link>
 					<span className="flex-1 truncate font-bold text-[14px] text-ink">
 						{current?.title}
-					</span>
-					<span className="hidden items-center gap-2 font-mono text-[11px] text-muted-foreground uppercase tracking-[0.07em] sm:flex">
-						Viewing as
-						<span className="rounded-[var(--radius-pill)] bg-brass-wash px-2.5 py-1 font-bold font-sans text-[11.5px] text-brass-deep normal-case tracking-normal">
-							{nav.roleLabel}
-						</span>
 					</span>
 					<span
 						className="flex size-9 items-center justify-center rounded-full border border-border text-ink-soft"
