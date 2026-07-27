@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
-import { Libre_Franklin, Spline_Sans_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
 
 import "../index.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
 
-const libreFranklin = Libre_Franklin({
-	variable: "--font-libre-franklin",
+const figtree = Figtree({
+	variable: "--font-figtree",
 	subsets: ["latin"],
 	weight: ["400", "500", "600", "700", "800"],
 });
 
-const splineSansMono = Spline_Sans_Mono({
-	variable: "--font-spline-sans-mono",
+const bricolage = Bricolage_Grotesque({
+	variable: "--font-bricolage",
 	subsets: ["latin"],
-	weight: ["400", "500", "600", "700"],
+	weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -33,9 +33,7 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en" suppressHydrationWarning>
-			<body
-				className={`${libreFranklin.variable} ${splineSansMono.variable} antialiased`}
-			>
+			<body className={`${figtree.variable} ${bricolage.variable} antialiased`}>
 				<Providers>
 					<div className="grid h-svh grid-rows-[auto_1fr]">
 						<Header />

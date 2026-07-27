@@ -11,10 +11,9 @@ import { ModeToggle } from "./mode-toggle";
 import UserMenu from "./user-menu";
 
 const links = [
-	{ href: "/#how", label: "How it works" },
-	{ href: "/#fees", label: "Fees" },
-	{ href: "/cases", label: "Cases" },
-	{ href: "/attorneys", label: "Attorneys" },
+	{ href: "/cases", label: "Donate" },
+	{ href: "/login", label: "Get justice" },
+	{ href: "/attorneys", label: "For attorneys" },
 ] as const;
 
 // Full-bleed auth flows render their own chrome — hide the site header there.
@@ -55,7 +54,9 @@ export default function Header() {
 				<Link href="/" className="flex items-center gap-3">
 					<Brandmark size={32} />
 					<span className="flex flex-col leading-none">
-						<span className="font-bold text-[15px] tracking-tight">JustUs</span>
+						<span className="font-bold text-[15px] tracking-tight">
+							JustUs Financial
+						</span>
 						<span className="mt-0.5 hidden font-mono text-[10px] text-muted-foreground uppercase tracking-[0.12em] sm:block">
 							Litigation crowdfunding
 						</span>
@@ -70,7 +71,7 @@ export default function Header() {
 						<Link
 							key={link.href}
 							href={link.href}
-							className="transition-colors hover:text-foreground"
+							className="font-semibold transition-colors hover:text-foreground"
 						>
 							{link.label}
 						</Link>
@@ -83,7 +84,7 @@ export default function Header() {
 						href="/login"
 						className={cn(
 							buttonVariants({ variant: "outline", size: "sm" }),
-							"hidden sm:inline-flex",
+							"hidden h-9 px-4 text-sm sm:inline-flex",
 						)}
 					>
 						Sign in
@@ -92,7 +93,7 @@ export default function Header() {
 						href="/login"
 						className={cn(
 							buttonVariants({ size: "sm" }),
-							"hidden sm:inline-flex",
+							"hidden h-9 px-4 text-sm sm:inline-flex",
 						)}
 					>
 						Start your case
