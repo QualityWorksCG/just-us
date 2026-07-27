@@ -42,7 +42,8 @@ export function createAuth() {
 			provider: "postgresql",
 		}),
 
-		trustedOrigins: [env.CORS_ORIGIN],
+		// Single origin for the app: also the CORS/trusted origin.
+		trustedOrigins: [env.BETTER_AUTH_URL],
 
 		// Passwords are hashed with scrypt by default (bcrypt-equivalent KDF); the
 		// plaintext is never persisted or logged. (JUS-8)

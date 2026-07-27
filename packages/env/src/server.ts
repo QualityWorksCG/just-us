@@ -31,15 +31,15 @@ const vercelOrigin = getVercelOrigin();
 const runtimeEnv = {
 	...process.env,
 	BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? vercelOrigin,
-	CORS_ORIGIN: process.env.CORS_ORIGIN ?? vercelOrigin,
 };
 
 export const env = createEnv({
 	server: {
 		DATABASE_URL: z.string().min(1),
 		BETTER_AUTH_SECRET: z.string().min(32),
+		// The app's public origin — used as Better Auth's baseURL and as the
+		// trusted/CORS origin. On Vercel it defaults to the deployment URL.
 		BETTER_AUTH_URL: z.url(),
-		CORS_ORIGIN: z.url(),
 		RESEND_API_KEY: z.string().min(1).optional(),
 		EMAIL_SOURCE: z.string().min(1).default("just-us <onboarding@resend.dev>"),
 		// Invite code required to self-register as an administrator (JUS-11).
