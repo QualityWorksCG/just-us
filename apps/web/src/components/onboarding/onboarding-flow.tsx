@@ -1,5 +1,12 @@
 "use client";
 
+import {
+	isValidJurisdiction,
+	JURISDICTION_MESSAGE,
+	type Jurisdiction,
+	US_STATES,
+} from "@just-us/auth/jurisdiction";
+import { requiresJurisdiction } from "@just-us/auth/rbac";
 import { Button } from "@just-us/ui/components/button";
 import { Input } from "@just-us/ui/components/input";
 import {
@@ -71,59 +78,6 @@ const ROLES: {
 	},
 ];
 
-const US_STATES = [
-	"Alabama",
-	"Alaska",
-	"Arizona",
-	"Arkansas",
-	"California",
-	"Colorado",
-	"Connecticut",
-	"Delaware",
-	"Florida",
-	"Georgia",
-	"Hawaii",
-	"Idaho",
-	"Illinois",
-	"Indiana",
-	"Iowa",
-	"Kansas",
-	"Kentucky",
-	"Louisiana",
-	"Maine",
-	"Maryland",
-	"Massachusetts",
-	"Michigan",
-	"Minnesota",
-	"Mississippi",
-	"Missouri",
-	"Montana",
-	"Nebraska",
-	"Nevada",
-	"New Hampshire",
-	"New Jersey",
-	"New Mexico",
-	"New York",
-	"North Carolina",
-	"North Dakota",
-	"Ohio",
-	"Oklahoma",
-	"Oregon",
-	"Pennsylvania",
-	"Rhode Island",
-	"South Carolina",
-	"South Dakota",
-	"Tennessee",
-	"Texas",
-	"Utah",
-	"Vermont",
-	"Virginia",
-	"Washington",
-	"West Virginia",
-	"Wisconsin",
-	"Wyoming",
-];
-
 // Selected lane gets the brass gradient (matches the auth brand panel).
 const SELECTED_LANE =
 	"bg-[radial-gradient(700px_500px_at_50%_-10%,color-mix(in_oklch,var(--brass)_32%,transparent),transparent_60%),linear-gradient(168deg,color-mix(in_oklch,var(--ink)_92%,var(--brass-deep)),color-mix(in_oklch,var(--ink)_58%,var(--brass-deep)))] text-paper";
@@ -139,11 +93,13 @@ export function OnboardingFlow({ name }: { name: string }) {
 	const [role, setRole] = useState<Role | null>(null);
 	const [firmName, setFirmName] = useState("");
 	const [barNumber, setBarNumber] = useState("");
-	const [jurisdiction, setJurisdiction] = useState("");
+	const [jurisdiction, setJurisdiction] = useState<Jurisdiction | "">("");
 	const [errors, setErrors] = useState<Record<string, string>>({});
 	const [pending, setPending] = useState(false);
 
 	const isAttorney = role === "attorney";
+	// Plaintiffs and attorneys are asked for a jurisdiction; donors are not. (JUS-12)
+	const needsJurisdiction = !!role && requiresJurisdiction(role);
 	const inputClass =
 		"h-10 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]";
 
@@ -154,26 +110,29 @@ export function OnboardingFlow({ name }: { name: string }) {
 			toast.error("Pick how you're joining to continue.");
 			return;
 		}
+		const next: Record<string, string> = {};
+		if (needsJurisdiction && !jurisdiction)
+			next.jurisdiction = JURISDICTION_MESSAGE;
 		if (role === "attorney") {
-			const next: Record<string, string> = {};
-			if (!jurisdiction) next.jurisdiction = "Select your jurisdiction";
 			if (!firmName.trim()) next.firmName = "Enter your firm";
 			if (!barNumber.trim()) next.barNumber = "Enter your bar number";
 			else if (!isValidBarNumber(barNumber))
 				next.barNumber = BAR_NUMBER_MESSAGE;
-			if (Object.keys(next).length) {
-				setErrors(next);
-				return;
-			}
+		}
+		if (Object.keys(next).length) {
+			setErrors(next);
+			return;
 		}
 
 		setPending(true);
 		try {
 			const result = await completeOnboardingAction({
 				role,
+				// Dropped for roles that don't collect it, so switching lanes after
+				// picking a state can't smuggle a stale value through.
+				jurisdiction: needsJurisdiction ? jurisdiction : undefined,
 				firmName: firmName.trim() || undefined,
 				barNumber: barNumber.trim() || undefined,
-				jurisdiction: jurisdiction || undefined,
 			});
 			if (result.ok) {
 				toast.success("You're all set. Welcome to JustUs.");
@@ -231,7 +190,7 @@ export function OnboardingFlow({ name }: { name: string }) {
 								"border-border border-b",
 								active
 									? SELECTED_LANE
-									: "bg-paper text-ink hover:bg-surface-2/60",
+									: "bg-surface text-ink hover:bg-paper-alt",
 							)}
 						>
 							{active && (
@@ -300,78 +259,114 @@ export function OnboardingFlow({ name }: { name: string }) {
 				onSubmit={handleSubmit}
 				className="sticky bottom-0 border-border border-t bg-paper/95 px-6 py-5 backdrop-blur-md sm:px-10"
 			>
-				{isAttorney && (
-					<div className="mb-4 grid gap-3 sm:grid-cols-3">
-						<div className="flex flex-col gap-1.5">
-							<label
-								htmlFor={ids.jurisdiction}
-								className="font-semibold text-[12.5px] text-ink"
+				{/*
+					One fixed-height slot for the role-specific fields. The lanes above are
+					`flex-1` and centre their content, so any change in this bar's height
+					resizes them and slides their content by half the delta — that was the
+					jump when switching lanes. Reserving the tallest state (label + control
+					+ error line) keeps the bar identical across roles, so nothing moves.
+					Donors get a line of copy rather than dead space.
+				*/}
+				{role && (
+					<div className="mb-4 flex min-h-[5.25rem] items-start">
+						{needsJurisdiction ? (
+							<div
+								className={cn(
+									"grid w-full gap-3",
+									isAttorney ? "sm:grid-cols-3" : "max-w-[320px]",
+								)}
 							>
-								Jurisdiction<span className="ml-0.5 text-danger">*</span>
-							</label>
-							<Select
-								value={jurisdiction}
-								onValueChange={(value: string | null) =>
-									setJurisdiction(value ?? "")
-								}
-							>
-								<SelectTrigger
-									id={ids.jurisdiction}
-									className="h-10 text-[14px]"
-									aria-invalid={!!errors.jurisdiction}
-								>
-									<SelectValue placeholder="Select your state…" />
-								</SelectTrigger>
-								<SelectContent className="max-h-[300px]">
-									{US_STATES.map((s) => (
-										<SelectItem key={s} value={s} className="text-[14px]">
-											{s}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							{errors.jurisdiction && (
-								<p className="text-[12px] text-danger">{errors.jurisdiction}</p>
-							)}
-						</div>
-						<div className="flex flex-col gap-1.5">
-							<label
-								htmlFor={ids.firm}
-								className="font-semibold text-[12.5px] text-ink"
-							>
-								Firm<span className="ml-0.5 text-danger">*</span>
-							</label>
-							<Input
-								id={ids.firm}
-								className={inputClass}
-								value={firmName}
-								onChange={(e) => setFirmName(e.target.value)}
-								placeholder="Bell & Associates"
-								aria-invalid={!!errors.firmName}
-							/>
-							{errors.firmName && (
-								<p className="text-[12px] text-danger">{errors.firmName}</p>
-							)}
-						</div>
-						<div className="flex flex-col gap-1.5">
-							<label
-								htmlFor={ids.bar}
-								className="font-semibold text-[12.5px] text-ink"
-							>
-								Bar number<span className="ml-0.5 text-danger">*</span>
-							</label>
-							<Input
-								id={ids.bar}
-								className={inputClass}
-								value={barNumber}
-								onChange={(e) => setBarNumber(e.target.value)}
-								placeholder="GA #338114"
-								aria-invalid={!!errors.barNumber}
-							/>
-							{errors.barNumber && (
-								<p className="text-[12px] text-danger">{errors.barNumber}</p>
-							)}
-						</div>
+								<div className="flex flex-col gap-1.5">
+									<label
+										htmlFor={ids.jurisdiction}
+										className="font-semibold text-[12.5px] text-ink"
+									>
+										{isAttorney ? "Jurisdiction" : "State"}
+										<span className="ml-0.5 text-danger">*</span>
+									</label>
+									<Select
+										value={jurisdiction}
+										onValueChange={(value: string | null) => {
+											setJurisdiction(
+												value && isValidJurisdiction(value) ? value : "",
+											);
+											setErrors((prev) => ({ ...prev, jurisdiction: "" }));
+										}}
+									>
+										<SelectTrigger
+											id={ids.jurisdiction}
+											className="h-10 text-[14px]"
+											aria-invalid={!!errors.jurisdiction}
+										>
+											<SelectValue placeholder="Select your state…" />
+										</SelectTrigger>
+										<SelectContent className="max-h-[300px]">
+											{US_STATES.map((s) => (
+												<SelectItem key={s} value={s} className="text-[14px]">
+													{s}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									{errors.jurisdiction && (
+										<p className="text-[12px] text-danger">
+											{errors.jurisdiction}
+										</p>
+									)}
+								</div>
+								{isAttorney && (
+									<>
+										<div className="flex flex-col gap-1.5">
+											<label
+												htmlFor={ids.firm}
+												className="font-semibold text-[12.5px] text-ink"
+											>
+												Firm<span className="ml-0.5 text-danger">*</span>
+											</label>
+											<Input
+												id={ids.firm}
+												className={inputClass}
+												value={firmName}
+												onChange={(e) => setFirmName(e.target.value)}
+												placeholder="Bell & Associates"
+												aria-invalid={!!errors.firmName}
+											/>
+											{errors.firmName && (
+												<p className="text-[12px] text-danger">
+													{errors.firmName}
+												</p>
+											)}
+										</div>
+										<div className="flex flex-col gap-1.5">
+											<label
+												htmlFor={ids.bar}
+												className="font-semibold text-[12.5px] text-ink"
+											>
+												Bar number<span className="ml-0.5 text-danger">*</span>
+											</label>
+											<Input
+												id={ids.bar}
+												className={inputClass}
+												value={barNumber}
+												onChange={(e) => setBarNumber(e.target.value)}
+												placeholder="GA #338114"
+												aria-invalid={!!errors.barNumber}
+											/>
+											{errors.barNumber && (
+												<p className="text-[12px] text-danger">
+													{errors.barNumber}
+												</p>
+											)}
+										</div>
+									</>
+								)}
+							</div>
+						) : (
+							<p className="self-center text-[13px] text-ink-soft">
+								Nothing else to set up — you can start browsing and backing
+								cases straight away.
+							</p>
+						)}
 					</div>
 				)}
 

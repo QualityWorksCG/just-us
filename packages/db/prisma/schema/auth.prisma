@@ -15,10 +15,15 @@ model User {
   // (welcome + role selection). Gates access to the app until done.
   onboarded Boolean @default(false)
 
-  // Attorney profile fields — only populated when role = attorney (captured at sign-up).
-  firmName     String?
-  barNumber    String?
+  // Home jurisdiction (US state), captured at sign-up for plaintiffs and
+  // attorneys only (JUS-12) — see JURISDICTION_ROLES in the auth package. Drives
+  // attorney-availability checks downstream. Null for donors and administrators,
+  // and for accounts created before JUS-12.
   jurisdiction String?
+
+  // Attorney profile fields — only populated when role = attorney (captured at sign-up).
+  firmName  String?
+  barNumber String?
 
   // Better Auth admin plugin: ban state (used here for account lockout too).
   banned     Boolean?
