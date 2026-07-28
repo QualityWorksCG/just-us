@@ -10,6 +10,7 @@
   "dependencies": {
     "@just-us/auth": "workspace:*",
     "@just-us/env": "workspace:*",
+    "@just-us/flags": "workspace:*",
     "@just-us/ui": "workspace:*",
     "@prisma/client": "catalog:",
     "@swc/helpers": "^0.5.23",

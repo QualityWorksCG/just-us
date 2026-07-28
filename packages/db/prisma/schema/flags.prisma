@@ -1,0 +1,19 @@
+/// Feature-flag state (JUS-13).
+///
+/// Only the on/off state lives here — the flags themselves are declared in a
+/// typed registry in `@just-us/flags`, so flag names are compile-time checked and
+/// a stale row can never resurrect a removed flag. A flag with no row here reads
+/// as disabled, so a newly-declared flag is never accidentally live.
+///
+/// State is per-environment by virtue of each environment having its own
+/// database; there is deliberately no environment column.
+model FeatureFlag {
+  key     String  @id
+  enabled Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+  /// User id of the administrator who last toggled this flag.
+  updatedBy String?
+
+  @@map("featureFlag")
+}

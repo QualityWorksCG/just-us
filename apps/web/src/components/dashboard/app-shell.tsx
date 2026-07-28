@@ -1,6 +1,7 @@
 "use client";
 
 import type { Role } from "@just-us/auth";
+import type { FlagState } from "@just-us/flags/registry";
 import {
 	Sidebar,
 	SidebarContent,
@@ -22,7 +23,7 @@ import { usePathname } from "next/navigation";
 
 import { Brandmark } from "@/components/brandmark";
 import { authClient } from "@/lib/auth-client";
-import { getRoleNav } from "@/lib/dashboard-nav";
+import { getRoleNav, visibleNavItems } from "@/lib/dashboard-nav";
 
 /**
  * Shared by the dashboard header and page body so the header title and the page
@@ -51,6 +52,7 @@ export function AppShell({
 	name,
 	email,
 	defaultOpen,
+	flags,
 	children,
 }: {
 	role: Role;
@@ -58,16 +60,21 @@ export function AppShell({
 	email: string;
 	/** Restored from the `sidebar_state` cookie so SSR matches the last choice. */
 	defaultOpen: boolean;
+	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
+	flags: FlagState;
 	children: React.ReactNode;
 }) {
 	const pathname = usePathname();
 	const nav = getRoleNav(role);
+	const items = visibleNavItems(role, flags);
 
 	const activeSlug =
 		pathname === "/dashboard"
 			? ""
 			: (pathname.replace(/^\/dashboard\/?/, "").split("/")[0] ?? "");
-	const current = nav.items.find((i) => i.slug === activeSlug) ?? nav.items[0];
+	// Title lookup uses the unfiltered list so a flagged screen still names itself
+	// correctly during the render right after it's switched off.
+	const current = nav.items.find((i) => i.slug === activeSlug) ?? items[0];
 
 	async function signOut() {
 		await authClient.signOut();
@@ -108,7 +115,7 @@ export function AppShell({
 					*/}
 					<SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
 						<SidebarMenu className="gap-0.5">
-							{nav.items.map((item) => {
+							{items.map((item) => {
 								const href = (
 									item.slug ? `/dashboard/${item.slug}` : "/dashboard"
 								) as Route;

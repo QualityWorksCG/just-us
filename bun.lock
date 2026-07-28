@@ -25,6 +25,7 @@
       "dependencies": {
         "@just-us/auth": "workspace:*",
         "@just-us/env": "workspace:*",
+        "@just-us/flags": "workspace:*",
         "@just-us/ui": "workspace:*",
         "@prisma/client": "catalog:",
         "@swc/helpers": "^0.5.23",
@@ -116,6 +117,17 @@
       "devDependencies": {
         "@just-us/config": "workspace:*",
         "@types/node": "^22.13.14",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/flags": {
+      "name": "@just-us/flags",
+      "version": "0.0.0",
+      "dependencies": {
+        "@just-us/db": "workspace:*",
+      },
+      "devDependencies": {
+        "@just-us/config": "workspace:*",
         "typescript": "catalog:",
       },
     },
@@ -428,6 +440,8 @@
     "@just-us/email": ["@just-us/email@workspace:packages/email"],
 
     "@just-us/env": ["@just-us/env@workspace:packages/env"],
+
+    "@just-us/flags": ["@just-us/flags@workspace:packages/flags"],
 
     "@just-us/ui": ["@just-us/ui@workspace:packages/ui"],
 
