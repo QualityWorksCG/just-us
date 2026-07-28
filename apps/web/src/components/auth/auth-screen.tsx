@@ -441,7 +441,7 @@ export function AuthScreen({
 										target="_blank"
 										rel="noreferrer"
 										onClick={(e) => e.stopPropagation()}
-										className="font-semibold text-brass-deep hover:underline"
+										className="font-semibold text-brass underline"
 									>
 										Terms of Service
 									</Link>{" "}
@@ -451,7 +451,7 @@ export function AuthScreen({
 										target="_blank"
 										rel="noreferrer"
 										onClick={(e) => e.stopPropagation()}
-										className="font-semibold text-brass-deep hover:underline"
+										className="font-semibold text-brass underline"
 									>
 										Privacy Policy
 									</Link>
@@ -548,27 +548,29 @@ export function AuthScreen({
 						</>
 					)}
 
-					<p className="mt-6 text-center text-[12px] text-muted-foreground leading-relaxed">
-						By continuing you agree to our{" "}
-						<Link
-							href="/terms"
-							target="_blank"
-							rel="noreferrer"
-							className="text-brass-deep hover:underline"
-						>
-							Terms of Service
-						</Link>{" "}
-						and{" "}
-						<Link
-							href="/privacy"
-							target="_blank"
-							rel="noreferrer"
-							className="text-brass-deep hover:underline"
-						>
-							Privacy Policy
-						</Link>
-						.
-					</p>
+					{mode === "signin" && (
+						<p className="mt-6 text-center text-[12px] text-muted-foreground leading-relaxed">
+							By continuing you agree to our{" "}
+							<Link
+								href="/terms"
+								target="_blank"
+								rel="noreferrer"
+								className="font-semibold text-brass underline"
+							>
+								Terms of Service
+							</Link>{" "}
+							and{" "}
+							<Link
+								href="/privacy"
+								target="_blank"
+								rel="noreferrer"
+								className="font-semibold text-brass underline"
+							>
+								Privacy Policy
+							</Link>
+							.
+						</p>
+					)}
 				</div>
 			</main>
 		</div>

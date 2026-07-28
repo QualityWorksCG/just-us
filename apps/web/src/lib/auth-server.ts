@@ -80,6 +80,15 @@ export async function requireRole(...allowed: Role[]) {
 	return { session, role };
 }
 
+/**
+ * Require an administrator. Thin wrapper over requireRole so admin-only code
+ * (feature-flag toggles, platform configuration) reads as intent rather than as a
+ * role list that could drift. (JUS-13)
+ */
+export async function requireAdministrator() {
+	return requireRole("administrator");
+}
+
 /** Require the current user's role to grant a specific permission. (JUS-9) */
 export async function requirePermission(permission: Permission) {
 	const session = await requireVerifiedSession();

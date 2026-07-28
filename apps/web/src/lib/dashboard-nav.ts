@@ -1,4 +1,7 @@
 import type { Role } from "@just-us/auth";
+// Registry entry point: this module is imported by the client sidebar, so it must
+// not reach the Prisma-backed package root.
+import type { FlagKey, FlagState } from "@just-us/flags/registry";
 import {
 	BadgeCheck,
 	Bookmark,
@@ -18,6 +21,7 @@ import {
 	ShieldAlert,
 	ShieldCheck,
 	SlidersHorizontal,
+	TrendingUp,
 	Users,
 } from "lucide-react";
 
@@ -28,6 +32,12 @@ export type NavItem = {
 	icon: LucideIcon;
 	title: string;
 	sub: string;
+	/**
+	 * Gate this screen behind a feature flag (JUS-13). Absent means always shown.
+	 * The flag hides the nav entry AND the route rejects when off — see
+	 * `visibleNavItems` and the screen route's `requireFeature` call.
+	 */
+	flag?: FlagKey;
 };
 
 export type RoleNav = {
@@ -215,6 +225,16 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				sub: "Where the platform is permitted to operate, and platform settings.",
 			},
 			{
+				// Phase 2, gated on the `investorTrack` flag (JUS-13). Hidden here and
+				// rejected by the route until an administrator turns the flag on.
+				slug: "investors",
+				label: "Investors",
+				icon: TrendingUp,
+				title: "Investors",
+				sub: "Investor accounts and the cases they are backing.",
+				flag: "investorTrack",
+			},
+			{
 				slug: "audit",
 				label: "Audit log",
 				icon: ScrollText,
@@ -246,4 +266,21 @@ export function findScreen(
 	slug: string,
 ): NavItem | undefined {
 	return getRoleNav(role).items.find((item) => item.slug === slug);
+}
+
+/**
+ * The nav items a role should actually see, with flagged-off screens removed.
+ * (JUS-13)
+ *
+ * Pure and synchronous so the client sidebar can call it with flag state handed
+ * down from the server. This only controls what is *rendered* — the screen route
+ * enforces the same flag server-side, because hiding a link is not a permission.
+ */
+export function visibleNavItems(
+	role: Role | string | null | undefined,
+	flags: FlagState,
+): NavItem[] {
+	return getRoleNav(role).items.filter(
+		(item) => !item.flag || flags[item.flag],
+	);
 }

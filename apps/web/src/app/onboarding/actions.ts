@@ -1,5 +1,10 @@
 "use server";
 
+import {
+	isValidJurisdiction,
+	JURISDICTION_MESSAGE,
+} from "@just-us/auth/jurisdiction";
+import { requiresJurisdiction } from "@just-us/auth/rbac";
 import { completeUserOnboarding } from "@just-us/auth/signup";
 import { z } from "zod";
 
@@ -14,13 +19,18 @@ const onboardingSchema = z
 		jurisdiction: z.string().optional(),
 	})
 	.superRefine((val, ctx) => {
-		if (val.role === "attorney") {
-			if (!val.jurisdiction)
+		// Only plaintiffs and attorneys supply a jurisdiction (JUS-12); it must be
+		// one of the known states so downstream consumers match the exact string.
+		if (requiresJurisdiction(val.role)) {
+			if (!val.jurisdiction || !isValidJurisdiction(val.jurisdiction))
 				ctx.addIssue({
 					code: "custom",
 					path: ["jurisdiction"],
-					message: "Select your jurisdiction",
+					message: JURISDICTION_MESSAGE,
 				});
+		}
+
+		if (val.role === "attorney") {
 			if (!val.firmName)
 				ctx.addIssue({
 					code: "custom",

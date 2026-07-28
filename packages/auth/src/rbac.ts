@@ -32,10 +32,25 @@ export const SELF_SIGNUP_ROLES = [
 
 export const DEFAULT_ROLE: Role = "donor";
 
+/**
+ * Roles that must supply a jurisdiction at sign-up (JUS-12). Plaintiffs need it
+ * for attorney-availability checks in their state; attorneys need it because it
+ * is where they are licensed to practice. Donors and administrators do not —
+ * jurisdiction is not captured for them and stays null on their profile.
+ */
+export const JURISDICTION_ROLES = [
+	"plaintiff",
+	"attorney",
+] as const satisfies readonly Role[];
+
 export function isRole(value: unknown): value is Role {
 	return (
 		typeof value === "string" && (ROLES as readonly string[]).includes(value)
 	);
+}
+
+export function requiresJurisdiction(role: string): boolean {
+	return (JURISDICTION_ROLES as readonly string[]).includes(role);
 }
 
 /**

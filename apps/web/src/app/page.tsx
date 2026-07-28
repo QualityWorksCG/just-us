@@ -1027,7 +1027,7 @@ export default function Home() {
 							judgment. JustUs never takes custody of donated funds.
 						</p>
 						<p className="shrink-0 font-mono text-[11px] text-dark-fg/45">
-							© 2026 JustUs Financial LLC · Phase 1
+							© 2026 JustUs Financial LLC
 						</p>
 					</div>
 				</div>

@@ -1,15 +1,40 @@
 "use client";
 
 import type { Role } from "@just-us/auth";
+import type { FlagState } from "@just-us/flags/registry";
+import {
+	Sidebar,
+	SidebarContent,
+	SidebarFooter,
+	SidebarGroup,
+	SidebarHeader,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+	SidebarProvider,
+	SidebarRail,
+	SidebarTrigger,
+} from "@just-us/ui/components/sidebar";
 import { cn } from "@just-us/ui/lib/utils";
-import { Bell, ExternalLink, LogOut } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Brandmark } from "@/components/brandmark";
 import { authClient } from "@/lib/auth-client";
-import { getRoleNav } from "@/lib/dashboard-nav";
+import { getRoleNav, visibleNavItems } from "@/lib/dashboard-nav";
+
+/**
+ * Shared by the dashboard header and page body so the header title and the page
+ * heading always sit on the same left edge, at any window width and in both
+ * sidebar states.
+ *
+ * Full-bleed by design: the content fills whatever width the sidebar leaves, with
+ * only gutter padding. No max-width and no centring — the page grows with the
+ * viewport instead of stranding a fixed column in the middle of a wide screen.
+ */
+const CONTENT_COLUMN = "w-full px-5 sm:px-8";
 
 function initials(name: string) {
 	return (
@@ -26,21 +51,30 @@ export function AppShell({
 	role,
 	name,
 	email,
+	defaultOpen,
+	flags,
 	children,
 }: {
 	role: Role;
 	name: string;
 	email: string;
+	/** Restored from the `sidebar_state` cookie so SSR matches the last choice. */
+	defaultOpen: boolean;
+	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
+	flags: FlagState;
 	children: React.ReactNode;
 }) {
 	const pathname = usePathname();
 	const nav = getRoleNav(role);
+	const items = visibleNavItems(role, flags);
 
 	const activeSlug =
 		pathname === "/dashboard"
 			? ""
 			: (pathname.replace(/^\/dashboard\/?/, "").split("/")[0] ?? "");
-	const current = nav.items.find((i) => i.slug === activeSlug) ?? nav.items[0];
+	// Title lookup uses the unfiltered list so a flagged screen still names itself
+	// correctly during the render right after it's switched off.
+	const current = nav.items.find((i) => i.slug === activeSlug) ?? items[0];
 
 	async function signOut() {
 		await authClient.signOut();
@@ -48,58 +82,76 @@ export function AppShell({
 	}
 
 	return (
-		<div className="grid min-h-svh grid-cols-1 md:grid-cols-[252px_1fr]">
-			{/* Sidebar */}
-			<aside className="sticky top-0 hidden h-svh flex-col bg-ink text-paper/72 md:flex">
-				<Link
-					href="/"
-					className="flex items-center gap-3 border-paper/10 border-b px-[18px] py-4"
-				>
-					<Brandmark size={30} />
-					<span className="leading-tight">
-						<span className="block font-extrabold text-[14px] text-paper/95">
-							JustUs Financial
+		<SidebarProvider defaultOpen={defaultOpen}>
+			{/*
+				`collapsible="icon"` keeps an icon rail when collapsed rather than hiding
+				the nav outright; on mobile the same markup renders in a sheet, which is
+				new — the old sidebar was `hidden md:flex` with no mobile nav at all.
+			*/}
+			<Sidebar collapsible="icon">
+				<SidebarHeader className="p-0">
+					<Link
+						href="/"
+						className="flex items-center gap-3 border-sidebar-border border-b px-[18px] py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+					>
+						<Brandmark size={30} />
+						{/* Wordmark is dropped in the icon rail; the mark alone carries it. */}
+						<span className="leading-tight group-data-[collapsible=icon]:hidden">
+							<span className="block font-extrabold text-[14px] text-paper/95">
+								JustUs Financial
+							</span>
+							<span className="block font-mono text-[9px] text-paper/50 tracking-[0.13em]">
+								{nav.eyebrow}
+							</span>
 						</span>
-						<span className="block font-mono text-[9px] text-paper/50 tracking-[0.13em]">
-							{nav.eyebrow}
-						</span>
-					</span>
-				</Link>
+					</Link>
+				</SidebarHeader>
 
-				<nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3">
-					{nav.items.map((item) => {
-						const href = (
-							item.slug ? `/dashboard/${item.slug}` : "/dashboard"
-						) as Route;
-						const active = item.slug === activeSlug;
-						return (
-							<Link
-								key={item.slug || "home"}
-								href={href}
-								aria-current={active ? "page" : undefined}
-								className={cn(
-									"flex items-center gap-3 rounded-[9px] px-3 py-2.5 font-semibold text-[13.5px] transition-colors",
-									active
-										? "bg-paper/13 text-paper"
-										: "text-paper/72 hover:bg-paper/10 hover:text-paper/90",
-								)}
-							>
-								<item.icon
-									className="size-[17px] shrink-0"
-									aria-hidden="true"
-								/>
-								{item.label}
-							</Link>
-						);
-					})}
-				</nav>
+				<SidebarContent>
+					{/*
+						p-2 in the rail is not cosmetic: the rail is 3rem and icon mode forces
+						buttons to size-8 (2rem), so 0.5rem of padding each side is exactly
+						what fits. p-3 leaves 1.5rem for a 2rem button and shoves it off-centre.
+					*/}
+					<SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
+						<SidebarMenu className="gap-0.5">
+							{items.map((item) => {
+								const href = (
+									item.slug ? `/dashboard/${item.slug}` : "/dashboard"
+								) as Route;
+								const active = item.slug === activeSlug;
+								return (
+									<SidebarMenuItem key={item.slug || "home"}>
+										<SidebarMenuButton
+											// Tooltip only surfaces while collapsed — that's the
+											// label's only home once the text is hidden.
+											tooltip={item.label}
+											isActive={active}
+											className="h-auto rounded-[9px] px-3 py-2.5 font-semibold text-[13.5px]"
+											render={
+												<Link
+													href={href}
+													aria-current={active ? "page" : undefined}
+												/>
+											}
+										>
+											<item.icon className="size-[17px] shrink-0" />
+											<span>{item.label}</span>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								);
+							})}
+						</SidebarMenu>
+					</SidebarGroup>
+				</SidebarContent>
 
-				<div className="border-paper/10 border-t p-3">
-					<div className="flex items-center gap-2.5 px-2.5 py-2">
-						<span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[12.5px] text-brass-ink">
+				<SidebarFooter className="border-sidebar-border border-t p-3 group-data-[collapsible=icon]:p-2">
+					<div className="flex items-center gap-2.5 px-2.5 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+						{/* size-9 overflows the 2rem rail slot, so drop to size-8 there. */}
+						<span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[12.5px] text-brass-ink group-data-[collapsible=icon]:size-8">
 							{initials(name)}
 						</span>
-						<span className="min-w-0 leading-tight">
+						<span className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
 							<span className="block truncate font-bold text-[13px] text-paper/92">
 								{name}
 							</span>
@@ -108,52 +160,49 @@ export function AppShell({
 							</span>
 						</span>
 					</div>
-					<Link
-						href="/"
-						className="flex items-center gap-3 rounded-[9px] px-3 py-2 font-semibold text-[13px] text-paper/60 transition-colors hover:bg-paper/10 hover:text-paper/90"
-					>
-						<ExternalLink className="size-4 shrink-0" aria-hidden="true" />
-						View public site
-					</Link>
-					<button
-						type="button"
-						onClick={signOut}
-						className="flex w-full items-center gap-3 rounded-[9px] px-3 py-2 font-semibold text-[13px] text-paper/60 transition-colors hover:bg-paper/10 hover:text-paper/90"
-					>
-						<LogOut className="size-4 shrink-0" aria-hidden="true" />
-						Sign out
-					</button>
-				</div>
-			</aside>
+					<SidebarMenu>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								tooltip="Sign out"
+								onClick={signOut}
+								className="h-auto rounded-[9px] px-3 py-2 font-semibold text-[13px] text-sidebar-foreground/80"
+							>
+								<LogOut className="size-4 shrink-0" />
+								<span>Sign out</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					</SidebarMenu>
+				</SidebarFooter>
 
-			{/* Main */}
-			<div className="flex min-w-0 flex-col bg-paper">
-				<header className="sticky top-0 z-30 flex h-[60px] items-center gap-3 border-border border-b bg-surface px-5 sm:px-7">
-					{/* mobile brand */}
-					<Link href="/dashboard" className="flex items-center gap-2 md:hidden">
-						<Brandmark size={26} />
-					</Link>
-					<span className="flex-1 truncate font-bold text-[14px] text-ink">
-						{current?.title}
-					</span>
-					<span className="hidden items-center gap-2 font-mono text-[11px] text-muted-foreground uppercase tracking-[0.07em] sm:flex">
-						Viewing as
-						<span className="rounded-[var(--radius-pill)] bg-brass-wash px-2.5 py-1 font-bold font-sans text-[11.5px] text-brass-deep normal-case tracking-normal">
-							{nav.roleLabel}
+				{/* Drag/click edge to toggle, in addition to the header trigger. */}
+				<SidebarRail />
+			</Sidebar>
+
+			<div className="flex min-w-0 flex-1 flex-col bg-paper">
+				{/*
+					The header bar spans full width (border + background reach the edges) but
+					its contents share the same centred, max-width column as <main> below —
+					otherwise the header title sits flush left while the page heading is
+					centred, and the gap between them changes every time the sidebar
+					collapses. Keep CONTENT_COLUMN identical in both places.
+				*/}
+				<header className="sticky top-0 z-30 h-[60px] border-border border-b bg-surface">
+					<div className={cn(CONTENT_COLUMN, "flex h-full items-center gap-3")}>
+						<SidebarTrigger className="-ml-1 text-ink-soft" />
+						<span className="flex-1 truncate font-bold text-[14px] text-ink">
+							{current?.title}
 						</span>
-					</span>
-					<span
-						className="flex size-9 items-center justify-center rounded-full border border-border text-ink-soft"
-						aria-hidden="true"
-					>
-						<Bell className="size-[17px]" />
-					</span>
+						<span
+							className="flex size-9 items-center justify-center rounded-full border border-border text-ink-soft"
+							aria-hidden="true"
+						>
+							<Bell className="size-[17px]" />
+						</span>
+					</div>
 				</header>
 
-				<main className="mx-auto w-full max-w-[1240px] px-5 py-8 sm:px-8 sm:py-10">
-					{children}
-				</main>
+				<main className={cn(CONTENT_COLUMN, "py-8 sm:py-10")}>{children}</main>
 			</div>
-		</div>
+		</SidebarProvider>
 	);
 }
