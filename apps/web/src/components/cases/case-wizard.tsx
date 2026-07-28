@@ -224,6 +224,21 @@ export function CaseWizard({ name }: { name: string }) {
 		setAiSuggestion(AI_SUGGESTION);
 	}
 
+	// Draft a concise title from the plaintiff's description so they never have
+	// to craft one cold. Mock heuristic — swap for a model call later.
+	function suggestTitle() {
+		const d = summary.trim();
+		if (d.length < 8) {
+			toast.error("Add a short description first, then I'll draft a title.");
+			return;
+		}
+		let t = d.split(/[.!?\n]/)[0].trim();
+		if (t.length > 70) t = `${t.slice(0, 67).trimEnd()}…`;
+		t = t.charAt(0).toUpperCase() + t.slice(1);
+		setTitle(t);
+		toast.success("Drafted a title from your description — edit it to taste.");
+	}
+
 	function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
 		const f = e.target.files?.[0];
 		if (f) setCoverUrl(URL.createObjectURL(f));
@@ -524,9 +539,9 @@ export function CaseWizard({ name }: { name: string }) {
 		"h-11 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]";
 
 	return (
-		<div className="flex min-h-svh bg-surface">
-			{/* Sidebar */}
-			<aside className="hidden w-[260px] shrink-0 flex-col justify-between border-border border-r px-6 py-6 lg:flex">
+		<div className="flex h-svh overflow-hidden bg-surface">
+			{/* Sidebar — fixed full height, never scrolls */}
+			<aside className="hidden h-full w-[260px] shrink-0 flex-col justify-between overflow-hidden border-border border-r bg-surface px-6 py-6 lg:flex">
 				<div>
 					<div className="mb-8 flex items-center gap-2.5">
 						<Brandmark size={30} />
@@ -581,9 +596,9 @@ export function CaseWizard({ name }: { name: string }) {
 				</button>
 			</aside>
 
-			{/* Main */}
-			<div className="flex min-w-0 flex-1 flex-col">
-				<main className="flex-1 px-6 py-10 sm:px-12">
+			{/* Main — only this column scrolls */}
+			<div className="flex min-h-0 min-w-0 flex-1 flex-col bg-paper">
+				<main className="min-h-0 flex-1 overflow-y-auto px-6 py-10 sm:px-12">
 					<div className="mx-auto max-w-[720px]">
 						<p className="mb-2 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.1em]">
 							Step {step} of 4
@@ -601,15 +616,50 @@ export function CaseWizard({ name }: { name: string }) {
 								</p>
 
 								<div className="mt-8 flex flex-col gap-6">
-									<Field label="Case title" htmlFor={ids.title}>
+									{/* Description first — then AI drafts a title from it. */}
+									<div className="flex flex-col gap-1.5">
+										<label
+											htmlFor={ids.summary}
+											className="font-semibold text-[13px] text-ink"
+										>
+											Describe what happened
+										</label>
+										<Textarea
+											id={ids.summary}
+											value={summary}
+											onChange={(e) => setSummary(e.target.value)}
+											placeholder="In a sentence or two — what happened and how it affected you? This is what donors see first."
+											className="min-h-[84px] rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 py-2.5 text-[14px]"
+										/>
+									</div>
+
+									<div className="flex flex-col gap-1.5">
+										<div className="flex items-center justify-between gap-2">
+											<label
+												htmlFor={ids.title}
+												className="font-semibold text-[13px] text-ink"
+											>
+												Case title
+											</label>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												className="h-7"
+												onClick={suggestTitle}
+											>
+												<Sparkles data-icon="inline-start" aria-hidden="true" />
+												Suggest with AI
+											</Button>
+										</div>
 										<Input
 											id={ids.title}
 											className={inputClass}
 											value={title}
 											onChange={(e) => setTitle(e.target.value)}
-											placeholder="e.g. Fired for reporting safety violations at a food plant"
+											placeholder="Write one, or let AI draft it from your description"
 										/>
-									</Field>
+									</div>
 
 									<div className="grid gap-5 sm:grid-cols-2">
 										<Field label="Category">
@@ -619,7 +669,7 @@ export function CaseWizard({ name }: { name: string }) {
 													setCategory(v ?? "Employment")
 												}
 											>
-												<SelectTrigger className="h-11 text-[14px]">
+												<SelectTrigger className="h-11 bg-surface text-[14px]">
 													<SelectValue placeholder="Select a category" />
 												</SelectTrigger>
 												<SelectContent>
@@ -645,7 +695,7 @@ export function CaseWizard({ name }: { name: string }) {
 													setLocation(v ?? LOCATIONS[0])
 												}
 											>
-												<SelectTrigger className="h-11 text-[14px]">
+												<SelectTrigger className="h-11 bg-surface text-[14px]">
 													<SelectValue placeholder="Select a location" />
 												</SelectTrigger>
 												<SelectContent>
@@ -662,16 +712,6 @@ export function CaseWizard({ name }: { name: string }) {
 											</Select>
 										</Field>
 									</div>
-
-									<Field label="One-line summary" htmlFor={ids.summary}>
-										<Input
-											id={ids.summary}
-											className={inputClass}
-											value={summary}
-											onChange={(e) => setSummary(e.target.value)}
-											placeholder="What happened, in one sentence — this is what donors see first."
-										/>
-									</Field>
 
 									<div>
 										<p className="mb-1.5 font-semibold text-[13px] text-ink">
@@ -749,7 +789,7 @@ export function CaseWizard({ name }: { name: string }) {
 												<button
 													type="button"
 													onClick={() => moreInput.current?.click()}
-													className="flex size-[92px] flex-col items-center justify-center gap-1 rounded-[var(--radius-card-sm)] border border-line-strong border-dashed text-muted-foreground transition-colors hover:text-ink"
+													className="flex size-[92px] flex-col items-center justify-center gap-1 rounded-[var(--radius-card-sm)] border border-line-strong border-dashed bg-surface text-muted-foreground transition-colors hover:text-ink"
 												>
 													<Plus className="size-5" aria-hidden="true" />
 													<span className="text-[12px]">Add</span>
@@ -1230,8 +1270,8 @@ export function CaseWizard({ name }: { name: string }) {
 					</div>
 				</main>
 
-				{/* Action bar */}
-				<div className="sticky bottom-0 border-border border-t bg-surface/95 px-6 py-4 backdrop-blur-md sm:px-12">
+				{/* Action bar — pinned below the scroll area */}
+				<div className="shrink-0 border-border border-t bg-paper px-6 py-4 sm:px-12">
 					<div className="mx-auto flex max-w-[720px] items-center justify-between gap-4">
 						<Button type="button" variant="outline" size="lg" onClick={back}>
 							<ArrowLeft data-icon="inline-start" aria-hidden="true" />
