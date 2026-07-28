@@ -1,0 +1,50 @@
+// Litigation case a plaintiff creates and raises the attorney fee for. Created
+// via the case-creation wizard. Nothing is public until a person reviews it, so
+// new cases start in `pending_review`.
+enum CaseStatus {
+  draft
+  pending_review
+  live
+  closed
+}
+
+model Case {
+  id      String @id @default(cuid())
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId String
+
+  // Step 1 — the basics
+  title    String
+  category String
+  location String
+  summary  String
+
+  // Step 2 — the story + evidence metadata ([{ name, size }]). Actual files are
+  // not stored yet (no object storage wired up); only their metadata is kept.
+  story    String
+  evidence Json?
+
+  // Cover + gallery image URLs. Populated once real uploads exist; empty for now.
+  coverImageUrl String?
+  images        String[] @default([])
+
+  // Step 3 — chosen attorney + agreed fee. Fee is the funding goal, in cents.
+  attorneyName     String?
+  attorneyFirm     String?
+  attorneyArea     String?
+  attorneyLocation String?
+  goalCents        Int
+
+  // Live funding progress.
+  raisedCents Int @default(0)
+  donorsCount Int @default(0)
+
+  status      CaseStatus @default(pending_review)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  publishedAt DateTime?
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("case")
+}

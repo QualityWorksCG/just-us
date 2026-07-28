@@ -24,6 +24,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@just-us/auth": "workspace:*",
+        "@just-us/db": "workspace:*",
         "@just-us/env": "workspace:*",
         "@just-us/ui": "workspace:*",
         "@prisma/client": "catalog:",
