@@ -1,8 +1,8 @@
 import "dotenv/config";
-import { config as loadEnv } from "dotenv";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { createEnv } from "@t3-oss/env-core";
+import { config as loadEnv } from "dotenv";
 import { z } from "zod";
 
 // Monorepo: prefer apps/web/.env when cwd isn't the Next app root.
@@ -41,6 +41,12 @@ export const env = createEnv({
 		// trusted/CORS origin. On Vercel it defaults to the deployment URL.
 		BETTER_AUTH_URL: z.url(),
 		RESEND_API_KEY: z.string().min(1).optional(),
+		// OpenAI key powering the case-wizard AI helpers (story polish, title
+		// suggestions). Optional so the app still boots without it.
+		OPENAI_API_KEY: z.string().min(1).optional(),
+		// Vercel Blob read/write token for case image uploads. Optional so the
+		// app boots without it (uploads simply fail with a clear error).
+		BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
 		EMAIL_SOURCE: z.string().min(1).default("just-us <onboarding@resend.dev>"),
 		// Invite code required to self-register as an administrator (JUS-11).
 		// When unset, administrator sign-up is disabled entirely.

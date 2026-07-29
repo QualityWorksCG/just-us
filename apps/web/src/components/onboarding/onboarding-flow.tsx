@@ -52,7 +52,7 @@ const ROLES: {
 		blurb:
 			"Submit your case and raise the fee to hire the attorney you choose.",
 		points: [
-			"Submit a case for review",
+			"Submit your case in minutes",
 			"Choose your own attorney",
 			"Raise the agreed fee together",
 		],
@@ -62,9 +62,10 @@ const ROLES: {
 		label: "I want to help fund cases",
 		article: "a donor",
 		icon: Heart,
-		blurb: "Give any amount to vetted cases and follow them to the outcome.",
+		blurb:
+			"Give any amount to cases you believe in and follow them to the outcome.",
 		points: [
-			"Browse vetted cases",
+			"Browse live cases",
 			"Donate any amount",
 			"Get updates until it closes",
 		],
@@ -74,8 +75,7 @@ const ROLES: {
 		label: "I'm an attorney",
 		article: "an attorney",
 		icon: Scale,
-		blurb:
-			"Take on vetted, fundable cases with the fee raised before you file.",
+		blurb: "Take on fundable cases with the fee raised before you file.",
 		points: [
 			"Appear in the directory",
 			"Pick the cases you want",
@@ -314,7 +314,7 @@ export function OnboardingFlow({ name }: { name: string }) {
 									? "We verify your bar standing before your profile goes live, so cases only reach attorneys who can take them."
 									: needsJurisdiction
 										? "This is the state your case falls under — we use it to match you with attorneys licensed there."
-										: "No extra details needed. Browse vetted cases and give what moves you, then follow every case you back to its outcome."}
+										: "No extra details needed. Browse live cases and give what moves you, then follow every case you back to its outcome."}
 							</p>
 
 							<div className="mt-8 max-w-[620px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)] sm:p-7">
@@ -423,9 +423,9 @@ export function OnboardingFlow({ name }: { name: string }) {
 											<Heart className="size-5" aria-hidden="true" />
 										</span>
 										<p className="text-[14px] text-ink-soft leading-relaxed">
-											You're all set to fund cases. Give any amount to a vetted
-											case and follow it to the outcome — no extra details
-											needed.
+											You're all set to fund cases. Give any amount to a case
+											you believe in and follow it to the outcome — no extra
+											details needed.
 										</p>
 									</div>
 								)}

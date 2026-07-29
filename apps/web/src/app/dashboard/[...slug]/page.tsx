@@ -1,5 +1,4 @@
 import type { Role } from "@just-us/auth";
-import type { Route } from "next";
 import { redirect } from "next/navigation";
 
 import { FeatureFlags } from "@/components/dashboard/feature-flags";
@@ -18,11 +17,6 @@ export default async function DashboardScreen({
 
 	const { slug } = await params;
 	const key = slug[0] ?? "";
-
-	// The plaintiff "Submit a case" screen is the full-page creation wizard.
-	if (role === "plaintiff" && key === "submit") {
-		redirect("/cases/new" as Route);
-	}
 
 	// RBAC: a screen not in this role's nav (another role's screen or an unknown
 	// path) bounces to the role home. Enforced server-side.

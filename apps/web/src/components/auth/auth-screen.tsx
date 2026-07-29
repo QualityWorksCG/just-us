@@ -24,7 +24,7 @@ import { authClient } from "@/lib/auth-client";
 type Mode = "create" | "signin";
 
 const BULLETS = [
-	"A person vets every case before it goes public",
+	"Nothing goes public until you hit publish",
 	"You choose your own attorney",
 	"One transparent 5% fee — we never hold the money",
 ];

@@ -1,7 +1,8 @@
 // biome-ignore-all lint/performance/noImgElement: previews are object-URL blobs of user uploads, not static assets next/image can optimize
 "use client";
 
-import { Button } from "@just-us/ui/components/button";
+import { US_STATES } from "@just-us/auth/jurisdiction";
+import { Button, buttonVariants } from "@just-us/ui/components/button";
 import { Input } from "@just-us/ui/components/input";
 import {
 	Select,
@@ -12,11 +13,13 @@ import {
 } from "@just-us/ui/components/select";
 import { Textarea } from "@just-us/ui/components/textarea";
 import { cn } from "@just-us/ui/lib/utils";
+import { upload } from "@vercel/blob/client";
 import {
 	ArrowLeft,
 	ArrowRight,
 	Check,
 	CircleCheck,
+	Clock,
 	Eye,
 	FileText,
 	Handshake,
@@ -34,32 +37,65 @@ import {
 	Send,
 	Share2,
 	Sparkles,
-	TriangleAlert,
 	Upload,
 	UserPlus,
+	Users,
 	X,
 } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { createCaseAction } from "@/app/cases/actions";
+import {
+	createCaseAction,
+	publishForAttorneysAction,
+	saveCaseDraftAction,
+} from "@/app/cases/actions";
+import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
 
-type View = "wizard" | "preview" | "success";
+export type WizardInitial = {
+	id: string;
+	title: string;
+	category: string;
+	location: string;
+	story: string;
+	goalCents: number;
+	payoutType: string | null;
+	attorney: {
+		name: string;
+		firm: string;
+		area: string;
+		location: string;
+		email: string;
+		phone: string;
+	} | null;
+	evidence: { name: string; size: number }[];
+	coverImageUrl: string | null;
+	images: string[];
+};
+
+type View = "wizard" | "preview" | "success" | "published-attorneys";
 type Attorney = {
 	name: string;
 	firm: string;
 	area: string;
 	location: string;
+	email?: string;
+	phone?: string;
 	quote?: string;
 };
 
 const STEPS = [
-	{ n: 1, label: "The basics" },
-	{ n: 2, label: "Your story" },
-	{ n: 3, label: "Attorney & goal" },
-	{ n: 4, label: "Review & publish" },
+	{ n: 1, label: "Your story" },
+	{ n: 2, label: "The basics" },
+	{ n: 3, label: "Representation" },
+	{ n: 4, label: "Attorney & fee" },
+	{ n: 5, label: "Review & publish" },
 ] as const;
+
+const LAST_STEP = 5;
 
 const CATEGORIES = [
 	"Employment",
@@ -72,23 +108,12 @@ const CATEGORIES = [
 	"Other",
 ];
 
-const LOCATIONS = [
-	"Austin, TX · 78701",
-	"Newark, NJ · 07102",
-	"New York, NY · 10001",
-	"Atlanta, GA · 30301",
+const PAYOUT_TYPES = [
+	"Bank transfer (ACH)",
+	"Debit card",
+	"PayPal",
+	"Wire transfer",
 ];
-
-const INTERESTED: Attorney = {
-	name: "Daniel Osei",
-	firm: "Osei Legal Group",
-	area: "Employment law",
-	location: "New Jersey",
-	quote: "I handle wage-and-hour cases in NJ and have room to take yours on.",
-};
-
-const AI_SUGGESTION =
-	"For two years, my shifts regularly ran past clock-out — but those hours never appeared as overtime on my pay. I raised it with my supervisor twice and nothing changed. After I filed a formal complaint, my hours were cut, and a month later I was let go.";
 
 function money(n: number) {
 	return new Intl.NumberFormat("en-US", {
@@ -113,40 +138,101 @@ function ThinBar({ pct = 0 }: { pct?: number }) {
 	);
 }
 
-export function CaseWizard({ name }: { name: string }) {
+export function CaseWizard({
+	name,
+	jurisdiction = "",
+	initial = null,
+}: {
+	name: string;
+	jurisdiction?: string;
+	initial?: WizardInitial | null;
+}) {
 	const ids = {
 		title: useId(),
-		summary: useId(),
 		story: useId(),
 		fee: useId(),
 		manual: useId(),
+		manualFirm: useId(),
+		manualState: useId(),
+		attorneyEmail: useId(),
+		attorneyPhone: useId(),
 	};
 	const firstName = name.trim().split(" ")[0] || "there";
 
+	const knownState = (s: string | undefined | null): s is string =>
+		!!s && (US_STATES as readonly string[]).includes(s);
+	const draftState = initial?.location;
+	const seedState = knownState(draftState)
+		? draftState
+		: knownState(jurisdiction)
+			? jurisdiction
+			: "";
+
+	// Resume the furthest step the saved draft supports.
+	const seedStep = (() => {
+		if (!initial?.story) return 1;
+		if (!initial.title || !initial.location) return 2;
+		if (!initial.attorney) return 3;
+		if (!initial.goalCents) return 4;
+		return 5;
+	})();
+	const attorneyState = knownState(initial?.attorney?.location)
+		? (initial?.attorney?.location ?? seedState)
+		: seedState;
+
 	const [view, setView] = useState<View>("wizard");
-	const [step, setStep] = useState(1);
+	const [step, setStep] = useState(seedStep);
 
-	// Step 1
-	const [title, setTitle] = useState("");
-	const [category, setCategory] = useState("Employment");
-	const [location, setLocation] = useState(LOCATIONS[0]);
-	const [summary, setSummary] = useState("");
-	const [coverUrl, setCoverUrl] = useState<string | null>(null);
-	const [moreImages, setMoreImages] = useState<string[]>([]);
+	// The draft row this wizard is bound to (created on first save / publish).
+	const [caseId, setCaseId] = useState<string | null>(initial?.id ?? null);
+	const [saving, setSaving] = useState(false);
 
-	// Step 2
-	const [story, setStory] = useState("");
+	// Step 1 — the story
+	const [story, setStory] = useState(initial?.story ?? "");
 	const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+	const [refining, setRefining] = useState(false);
 	const [evidence, setEvidence] = useState<{ name: string; size: number }[]>(
-		[],
+		initial?.evidence ?? [],
 	);
 
-	// Step 3
-	const [attorney, setAttorney] = useState<Attorney | null>(null);
-	const [dismissedInterested, setDismissedInterested] = useState(false);
-	const [showManual, setShowManual] = useState(false);
-	const [manualName, setManualName] = useState("");
-	const [fee, setFee] = useState("");
+	// Step 2 — the basics
+	const [category, setCategory] = useState(initial?.category || "Employment");
+	// State (US jurisdiction) prefilled from the draft or from onboarding.
+	const [state, setState] = useState(seedState);
+	const [title, setTitle] = useState(initial?.title ?? "");
+	const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
+	const [suggestingTitles, setSuggestingTitles] = useState(false);
+	const [coverUrl, setCoverUrl] = useState<string | null>(
+		initial?.coverImageUrl ?? null,
+	);
+	const [moreImages, setMoreImages] = useState<string[]>(initial?.images ?? []);
+	const [uploadingCover, setUploadingCover] = useState(false);
+	const [uploadingMore, setUploadingMore] = useState(false);
+
+	// Step 3 — representation (do you have an attorney?)
+	const [repChoice, setRepChoice] = useState<"have" | "find" | null>(
+		initial?.attorney ? "have" : null,
+	);
+	const [attorney, setAttorney] = useState<Attorney | null>(
+		initial?.attorney ?? null,
+	);
+	const [atName, setAtName] = useState(initial?.attorney?.name ?? "");
+	const [atFirm, setAtFirm] = useState(initial?.attorney?.firm ?? "");
+	const [atEmail, setAtEmail] = useState(initial?.attorney?.email ?? "");
+	const [atPhone, setAtPhone] = useState(initial?.attorney?.phone ?? "");
+	const [atState, setAtState] = useState(attorneyState);
+
+	// Step 4 — the agreed fee
+	const [fee, setFee] = useState(
+		initial?.goalCents ? (initial.goalCents / 100).toLocaleString("en-US") : "",
+	);
+	// Payout type isn't captured in the wizard UI (yet); keep the draft's value
+	// or default so it still persists on publish.
+	const payoutType =
+		initial?.payoutType &&
+		(PAYOUT_TYPES as readonly string[]).includes(initial.payoutType)
+			? initial.payoutType
+			: PAYOUT_TYPES[0];
 	const [publishing, setPublishing] = useState(false);
 
 	const coverInput = useRef<HTMLInputElement>(null);
@@ -156,18 +242,27 @@ export function CaseWizard({ name }: { name: string }) {
 	const goal = Number(fee.replace(/[^0-9.]/g, "")) || 0;
 	const displayTitle = title.trim() || "Your case title";
 	const attorneyName = attorney?.name ?? "your attorney";
+	// One-line hook for cards, derived from the story's first sentence.
+	const summary =
+		story
+			.trim()
+			.split(/(?<=[.!?])\s/)[0]
+			?.trim() ?? "";
 
 	function next() {
 		if (step === 1) {
-			if (!title.trim()) return toast.error("Give your case a title.");
-			if (!summary.trim()) return toast.error("Add a one-line summary.");
+			if (story.trim().length < 20)
+				return toast.error("Tell us what happened to continue.");
 		}
-		if (step === 3) {
-			if (!attorney)
-				return toast.error("Choose an attorney to represent your case.");
+		if (step === 2) {
+			if (!title.trim()) return toast.error("Add a title for your case.");
+			if (!state) return toast.error("Select the state your case is in.");
+		}
+		if (step === 4) {
+			if (!attorney) return toast.error("Add your attorney first.");
 			if (!goal) return toast.error("Enter the agreed fee.");
 		}
-		setStep((s) => Math.min(4, s + 1));
+		setStep((s) => Math.min(LAST_STEP, s + 1));
 		window.scrollTo({ top: 0 });
 	}
 
@@ -180,30 +275,99 @@ export function CaseWizard({ name }: { name: string }) {
 		window.scrollTo({ top: 0 });
 	}
 
+	// Step 3, "Yes, I have an attorney" → record them and move to the fee.
+	function sendInviteAndContinue() {
+		if (!atName.trim()) return toast.error("Add your attorney's full name.");
+		setAttorney({
+			name: atName.trim(),
+			firm: atFirm.trim() || "Independent",
+			area: category,
+			location: atState || state,
+			email: atEmail.trim() || undefined,
+			phone: atPhone.trim() || undefined,
+		});
+		toast.success(`We'll invite ${atName.trim().split(" ")[0]} to your case.`);
+		setStep(4);
+		window.scrollTo({ top: 0 });
+	}
+
+	// Step 3, "No, not yet" → publish the case out to attorneys (no fee yet).
+	async function publishForAttorneysFlow() {
+		if (story.trim().length < 20) {
+			toast.error("Add your story before publishing.");
+			setStep(1);
+			return;
+		}
+		if (!title.trim() || !state) {
+			toast.error("Add a title and state before publishing.");
+			setStep(2);
+			return;
+		}
+		setPublishing(true);
+		const res = await publishForAttorneysAction({
+			id: caseId ?? undefined,
+			title: title.trim(),
+			category,
+			location: state,
+			summary: summary || story.trim().slice(0, 140),
+			story: story.trim(),
+			evidence,
+			coverImageUrl: coverUrl,
+			images: moreImages,
+		});
+		if (res.ok) {
+			setCaseId(res.caseId);
+			setView("published-attorneys");
+			window.scrollTo({ top: 0 });
+		} else {
+			toast.error(res.error);
+			setPublishing(false);
+		}
+	}
+
 	async function publish() {
-		if (!coverUrl) return toast.error("Add a cover image before publishing.");
-		if (!attorney || !goal)
-			return toast.error("Choose an attorney and set the fee first.");
-		const storyText = story.trim();
-		if (storyText.length < 10) {
+		if (story.trim().length < 20) {
 			toast.error("Add your story before publishing.");
 			setView("wizard");
+			setStep(1);
+			return;
+		}
+		if (!title.trim() || !state || !coverUrl) {
+			toast.error("Add a title, state, and cover image before publishing.");
+			setView("wizard");
 			setStep(2);
+			return;
+		}
+		if (!attorney) {
+			toast.error("Add your attorney first.");
+			setView("wizard");
+			setStep(3);
+			return;
+		}
+		if (!goal) {
+			toast.error("Set the agreed fee first.");
+			setView("wizard");
+			setStep(4);
 			return;
 		}
 
 		setPublishing(true);
 		const result = await createCaseAction({
+			id: caseId ?? undefined,
 			title: title.trim(),
 			category,
-			location,
-			summary: summary.trim(),
-			story: storyText,
+			location: state,
+			summary: summary || story.trim().slice(0, 140),
+			story: story.trim(),
 			goalCents: Math.round(goal * 100),
+			payoutType,
 			attorney,
 			evidence,
+			coverImageUrl: coverUrl,
+			images: moreImages,
 		});
 		if (result.ok) {
+			setCaseId(result.caseId);
 			setView("success");
 			window.scrollTo({ top: 0 });
 		} else {
@@ -212,42 +376,89 @@ export function CaseWizard({ name }: { name: string }) {
 		}
 	}
 
-	function acceptInterested() {
-		setAttorney(INTERESTED);
-		if (!fee) setFee("18,500");
-		toast.success(`${INTERESTED.name} added as your attorney.`);
-	}
-
-	function refineWithAI() {
-		if (story.trim().length < 12)
-			return toast.error("Write a little of your story first.");
-		setAiSuggestion(AI_SUGGESTION);
-	}
-
-	// Draft a concise title from the plaintiff's description so they never have
-	// to craft one cold. Mock heuristic — swap for a model call later.
-	function suggestTitle() {
-		const d = summary.trim();
-		if (d.length < 8) {
-			toast.error("Add a short description first, then I'll draft a title.");
-			return;
+	// Persist whatever's filled in as a draft, then head to the dashboard.
+	async function saveAndExit() {
+		setSaving(true);
+		const res = await saveCaseDraftAction({
+			id: caseId ?? undefined,
+			title: title.trim() || undefined,
+			category,
+			location: state || undefined,
+			summary: summary || undefined,
+			story: story.trim() || undefined,
+			goalCents: goal ? Math.round(goal * 100) : undefined,
+			payoutType,
+			attorney,
+			evidence,
+			coverImageUrl: coverUrl,
+			images: moreImages,
+		});
+		if (res.ok) {
+			toast.success("Progress saved — pick up where you left off anytime.");
+			window.location.assign("/dashboard");
+		} else {
+			toast.error(res.error);
+			setSaving(false);
 		}
-		let t = d.split(/[.!?\n]/)[0].trim();
-		if (t.length > 70) t = `${t.slice(0, 67).trimEnd()}…`;
-		t = t.charAt(0).toUpperCase() + t.slice(1);
-		setTitle(t);
-		toast.success("Drafted a title from your description — edit it to taste.");
 	}
 
-	function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
-		const f = e.target.files?.[0];
-		if (f) setCoverUrl(URL.createObjectURL(f));
+	// Polish the story with OpenAI — facts and voice preserved, clarity improved.
+	async function refineWithAI() {
+		if (story.trim().length < 20)
+			return toast.error("Write a little of your story first.");
+		setRefining(true);
+		const result = await refineStoryAction(story);
+		setRefining(false);
+		if (result.ok) setAiSuggestion(result.text);
+		else toast.error(result.error);
 	}
-	function onPickMore(e: React.ChangeEvent<HTMLInputElement>) {
-		const urls = Array.from(e.target.files ?? []).map((f) =>
-			URL.createObjectURL(f),
+
+	// Ask OpenAI for a few title options drawn from the story.
+	async function suggestTitles() {
+		if (story.trim().length < 20)
+			return toast.error("Add your story first so AI can draft titles.");
+		setSuggestingTitles(true);
+		const result = await suggestTitlesAction(story);
+		setSuggestingTitles(false);
+		if (result.ok) setTitleSuggestions(result.titles);
+		else toast.error(result.error);
+	}
+
+	async function uploadImage(file: File): Promise<string> {
+		const blob = await upload(file.name, file, {
+			access: "public",
+			handleUploadUrl: "/api/cases/upload",
+		});
+		return blob.url;
+	}
+
+	async function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
+		const f = e.target.files?.[0];
+		if (!f) return;
+		setUploadingCover(true);
+		try {
+			setCoverUrl(await uploadImage(f));
+		} catch {
+			toast.error("Couldn't upload that image. Please try again.");
+		} finally {
+			setUploadingCover(false);
+		}
+	}
+	async function onPickMore(e: React.ChangeEvent<HTMLInputElement>) {
+		const files = Array.from(e.target.files ?? []).slice(
+			0,
+			6 - moreImages.length,
 		);
-		setMoreImages((p) => [...p, ...urls].slice(0, 6));
+		if (!files.length) return;
+		setUploadingMore(true);
+		try {
+			const urls = await Promise.all(files.map(uploadImage));
+			setMoreImages((p) => [...p, ...urls].slice(0, 6));
+		} catch {
+			toast.error("Couldn't upload one of those images. Please try again.");
+		} finally {
+			setUploadingMore(false);
+		}
 	}
 	function onPickEvidence(e: React.ChangeEvent<HTMLInputElement>) {
 		const files = Array.from(e.target.files ?? []).map((f) => ({
@@ -264,10 +475,132 @@ export function CaseWizard({ name }: { name: string }) {
 		toast.success("Link copied to clipboard.");
 	}
 
+	// ─────────────────────────── Published-to-attorneys confirmation
+	if (view === "published-attorneys") {
+		return (
+			<div className="h-svh overflow-y-auto bg-surface px-6 py-16">
+				<div className="mx-auto max-w-[620px] text-center">
+					<div className="relative mx-auto mb-6 flex size-[92px] items-center justify-center">
+						<span
+							aria-hidden="true"
+							className="absolute inset-0 rounded-full bg-[radial-gradient(circle,color-mix(in_oklch,var(--brass)_28%,transparent),transparent_70%)]"
+						/>
+						<span className="relative flex size-16 items-center justify-center rounded-full bg-brass text-white">
+							<Megaphone className="size-7" aria-hidden="true" />
+						</span>
+					</div>
+					<p className="mb-3 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.14em]">
+						Published to attorneys
+					</p>
+					<h1 className="font-extrabold text-[clamp(1.875rem,3.6vw,2.75rem)] text-ink tracking-[-0.03em]">
+						Your case is out to attorneys
+					</h1>
+					<p className="mx-auto mt-3 max-w-[460px] text-[15px] text-ink-soft leading-relaxed">
+						Bar-listed attorneys on JustUs can now review your case and request
+						to represent you. You choose who takes it on.
+					</p>
+
+					<div className="mt-8 flex items-center justify-between gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 text-left shadow-[var(--shadow-rest)]">
+						<div className="min-w-0">
+							<p className="truncate font-bold text-[15px] text-ink">
+								{displayTitle}
+							</p>
+							<p className="mt-0.5 text-[12.5px] text-muted-foreground">
+								{category} · {state || "—"} · 0 requests yet · published just
+								now
+							</p>
+						</div>
+						<span className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1 font-mono font-semibold text-[11px] text-green-deep uppercase tracking-[0.06em]">
+							<span className="size-1.5 rounded-full bg-success" />
+							Visible
+						</span>
+					</div>
+
+					<ol className="mt-6 flex items-center gap-2 text-[12.5px]">
+						{[
+							{ label: "Published", done: true },
+							{ label: "Requests", done: false },
+							{ label: "You choose", done: false },
+							{ label: "Live", done: false },
+						].map((s, i, arr) => (
+							<li key={s.label} className="flex flex-1 items-center gap-2">
+								<span className="inline-flex items-center gap-1.5">
+									{s.done ? (
+										<CircleCheck
+											className="size-4 text-success"
+											aria-hidden="true"
+										/>
+									) : (
+										<span className="size-3.5 rounded-full border border-line-strong" />
+									)}
+									<span
+										className={
+											s.done
+												? "font-semibold text-ink"
+												: "text-muted-foreground"
+										}
+									>
+										{s.label}
+									</span>
+								</span>
+								{i < arr.length - 1 && (
+									<span className="h-px flex-1 bg-border" />
+								)}
+							</li>
+						))}
+					</ol>
+
+					<div className="mt-6 flex items-center justify-between gap-3 rounded-[var(--radius-card-sm)] bg-brass-wash/50 px-4 py-3 text-left text-[13px] text-ink-soft">
+						<span className="inline-flex items-center gap-2">
+							<Search className="size-4 text-brass-deep" aria-hidden="true" />
+							Don't want to wait? Reach out to attorneys yourself.
+						</span>
+						<button
+							type="button"
+							onClick={() => toast.success("The directory is coming soon.")}
+							className="shrink-0 font-semibold text-brass-deep hover:underline"
+						>
+							Search →
+						</button>
+					</div>
+
+					<div className="mt-6 flex items-center justify-center gap-2.5">
+						<Link
+							href={
+								(caseId
+									? `/dashboard/cases/${caseId}/requests`
+									: "/dashboard/cases") as Route
+							}
+							className={cn(buttonVariants({ size: "lg" }), "px-5")}
+						>
+							Go to my case
+							<ArrowRight data-icon="inline-end" aria-hidden="true" />
+						</Link>
+						<Link
+							href="/dashboard"
+							className={cn(
+								buttonVariants({ variant: "outline", size: "lg" }),
+								"px-5",
+							)}
+						>
+							Back to dashboard
+						</Link>
+					</div>
+
+					<p className="mt-5 flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground">
+						<Clock className="size-3.5" aria-hidden="true" />
+						Attorneys reply on their own time — usually a few days. We'll email
+						you the moment someone requests your case.
+					</p>
+				</div>
+			</div>
+		);
+	}
+
 	// ─────────────────────────────────────────── Success view
 	if (view === "success") {
 		return (
-			<div className="min-h-svh bg-surface px-6 py-16">
+			<div className="h-svh overflow-y-auto bg-surface px-6 py-16">
 				<div className="mx-auto max-w-[620px] text-center">
 					<div className="relative mx-auto mb-6 flex size-[92px] items-center justify-center">
 						<span
@@ -338,15 +671,27 @@ export function CaseWizard({ name }: { name: string }) {
 						))}
 					</div>
 
-					<div className="mt-8">
-						<Button
-							size="lg"
-							className="px-6"
-							onClick={() => setView("preview")}
+					<div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+						<Link
+							href={
+								(caseId
+									? `/dashboard/cases/${caseId}`
+									: "/dashboard/cases") as Route
+							}
+							className={cn(buttonVariants({ size: "lg" }), "px-6")}
 						>
 							<ArrowRight data-icon="inline-start" aria-hidden="true" />
-							View your campaign
-						</Button>
+							Manage your case
+						</Link>
+						<Link
+							href={"/dashboard/cases" as Route}
+							className={cn(
+								buttonVariants({ variant: "outline", size: "lg" }),
+								"px-6",
+							)}
+						>
+							Back to my cases
+						</Link>
 					</div>
 				</div>
 			</div>
@@ -356,7 +701,7 @@ export function CaseWizard({ name }: { name: string }) {
 	// ─────────────────────────────────────────── Preview view
 	if (view === "preview") {
 		return (
-			<div className="min-h-svh bg-surface">
+			<div className="h-svh overflow-y-auto bg-surface">
 				{/* Preview chrome */}
 				<div className="sticky top-0 z-20 flex items-center justify-between gap-4 bg-dark px-6 py-3 text-dark-fg sm:px-10">
 					<div className="flex items-center gap-2.5">
@@ -402,7 +747,7 @@ export function CaseWizard({ name }: { name: string }) {
 								{category}
 							</span>
 							<span className="rounded-[var(--radius-chip)] border border-border px-2.5 py-1 text-[12px] text-ink-soft">
-								{location.split(" · ")[0]}
+								{state}
 							</span>
 						</div>
 						<h1 className="font-extrabold text-[clamp(1.75rem,3.4vw,2.5rem)] text-ink leading-[1.05] tracking-[-0.03em]">
@@ -436,10 +781,10 @@ export function CaseWizard({ name }: { name: string }) {
 
 						<h2 className="mt-8 mb-2 font-bold text-ink text-lg">The story</h2>
 						<div className="space-y-3 text-[14.5px] text-ink-soft leading-relaxed">
-							{(story.trim() ? story : AI_SUGGESTION)
+							{(story.trim() || "Your story will appear here.")
 								.split("\n")
 								.filter(Boolean)
-								.map((para) => (
+								.map((para: string) => (
 									<p key={para.slice(0, 24)}>{para}</p>
 								))}
 						</div>
@@ -541,7 +886,7 @@ export function CaseWizard({ name }: { name: string }) {
 	return (
 		<div className="flex h-svh overflow-hidden bg-surface">
 			{/* Sidebar — fixed full height, never scrolls */}
-			<aside className="hidden h-full w-[260px] shrink-0 flex-col justify-between overflow-hidden border-border border-r bg-surface px-6 py-6 lg:flex">
+			<aside className="hidden h-full w-[320px] shrink-0 flex-col justify-between overflow-hidden border-border border-r bg-surface px-7 py-6 lg:flex">
 				<div>
 					<div className="mb-8 flex items-center gap-2.5">
 						<Brandmark size={30} />
@@ -554,14 +899,22 @@ export function CaseWizard({ name }: { name: string }) {
 						{STEPS.map((s) => {
 							const state =
 								step === s.n ? "active" : step > s.n ? "done" : "todo";
+							// Completed steps are clickable to jump back; you can't skip
+							// ahead (that would bypass each step's validation).
+							const clickable = state === "done";
 							return (
 								<li key={s.n}>
-									<div
+									<button
+										type="button"
+										onClick={() => clickable && setStep(s.n)}
+										disabled={!clickable}
+										aria-current={state === "active" ? "step" : undefined}
 										className={cn(
-											"flex items-center gap-3 rounded-[var(--radius-control)] px-3 py-2.5 text-[14px]",
+											"flex w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-2.5 text-left text-[14px] transition-colors",
 											state === "active"
 												? "bg-brass-wash font-bold text-ink"
 												: "font-medium text-ink-soft",
+											clickable && "cursor-pointer hover:bg-surface-2",
 										)}
 									>
 										<span
@@ -580,7 +933,7 @@ export function CaseWizard({ name }: { name: string }) {
 											)}
 										</span>
 										{s.label}
-									</div>
+									</button>
 								</li>
 							);
 						})}
@@ -588,11 +941,12 @@ export function CaseWizard({ name }: { name: string }) {
 				</div>
 				<button
 					type="button"
-					onClick={() => window.location.assign("/dashboard")}
-					className="flex items-center gap-2 font-medium text-[13px] text-muted-foreground transition-colors hover:text-ink"
+					onClick={saveAndExit}
+					disabled={saving}
+					className="flex items-center gap-2 font-medium text-[13px] text-muted-foreground transition-colors hover:text-ink disabled:opacity-60"
 				>
 					<ArrowLeft className="size-4" aria-hidden="true" />
-					Save & exit
+					{saving ? "Saving…" : "Save & exit"}
 				</button>
 			</aside>
 
@@ -601,66 +955,21 @@ export function CaseWizard({ name }: { name: string }) {
 				<main className="min-h-0 flex-1 overflow-y-auto px-6 py-10 sm:px-12">
 					<div className="mx-auto max-w-[720px]">
 						<p className="mb-2 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.1em]">
-							Step {step} of 4
+							Step {step} of {LAST_STEP}
 						</p>
 
-						{step === 1 && (
+						{step === 2 && (
 							<>
 								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
-									Let's create your case, {firstName}.
+									Now, the basics.
 								</h1>
 								<p className="mt-2.5 max-w-[560px] text-[15px] text-ink-soft leading-relaxed">
-									Start with the basics — you can edit anything before it goes
-									live. Nothing is public until a person reviews it and you hit
-									publish.
+									A category, the state your case is in, a title, and photos. AI
+									can draft a title from your story — pick one or write your
+									own.
 								</p>
 
 								<div className="mt-8 flex flex-col gap-6">
-									{/* Description first — then AI drafts a title from it. */}
-									<div className="flex flex-col gap-1.5">
-										<label
-											htmlFor={ids.summary}
-											className="font-semibold text-[13px] text-ink"
-										>
-											Describe what happened
-										</label>
-										<Textarea
-											id={ids.summary}
-											value={summary}
-											onChange={(e) => setSummary(e.target.value)}
-											placeholder="In a sentence or two — what happened and how it affected you? This is what donors see first."
-											className="min-h-[84px] rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 py-2.5 text-[14px]"
-										/>
-									</div>
-
-									<div className="flex flex-col gap-1.5">
-										<div className="flex items-center justify-between gap-2">
-											<label
-												htmlFor={ids.title}
-												className="font-semibold text-[13px] text-ink"
-											>
-												Case title
-											</label>
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												className="h-7"
-												onClick={suggestTitle}
-											>
-												<Sparkles data-icon="inline-start" aria-hidden="true" />
-												Suggest with AI
-											</Button>
-										</div>
-										<Input
-											id={ids.title}
-											className={inputClass}
-											value={title}
-											onChange={(e) => setTitle(e.target.value)}
-											placeholder="Write one, or let AI draft it from your description"
-										/>
-									</div>
-
 									<div className="grid gap-5 sm:grid-cols-2">
 										<Field label="Category">
 											<Select
@@ -685,32 +994,79 @@ export function CaseWizard({ name }: { name: string }) {
 												</SelectContent>
 											</Select>
 										</Field>
-										<Field
-											label="Location"
-											hint="Prefilled from your payout location"
-										>
+										<Field label="State" hint="Prefilled from your onboarding">
 											<Select
-												value={location}
-												onValueChange={(v: string | null) =>
-													setLocation(v ?? LOCATIONS[0])
-												}
+												value={state}
+												onValueChange={(v: string | null) => setState(v ?? "")}
 											>
 												<SelectTrigger className="h-11 bg-surface text-[14px]">
-													<SelectValue placeholder="Select a location" />
+													<SelectValue placeholder="Select your state" />
 												</SelectTrigger>
-												<SelectContent>
-													{LOCATIONS.map((l) => (
+												<SelectContent className="max-h-[300px]">
+													{US_STATES.map((s) => (
 														<SelectItem
-															key={l}
-															value={l}
+															key={s}
+															value={s}
 															className="text-[14px]"
 														>
-															{l}
+															{s}
 														</SelectItem>
 													))}
 												</SelectContent>
 											</Select>
 										</Field>
+									</div>
+
+									<div className="flex flex-col gap-1.5">
+										<div className="flex items-center justify-between gap-2">
+											<label
+												htmlFor={ids.title}
+												className="font-semibold text-[13px] text-ink"
+											>
+												Case title
+											</label>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												className="h-7"
+												onClick={suggestTitles}
+												disabled={suggestingTitles}
+											>
+												<Sparkles data-icon="inline-start" aria-hidden="true" />
+												{suggestingTitles ? "Thinking…" : "Suggest titles"}
+											</Button>
+										</div>
+										<Input
+											id={ids.title}
+											className={inputClass}
+											value={title}
+											onChange={(e) => setTitle(e.target.value)}
+											placeholder="Write your own, or use an AI suggestion below"
+										/>
+										{titleSuggestions.length > 0 && (
+											<div className="mt-1.5 flex flex-col gap-1.5">
+												{titleSuggestions.map((t) => (
+													<button
+														key={t}
+														type="button"
+														onClick={() => setTitle(t)}
+														className={cn(
+															"flex items-center gap-2 rounded-[var(--radius-control)] border px-3 py-2 text-left text-[13.5px] transition-colors",
+															title === t
+																? "border-brass bg-brass-wash text-ink"
+																: "border-border bg-surface text-ink-soft hover:border-brass-deep",
+														)}
+													>
+														<Sparkles
+															className="size-3.5 shrink-0 text-brass-deep"
+															aria-hidden="true"
+														/>
+														{t}
+													</button>
+												))}
+											</div>
+										)}
 									</div>
 
 									<div>
@@ -720,9 +1076,22 @@ export function CaseWizard({ name }: { name: string }) {
 										<button
 											type="button"
 											onClick={() => coverInput.current?.click()}
-											className="flex w-full flex-col items-center gap-2 rounded-[var(--radius-card-lg)] border border-line-strong border-dashed bg-surface px-6 py-10 text-center transition-colors hover:bg-surface-2/50"
+											disabled={uploadingCover}
+											className="flex w-full flex-col items-center gap-2 rounded-[var(--radius-card-lg)] border border-line-strong border-dashed bg-surface px-6 py-10 text-center transition-colors hover:border-brass hover:border-solid hover:ring-1 hover:ring-brass disabled:opacity-70"
 										>
-											{coverUrl ? (
+											{uploadingCover ? (
+												<>
+													<span className="flex size-11 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
+														<Upload
+															className="size-5 animate-pulse"
+															aria-hidden="true"
+														/>
+													</span>
+													<span className="font-bold text-[14px] text-ink">
+														Uploading…
+													</span>
+												</>
+											) : coverUrl ? (
 												<img
 													src={coverUrl}
 													alt="Cover preview"
@@ -785,11 +1154,20 @@ export function CaseWizard({ name }: { name: string }) {
 													</button>
 												</div>
 											))}
-											{moreImages.length < 6 && (
+											{uploadingMore && (
+												<div className="flex size-[92px] flex-col items-center justify-center gap-1 rounded-[var(--radius-card-sm)] border border-line-strong border-dashed bg-surface text-muted-foreground">
+													<Upload
+														className="size-5 animate-pulse"
+														aria-hidden="true"
+													/>
+													<span className="text-[11px]">Uploading…</span>
+												</div>
+											)}
+											{moreImages.length < 6 && !uploadingMore && (
 												<button
 													type="button"
 													onClick={() => moreInput.current?.click()}
-													className="flex size-[92px] flex-col items-center justify-center gap-1 rounded-[var(--radius-card-sm)] border border-line-strong border-dashed bg-surface text-muted-foreground transition-colors hover:text-ink"
+													className="flex size-[92px] flex-col items-center justify-center gap-1 rounded-[var(--radius-card-sm)] border border-line-strong border-dashed bg-surface text-muted-foreground transition-colors hover:border-brass hover:border-solid hover:text-ink hover:ring-1 hover:ring-brass"
 												>
 													<Plus className="size-5" aria-hidden="true" />
 													<span className="text-[12px]">Add</span>
@@ -813,7 +1191,7 @@ export function CaseWizard({ name }: { name: string }) {
 							</>
 						)}
 
-						{step === 2 && (
+						{step === 1 && (
 							<>
 								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
 									What happened?
@@ -847,12 +1225,13 @@ export function CaseWizard({ name }: { name: string }) {
 													size="sm"
 													className="h-8"
 													onClick={refineWithAI}
+													disabled={refining}
 												>
 													<Sparkles
 														data-icon="inline-start"
 														aria-hidden="true"
 													/>
-													Refine with AI
+													{refining ? "Refining…" : "Refine with AI"}
 												</Button>
 											</div>
 										</div>
@@ -902,7 +1281,8 @@ export function CaseWizard({ name }: { name: string }) {
 													variant="ghost"
 													size="sm"
 													className="h-9"
-													onClick={() => toast.success("Rewriting…")}
+													onClick={refineWithAI}
+													disabled={refining}
 												>
 													Try again
 												</Button>
@@ -924,7 +1304,7 @@ export function CaseWizard({ name }: { name: string }) {
 										<button
 											type="button"
 											onClick={() => evidenceInput.current?.click()}
-											className="flex w-full flex-col items-center gap-1.5 rounded-[var(--radius-card-lg)] border border-line-strong border-dashed bg-surface px-6 py-8 text-center transition-colors hover:bg-surface-2/50"
+											className="flex w-full flex-col items-center gap-1.5 rounded-[var(--radius-card-lg)] border border-line-strong border-dashed bg-surface px-6 py-8 text-center transition-colors hover:border-brass hover:border-solid hover:ring-1 hover:ring-brass"
 										>
 											<Upload
 												className="size-5 text-brass-deep"
@@ -991,160 +1371,317 @@ export function CaseWizard({ name }: { name: string }) {
 						{step === 3 && (
 							<>
 								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
-									Choose your attorney &amp; set the fee.
+									Do you have an attorney?
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
-									Accept an interested attorney, browse the directory, or bring
-									your own — then agree the fee. It becomes your funding goal.
+									You always choose who represents you. Already found someone?
+									Add them. If not, we'll help you get in front of attorneys.
 								</p>
 
-								<div className="mt-6 flex gap-2.5 rounded-[var(--radius-control)] border border-warn/50 bg-warn/10 px-4 py-3 text-[13px] text-ink leading-relaxed">
-									<TriangleAlert
-										className="mt-0.5 size-4 shrink-0 text-warn-deep"
-										aria-hidden="true"
-									/>
-									You're responsible for vetting any attorney you choose. JustUs
-									can't confirm their bar standing for you — verify it yourself
-									before accepting.
-								</div>
-
-								{!dismissedInterested && !attorney && (
-									<>
-										<p className="mt-6 mb-2.5 font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.1em]">
-											Interested in your case
-										</p>
-										<div className="flex items-center gap-4 rounded-[var(--radius-card-lg)] border border-brass bg-brass-wash/40 p-4">
-											<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[13px] text-white">
-												DO
-											</span>
-											<div className="min-w-0 flex-1">
-												<p className="text-[14px]">
-													<span className="font-bold text-ink">
-														{INTERESTED.name}
-													</span>{" "}
-													<span className="text-muted-foreground">
-														{INTERESTED.area} · {INTERESTED.location}
+								<div className="mt-8 grid gap-4 sm:grid-cols-2">
+									{[
+										{
+											value: "have" as const,
+											icon: UserPlus,
+											title: "Yes, I have an attorney",
+											body: "Enter their details and we'll invite them to your case.",
+										},
+										{
+											value: "find" as const,
+											icon: Users,
+											title: "No, not yet",
+											body: "Let attorneys come to you, or reach out yourself.",
+										},
+									].map((opt) => {
+										const active = repChoice === opt.value;
+										return (
+											<button
+												key={opt.value}
+												type="button"
+												onClick={() => setRepChoice(opt.value)}
+												aria-pressed={active}
+												className={cn(
+													"flex flex-col rounded-[var(--radius-card-lg)] border p-5 text-left transition-all",
+													active
+														? "border-brass bg-brass-wash/50 ring-1 ring-brass"
+														: "border-border bg-surface hover:border-brass-deep",
+												)}
+											>
+												<div className="mb-4 flex items-start justify-between">
+													<span
+														className={cn(
+															"flex size-11 items-center justify-center rounded-xl",
+															active
+																? "bg-brass text-white"
+																: "bg-brass-wash text-brass-deep",
+														)}
+													>
+														<opt.icon className="size-5" aria-hidden="true" />
 													</span>
-												</p>
-												<p className="mt-0.5 text-[13px] text-ink-soft italic">
-													“{INTERESTED.quote}”
-												</p>
-											</div>
-											<div className="flex shrink-0 items-center gap-2">
-												<Button
-													type="button"
-													size="sm"
-													className="h-9"
-													onClick={acceptInterested}
-												>
-													<Check data-icon="inline-start" aria-hidden="true" />
-													Accept
-												</Button>
-												<Button
-													type="button"
-													variant="outline"
-													size="sm"
-													className="h-9"
-													onClick={() => toast.success("Opening profile…")}
-												>
-													View
-												</Button>
-												<button
-													type="button"
-													aria-label="Dismiss"
-													onClick={() => setDismissedInterested(true)}
-													className="flex size-8 items-center justify-center rounded-full text-muted-foreground hover:text-ink"
-												>
-													<X className="size-4" aria-hidden="true" />
-												</button>
-											</div>
-										</div>
-									</>
-								)}
-
-								{attorney && (
-									<div className="mt-6 flex items-center gap-4 rounded-[var(--radius-card-lg)] border border-brass bg-brass-wash/40 p-4">
-										<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass text-white">
-											<Check className="size-5" aria-hidden="true" />
-										</span>
-										<div className="min-w-0 flex-1">
-											<p className="font-bold text-[14px] text-ink">
-												{attorney.name} · {attorney.area}
-											</p>
-											<p className="text-[13px] text-muted-foreground">
-												{attorney.firm} · {attorney.location}
-											</p>
-										</div>
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											onClick={() => setAttorney(null)}
-										>
-											Change
-										</Button>
-									</div>
-								)}
-
-								<div className="mt-5 grid gap-4 sm:grid-cols-2">
-									<OptionCard
-										icon={Search}
-										title="Browse the directory"
-										body="Compare profiles and reviews, then reach out."
-										cta="Open directory"
-										onClick={() =>
-											toast.success("The directory is coming soon.")
-										}
-									/>
-									<OptionCard
-										icon={UserPlus}
-										title="I have an attorney"
-										body="Add their details to invite them."
-										cta="Add their details"
-										onClick={() => setShowManual((v) => !v)}
-									/>
+													<span
+														className={cn(
+															"flex size-6 items-center justify-center rounded-full border-2 transition-colors",
+															active
+																? "border-brass bg-brass text-white"
+																: "border-line-strong",
+														)}
+													>
+														{active && (
+															<Check className="size-3.5" aria-hidden="true" />
+														)}
+													</span>
+												</div>
+												<span className="font-bold text-[16px] text-ink">
+													{opt.title}
+												</span>
+												<span className="mt-1 text-[13px] text-ink-soft leading-relaxed">
+													{opt.body}
+												</span>
+											</button>
+										);
+									})}
 								</div>
 
-								{showManual && (
-									<div className="mt-4 flex items-end gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-4">
-										<div className="flex-1">
+								{repChoice === "have" && (
+									<div className="mt-6 flex flex-col gap-5">
+										<p className="font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.1em]">
+											Your attorney's details
+										</p>
+										<div className="flex flex-col gap-1.5">
 											<label
 												htmlFor={ids.manual}
-												className="mb-1.5 block font-semibold text-[13px] text-ink"
+												className="font-semibold text-[13px] text-ink"
 											>
-												Attorney's name
+												Attorney's full name
+												<span className="ml-0.5 text-danger">*</span>
 											</label>
 											<Input
 												id={ids.manual}
 												className={inputClass}
-												value={manualName}
-												onChange={(e) => setManualName(e.target.value)}
-												placeholder="Jordan Rivera"
+												value={atName}
+												onChange={(e) => setAtName(e.target.value)}
+												placeholder="e.g. Daniel Osei"
 											/>
 										</div>
-										<Button
-											type="button"
-											onClick={() => {
-												if (!manualName.trim())
-													return toast.error("Enter their name.");
-												setAttorney({
-													name: manualName.trim(),
-													firm: "Invited",
-													area: category,
-													location: location.split(" · ")[0],
-												});
-												setShowManual(false);
-												toast.success("Attorney invited.");
-											}}
-										>
-											Invite
-										</Button>
+										<div className="grid gap-4 sm:grid-cols-2">
+											<div className="flex flex-col gap-1.5">
+												<label
+													htmlFor={ids.manualFirm}
+													className="font-semibold text-[13px] text-ink"
+												>
+													Law firm
+												</label>
+												<Input
+													id={ids.manualFirm}
+													className={inputClass}
+													value={atFirm}
+													onChange={(e) => setAtFirm(e.target.value)}
+													placeholder="e.g. Osei Legal Group"
+												/>
+											</div>
+											<div className="flex flex-col gap-1.5">
+												<label
+													htmlFor={ids.attorneyEmail}
+													className="font-semibold text-[13px] text-ink"
+												>
+													Email
+												</label>
+												<Input
+													id={ids.attorneyEmail}
+													type="email"
+													className={inputClass}
+													value={atEmail}
+													onChange={(e) => setAtEmail(e.target.value)}
+													placeholder="attorney@email.com"
+												/>
+											</div>
+										</div>
+										<div className="grid gap-4 sm:grid-cols-2">
+											<div className="flex flex-col gap-1.5">
+												<label
+													htmlFor={ids.manualState}
+													className="font-semibold text-[13px] text-ink"
+												>
+													Jurisdiction
+												</label>
+												<Select
+													value={atState}
+													onValueChange={(v: string | null) =>
+														setAtState(v ?? "")
+													}
+												>
+													<SelectTrigger
+														id={ids.manualState}
+														className="h-11 bg-surface text-[14px]"
+													>
+														<SelectValue placeholder="Select a state" />
+													</SelectTrigger>
+													<SelectContent className="max-h-[300px]">
+														{US_STATES.map((s) => (
+															<SelectItem
+																key={s}
+																value={s}
+																className="text-[14px]"
+															>
+																{s}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+											</div>
+											<div className="flex flex-col gap-1.5">
+												<label
+													htmlFor={ids.attorneyPhone}
+													className="font-semibold text-[13px] text-ink"
+												>
+													Phone{" "}
+													<span className="font-normal text-muted-foreground">
+														(optional)
+													</span>
+												</label>
+												<Input
+													id={ids.attorneyPhone}
+													type="tel"
+													className={inputClass}
+													value={atPhone}
+													onChange={(e) => setAtPhone(e.target.value)}
+													placeholder="(555) 000-0000"
+												/>
+											</div>
+										</div>
+										<p className="flex gap-2.5 rounded-[var(--radius-card-sm)] bg-green-soft px-4 py-3 text-[13px] text-green-deep leading-relaxed">
+											<Send
+												className="mt-0.5 size-4 shrink-0 text-success"
+												aria-hidden="true"
+											/>
+											We'll email them an invite to represent you. They confirm
+											before they're attached — and you agree the fee together
+											on the next step.
+										</p>
 									</div>
 								)}
 
-								<hr className="my-7 border-border" />
+								{repChoice === "find" && (
+									<>
+										<p className="mt-6 mb-3 font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.1em]">
+											No attorney yet? Two ways to find one
+										</p>
+										<div className="grid gap-4 sm:grid-cols-2">
+											<div className="flex flex-col rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+												<div className="mb-3 flex items-center justify-between">
+													<span className="flex size-10 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
+														<Megaphone className="size-5" aria-hidden="true" />
+													</span>
+													<span className="rounded-[var(--radius-pill)] bg-brass-wash px-2.5 py-1 font-mono font-semibold text-[10px] text-brass-deep uppercase tracking-[0.06em]">
+														Recommended
+													</span>
+												</div>
+												<h3 className="font-bold text-[15px] text-ink">
+													Let attorneys request your case
+												</h3>
+												<p className="mt-1 mb-4 flex-1 text-[13px] text-ink-soft leading-relaxed">
+													Publish your case on JustUs. Attorneys can review it
+													and ask to represent you — no searching needed.
+												</p>
+												<Button
+													type="button"
+													className="w-full"
+													onClick={publishForAttorneysFlow}
+													disabled={publishing}
+												>
+													{publishing ? "Publishing…" : "Publish for attorneys"}
+													<ArrowRight
+														data-icon="inline-end"
+														aria-hidden="true"
+													/>
+												</Button>
+											</div>
+											<div className="flex flex-col rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+												<span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
+													<Search className="size-5" aria-hidden="true" />
+												</span>
+												<h3 className="font-bold text-[15px] text-ink">
+													Search and reach out yourself
+												</h3>
+												<p className="mt-1 mb-4 flex-1 text-[13px] text-ink-soft leading-relaxed">
+													Don't want to wait? Browse the directory and message
+													attorneys who fit. You choose who to talk to.
+												</p>
+												<Button
+													type="button"
+													variant="outline"
+													className="w-full"
+													onClick={() =>
+														toast.success("The directory is coming soon.")
+													}
+												>
+													Search the directory
+													<ArrowRight
+														data-icon="inline-end"
+														aria-hidden="true"
+													/>
+												</Button>
+											</div>
+										</div>
+										<div className="mt-4 flex gap-2.5 rounded-[var(--radius-card-sm)] border border-warn/50 bg-warn/10 px-4 py-3 text-[13px] text-ink leading-relaxed">
+											<Clock
+												className="mt-0.5 size-4 shrink-0 text-warn-deep"
+												aria-hidden="true"
+											/>
+											Heads up — attorneys reply on their own time, so it can
+											take a few days to hear back. You can do both, and your
+											campaign can still go live while you wait.
+										</div>
+									</>
+								)}
+							</>
+						)}
 
-								<div className="max-w-[320px]">
+						{step === 4 && (
+							<>
+								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
+									Agree the fee
+								</h1>
+								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
+									You're working with {attorneyName}. Set the fee you agreed
+									together — it becomes your funding goal, and nothing more is
+									ever raised.
+								</p>
+
+								<p className="mt-7 mb-2.5 font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.1em]">
+									Your attorney
+								</p>
+								{attorney ? (
+									<div className="flex items-center gap-4 rounded-[var(--radius-card-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-rest)]">
+										<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[13px] text-white">
+											{attorney.name
+												.split(/\s+/)
+												.slice(0, 2)
+												.map((p) => p[0]?.toUpperCase() ?? "")
+												.join("")}
+										</span>
+										<div className="min-w-0 flex-1">
+											<p className="font-bold text-[15px] text-ink">
+												{attorney.name}
+											</p>
+											<p className="text-[12.5px] text-muted-foreground">
+												{[attorney.area, attorney.location, attorney.firm]
+													.filter(Boolean)
+													.join(" · ")}
+											</p>
+										</div>
+										<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1.5 font-semibold text-[12px] text-green-deep">
+											<CircleCheck className="size-3.5" aria-hidden="true" />
+											Representing you
+										</span>
+									</div>
+								) : (
+									<div className="rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-4 py-4 text-[13.5px] text-muted-foreground">
+										Add your attorney on the previous step first.
+									</div>
+								)}
+
+								<div className="mt-6 max-w-[320px]">
 									<label
 										htmlFor={ids.fee}
 										className="mb-1.5 block font-semibold text-[13px] text-ink"
@@ -1167,7 +1704,7 @@ export function CaseWizard({ name }: { name: string }) {
 									</div>
 								</div>
 
-								<div className="mt-4 flex gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
+								<div className="mt-4 flex max-w-[520px] gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
 									<Scale
 										className="mt-0.5 size-4 shrink-0 text-brass-deep"
 										aria-hidden="true"
@@ -1185,7 +1722,7 @@ export function CaseWizard({ name }: { name: string }) {
 							</>
 						)}
 
-						{step === 4 && (
+						{step === 5 && (
 							<>
 								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
 									Ready to go live?
@@ -1204,7 +1741,7 @@ export function CaseWizard({ name }: { name: string }) {
 											{category}
 										</span>
 										<span className="rounded-[var(--radius-chip)] border border-border px-2.5 py-1 text-[12px] text-ink-soft">
-											{location.split(" · ")[0]}
+											{state}
 										</span>
 									</div>
 									<h3 className="font-bold text-[18px] text-ink">
@@ -1277,12 +1814,7 @@ export function CaseWizard({ name }: { name: string }) {
 							<ArrowLeft data-icon="inline-start" aria-hidden="true" />
 							Back
 						</Button>
-						{step < 4 ? (
-							<Button type="button" size="lg" className="px-6" onClick={next}>
-								Continue
-								<ArrowRight data-icon="inline-end" aria-hidden="true" />
-							</Button>
-						) : (
+						{step === 5 ? (
 							<Button
 								type="button"
 								size="lg"
@@ -1292,6 +1824,38 @@ export function CaseWizard({ name }: { name: string }) {
 							>
 								<Rocket data-icon="inline-start" aria-hidden="true" />
 								{publishing ? "Publishing…" : "Publish & go live"}
+							</Button>
+						) : step === 3 && repChoice === "have" ? (
+							<Button
+								type="button"
+								size="lg"
+								className="px-6"
+								onClick={sendInviteAndContinue}
+							>
+								Send invite &amp; continue
+								<ArrowRight data-icon="inline-end" aria-hidden="true" />
+							</Button>
+						) : step === 3 && repChoice === "find" ? (
+							<Button
+								type="button"
+								size="lg"
+								className="px-6"
+								onClick={publishForAttorneysFlow}
+								disabled={publishing}
+							>
+								{publishing ? "Publishing…" : "Continue"}
+								<ArrowRight data-icon="inline-end" aria-hidden="true" />
+							</Button>
+						) : (
+							<Button
+								type="button"
+								size="lg"
+								className="px-6"
+								onClick={next}
+								disabled={step === 3 && !repChoice}
+							>
+								Continue
+								<ArrowRight data-icon="inline-end" aria-hidden="true" />
 							</Button>
 						)}
 					</div>
@@ -1320,39 +1884,5 @@ function Field({
 			{children}
 			{hint && <p className="text-[12px] text-muted-foreground">{hint}</p>}
 		</div>
-	);
-}
-
-function OptionCard({
-	icon: Icon,
-	title,
-	body,
-	cta,
-	onClick,
-}: {
-	icon: typeof Search;
-	title: string;
-	body: string;
-	cta: string;
-	onClick: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			className="flex flex-col rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 text-left transition-colors hover:border-line-strong"
-		>
-			<span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
-				<Icon className="size-5" aria-hidden="true" />
-			</span>
-			<span className="font-bold text-[15px] text-ink">{title}</span>
-			<span className="mt-1 text-[13px] text-ink-soft leading-relaxed">
-				{body}
-			</span>
-			<span className="mt-3 inline-flex items-center gap-1.5 font-semibold text-[13px] text-brass-deep">
-				{cta}
-				<ArrowRight className="size-3.5" aria-hidden="true" />
-			</span>
-		</button>
 	);
 }

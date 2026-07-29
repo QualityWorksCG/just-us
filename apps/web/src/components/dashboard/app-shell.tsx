@@ -34,7 +34,7 @@ import { getRoleNav, visibleNavItems } from "@/lib/dashboard-nav";
  * only gutter padding. No max-width and no centring — the page grows with the
  * viewport instead of stranding a fixed column in the middle of a wide screen.
  */
-const CONTENT_COLUMN = "w-full px-5 sm:px-8";
+const CONTENT_COLUMN = "w-full px-6 sm:px-10 lg:px-12";
 
 function initials(name: string) {
 	return (
@@ -186,8 +186,8 @@ export function AppShell({
 					centred, and the gap between them changes every time the sidebar
 					collapses. Keep CONTENT_COLUMN identical in both places.
 				*/}
-				<header className="sticky top-0 z-30 h-[60px] border-border border-b bg-surface">
-					<div className={cn(CONTENT_COLUMN, "flex h-full items-center gap-3")}>
+				<header className="sticky top-0 z-30 border-border border-b bg-surface">
+					<div className={cn(CONTENT_COLUMN, "flex items-center gap-3 py-5")}>
 						<SidebarTrigger className="-ml-1 text-ink-soft" />
 						<span className="flex-1 truncate font-bold text-[14px] text-ink">
 							{current?.title}
@@ -201,7 +201,7 @@ export function AppShell({
 					</div>
 				</header>
 
-				<main className={cn(CONTENT_COLUMN, "py-8 sm:py-10")}>{children}</main>
+				<main className={cn(CONTENT_COLUMN, "pt-5 pb-10")}>{children}</main>
 			</div>
 		</SidebarProvider>
 	);

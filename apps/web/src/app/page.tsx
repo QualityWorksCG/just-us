@@ -1,3 +1,4 @@
+import { listLiveCases } from "@just-us/db/cases";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
 import {
@@ -24,6 +25,7 @@ import Link from "next/link";
 
 import { Brandmark } from "@/components/brandmark";
 import { CountUp } from "@/components/count-up";
+import { FeaturedCases, type LandingCase } from "@/components/featured-cases";
 import { LandingFaq } from "@/components/landing-faq";
 import { Reveal } from "@/components/reveal";
 
@@ -32,7 +34,7 @@ const howSteps = [
 		num: "01",
 		icon: FileText,
 		title: "Tell what happened",
-		body: "Share your story and evidence — we vet every case before it goes public.",
+		body: "Share your story and evidence — you decide what goes public.",
 	},
 	{
 		num: "02",
@@ -51,41 +53,6 @@ const howSteps = [
 		icon: HeartHandshake,
 		title: "Follow it to the end",
 		body: "Your attorney posts updates through to the outcome.",
-	},
-] as const;
-
-const featuredCase = {
-	title: "Mom's call button went unanswered for hours",
-	category: "Elder care",
-	jurisdiction: "Florida",
-	img: "/images/case-eldercare.png",
-	blurb:
-		"“The home ignored her for hours. When mum's care needs slipped, we asked — and 356 strangers decided it mattered too.”",
-	owner: "The Calloway family",
-	attorney: "Miriam Solis",
-	raised: 19760,
-	goal: 22000,
-	donors: 356,
-} as const;
-
-const sideCases = [
-	{
-		title: "Fired for reporting safety violations at a food plant",
-		category: "Employment",
-		attorney: "Marcus Bell",
-		img: "/images/case-employment.png",
-		raised: 12340,
-		goal: 18600,
-		donors: 84,
-	},
-	{
-		title: "A contractor took my roof deposit and vanished",
-		category: "Consumer fraud",
-		attorney: "Walter Griggs",
-		img: "/images/case-consumer.png",
-		raised: 6690,
-		goal: 7200,
-		donors: 93,
 	},
 ] as const;
 
@@ -128,9 +95,9 @@ const promises = [
 const trustItems = [
 	{
 		icon: ShieldCheck,
-		title: "Every case is vetted",
-		body: "Cases are screened before they can be listed or funded, with people reviewing anything flagged.",
-		badge: "AI-screened, human reviewed",
+		title: "You choose your own attorney",
+		body: "Browse bar-verified attorneys and pick who represents you — no one is ever assigned to you.",
+		badge: "Your call, always",
 	},
 	{
 		icon: BadgeCheck,
@@ -165,7 +132,7 @@ const roles = [
 		icon: Heart,
 		eyebrow: "For supporters",
 		title: "Donor",
-		body: "Give any amount to a vetted case, and follow every update to the outcome.",
+		body: "Give any amount to a case you believe in, and follow every update to the outcome.",
 		cta: "Become a donor",
 		href: "/cases",
 	},
@@ -183,8 +150,8 @@ const startPaths = [
 	{
 		icon: Pencil,
 		title: "Been wronged?",
-		body: "Submit your case free. A person vets it, you choose your attorney, and the public funds the agreed fee.",
-		meta: "Free to submit · vetted before it's public",
+		body: "Submit your case free, choose your attorney, and the public funds the agreed fee you set.",
+		meta: "Free to submit · you choose your attorney",
 		cta: "Start your case",
 		href: "/login",
 		badge: "Most start here",
@@ -192,7 +159,7 @@ const startPaths = [
 	{
 		icon: Heart,
 		title: "Fund someone's day in court",
-		body: "Give any amount to a vetted case. One transparent 5% fee, and every update until the outcome.",
+		body: "Give any amount to a case you believe in. One transparent 5% fee, and every update until the outcome.",
 		meta: "Any amount · one flat 5% fee",
 		cta: "Become a donor",
 		href: "/cases",
@@ -200,7 +167,7 @@ const startPaths = [
 	{
 		icon: Scale,
 		title: "Practice law that matters",
-		body: "List the vetted, fundable cases you choose — with the fee raised before you file.",
+		body: "List the fundable cases you choose — with the fee raised before you file.",
 		meta: "Bar-verified · funded before you file",
 		cta: "Join as an attorney",
 		href: "/attorneys",
@@ -241,31 +208,6 @@ function ProgressBar({
 	);
 }
 
-function DonorAvatars() {
-	const tones = [
-		"from-brass to-brass-deep",
-		"from-brass-deep to-ink",
-		"from-surface-2 to-brass",
-		"from-brass-wash to-brass-deep",
-		"from-ink to-brass-deep",
-	];
-	return (
-		<div className="flex items-center -space-x-2">
-			{tones.map((tone, i) => (
-				<span
-					key={tone}
-					className={cn(
-						"size-8 rounded-full border-2 border-paper bg-gradient-to-br",
-						tone,
-					)}
-					style={{ zIndex: tones.length - i }}
-					aria-hidden="true"
-				/>
-			))}
-		</div>
-	);
-}
-
 function HeroVisual() {
 	return (
 		<div className="relative mx-auto w-full max-w-[560px] pb-6">
@@ -289,7 +231,7 @@ function HeroVisual() {
 					/>
 					<span className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-card/95 px-3 py-1.5 font-semibold text-[12px] text-ink shadow-[var(--shadow-float)] backdrop-blur">
 						<ShieldCheck className="size-3.5 text-success" aria-hidden="true" />
-						Every case is vetted
+						You choose your attorney
 					</span>
 				</div>
 
@@ -342,7 +284,23 @@ function HeroVisual() {
 	);
 }
 
-export default function Home() {
+export default async function Home() {
+	const liveCases = await listLiveCases(3);
+	const liveCards: LandingCase[] = liveCases.map((c) => ({
+		id: c.id,
+		title: c.title || "Untitled case",
+		category: c.category || "Case",
+		jurisdiction: c.location || "—",
+		cover: c.coverImageUrl,
+		blurb:
+			c.summary || `${c.story.slice(0, 160)}${c.story.length > 160 ? "…" : ""}`,
+		owner: c.owner?.name ?? "A plaintiff",
+		attorney: c.attorneyName,
+		raised: c.raisedCents / 100,
+		goal: c.goalCents / 100,
+		donors: c.donorsCount,
+	}));
+
 	return (
 		<main className="h-full overflow-y-auto">
 			{/* Hero */}
@@ -478,140 +436,8 @@ export default function Home() {
 				</div>
 			</section>
 
-			{/* Featured cases */}
-			<section
-				id="cases"
-				aria-labelledby="cases-heading"
-				className="border-border border-b"
-			>
-				<div className="mx-auto max-w-[1180px] px-6 py-16 sm:py-20">
-					<div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-						<div>
-							<h2
-								id="cases-heading"
-								className="font-extrabold text-[30px] text-ink tracking-[-0.02em]"
-							>
-								Cases raising right now
-							</h2>
-						</div>
-						<Link
-							href="/cases"
-							className={cn(buttonVariants({ variant: "outline" }))}
-						>
-							See all cases
-							<ArrowRight data-icon="inline-end" aria-hidden="true" />
-						</Link>
-					</div>
-					<div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-						{/* Featured large card */}
-						<Link
-							href="/cases"
-							className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-border bg-card shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--dur-base)] hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-hover)]"
-						>
-							<div className="relative h-[220px] overflow-hidden bg-surface-2">
-								<Image
-									src={featuredCase.img}
-									alt={featuredCase.title}
-									fill
-									sizes="(min-width: 1024px) 620px, 100vw"
-									className="object-cover transition-transform duration-[var(--dur-base)] group-hover:scale-[1.03]"
-								/>
-								<span className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-card/95 px-3 py-1 font-semibold text-[12px] text-success shadow-[var(--shadow-float)] backdrop-blur">
-									<Check className="size-3.5" aria-hidden="true" />
-									Closed to the goal
-								</span>
-							</div>
-							<div className="flex flex-1 flex-col p-6">
-								<div className="mb-2.5 flex flex-wrap gap-1.5">
-									<span className="rounded-[var(--radius-chip)] bg-brass-wash px-2 py-0.5 font-semibold text-[12px] text-brass-deep">
-										{featuredCase.category}
-									</span>
-									<span className="rounded-[var(--radius-chip)] border border-border px-2 py-0.5 text-[12px] text-ink-soft">
-										{featuredCase.jurisdiction}
-									</span>
-								</div>
-								<h3 className="mb-2 font-bold text-[19px] text-ink leading-snug">
-									{featuredCase.title}
-								</h3>
-								<p className="mb-4 text-[13.5px] text-ink-soft leading-relaxed">
-									{featuredCase.blurb}
-								</p>
-								<p className="mb-4 text-[13px] text-muted-foreground">
-									{featuredCase.owner} · with {featuredCase.attorney}
-								</p>
-								<div className="mt-auto">
-									<div className="mb-3 flex items-center gap-2.5">
-										<DonorAvatars />
-										<span className="font-semibold text-[12.5px] text-ink-soft">
-											{featuredCase.donors} donors
-										</span>
-									</div>
-									<ProgressBar
-										value={featuredCase.raised}
-										max={featuredCase.goal}
-									/>
-									<div className="mt-2.5 flex justify-between text-[12.5px] text-ink-soft">
-										<span className="font-bold tabular-nums">
-											{money(featuredCase.raised)} of {money(featuredCase.goal)}
-										</span>
-										<span className="text-muted-foreground">
-											{Math.round(
-												(featuredCase.raised / featuredCase.goal) * 100,
-											)}
-											% funded
-										</span>
-									</div>
-								</div>
-							</div>
-						</Link>
-
-						{/* Side cases */}
-						<div className="grid gap-5">
-							{sideCases.map((c) => (
-								<Link
-									key={c.title}
-									href="/cases"
-									className="group flex gap-4 rounded-[var(--radius-card)] border border-border bg-card p-4 shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--dur-base)] hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-hover)]"
-								>
-									<div className="relative min-h-[128px] w-[132px] shrink-0 self-stretch overflow-hidden rounded-[var(--radius-card-sm)] bg-surface-2">
-										<Image
-											src={c.img}
-											alt={c.title}
-											fill
-											sizes="132px"
-											className="object-cover"
-										/>
-									</div>
-									<div className="flex min-w-0 flex-col">
-										<span className="mb-1.5 w-fit rounded-[var(--radius-chip)] bg-brass-wash px-2 py-0.5 font-semibold text-[11.5px] text-brass-deep">
-											{c.category}
-										</span>
-										<h3 className="mb-1 font-bold text-[14.5px] text-ink leading-snug">
-											{c.title}
-										</h3>
-										<p className="mb-2 text-[12px] text-muted-foreground">
-											with {c.attorney}
-										</p>
-										<div className="mt-auto">
-											<ProgressBar
-												value={c.raised}
-												max={c.goal}
-												className="h-1.5"
-											/>
-											<div className="mt-1.5 flex justify-between text-[12px] text-ink-soft">
-												<span className="font-bold tabular-nums">
-													{money(c.raised)} of {money(c.goal)}
-												</span>
-												<span>{c.donors} donors</span>
-											</div>
-										</div>
-									</div>
-								</Link>
-							))}
-						</div>
-					</div>
-				</div>
-			</section>
+			{/* Featured cases — real live cases from the platform */}
+			<FeaturedCases cases={liveCards} />
 
 			{/* Impact stats band */}
 			<section
