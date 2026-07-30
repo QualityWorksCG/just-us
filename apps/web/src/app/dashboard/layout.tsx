@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 import { AppShell } from "@/components/dashboard/app-shell";
 import { requireOnboarded } from "@/lib/auth-server";
+import { getFlags } from "@/lib/flags-server";
 
 export default async function DashboardLayout({
 	children,
@@ -18,12 +19,17 @@ export default async function DashboardLayout({
 	// expanded sidebar renders first and snaps shut on hydration.
 	const sidebarState = (await cookies()).get("sidebar_state")?.value;
 
+	// Flag state is read here and handed down, so the client sidebar stays a pure
+	// render of what the server decided rather than fetching flags itself. (JUS-13)
+	const flags = await getFlags();
+
 	return (
 		<AppShell
 			role={role}
 			name={session.user.name}
 			email={session.user.email}
 			defaultOpen={sidebarState !== "false"}
+			flags={flags}
 		>
 			{children}
 		</AppShell>

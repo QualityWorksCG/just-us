@@ -1,0 +1,17 @@
+{
+	"name": "@just-us/flags",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./registry": "./src/registry.ts"
+	},
+	"dependencies": {
+		"@just-us/db": "workspace:*"
+	},
+	"devDependencies": {
+		"@just-us/config": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

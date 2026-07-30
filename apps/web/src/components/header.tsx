@@ -24,6 +24,7 @@ const CHROME_LESS_ROUTES = [
 	"/reset-password",
 	"/verify-email",
 	"/onboarding",
+	"/cases/new",
 	"/terms",
 	"/privacy",
 ];

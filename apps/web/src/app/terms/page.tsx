@@ -102,11 +102,12 @@ export default function TermsPage() {
 					running the service.
 				</p>
 				<p>
-					A person reviews every case before it can go public. We may decline,
-					remove, or unpublish content at our discretion, and vetting does not
-					guarantee any outcome. You are responsible for the accuracy of what
-					you submit and must not post anything false, unlawful, or that
-					violates someone else's rights or a court order.
+					Cases go live when the plaintiff publishes them; JustUs does not
+					pre-screen or review cases before publication. We may decline, remove,
+					or unpublish content at our discretion, but doing so is not guaranteed
+					and no listing implies our endorsement. You are responsible for the
+					accuracy of what you submit and must not post anything false,
+					unlawful, or that violates someone else's rights or a court order.
 				</p>
 			</section>
 

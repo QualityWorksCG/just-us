@@ -1,38 +1,155 @@
+// biome-ignore-all lint/performance/noImgElement: case covers are user-uploaded Blob URLs, not static assets
+import { browseLiveCases } from "@just-us/db/cases";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { ArrowLeft, FileText } from "lucide-react";
-import type { Metadata } from "next";
+import { Scale, SearchX } from "lucide-react";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 
+import { BrowseControls } from "@/components/browse-controls";
+
 export const metadata: Metadata = {
-	title: "Browse cases",
+	title: "Browse cases · JustUs Financial",
 	description:
-		"Browse cases seeking support on JustUs and back someone's fight for justice.",
+		"Browse cases people are funding on JustUs and back someone's fight for justice.",
 };
 
-export default function CasesPage() {
+function money(n: number) {
+	return new Intl.NumberFormat("en-US", {
+		style: "currency",
+		currency: "USD",
+		maximumFractionDigits: 0,
+	}).format(n);
+}
+
+export default async function BrowseCasesPage({
+	searchParams,
+}: {
+	searchParams: Promise<{
+		q?: string;
+		state?: string;
+		category?: string;
+		sort?: string;
+	}>;
+}) {
+	const sp = await searchParams;
+	const sort =
+		sp.sort === "funded" || sp.sort === "newest" ? sp.sort : "trending";
+	const cases = await browseLiveCases({
+		q: sp.q,
+		state: sp.state,
+		category: sp.category,
+		sort,
+	});
+	const filtered = !!(sp.q || sp.state || sp.category);
+
 	return (
-		<main className="flex h-full items-center justify-center overflow-y-auto px-6 py-20">
-			<div className="mx-auto max-w-md text-center">
-				<FileText
-					className="mx-auto size-8 text-foreground"
-					aria-hidden="true"
-				/>
-				<h1 className="mt-6 font-semibold text-2xl tracking-tight">
-					The case directory is on its way
-				</h1>
-				<p className="mt-3 text-muted-foreground text-sm leading-relaxed">
-					Soon you'll be able to browse active cases and support the ones that
-					speak to you. Every donation is a gift that goes straight to a
-					person's legal representation.
+		<main className="h-full overflow-y-auto bg-paper">
+			<div className="mx-auto max-w-[1180px] px-6 py-12 sm:py-16">
+				<p className="font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.12em]">
+					Live now
 				</p>
-				<Link
-					href="/"
-					className={cn(buttonVariants({ variant: "outline" }), "mt-8")}
-				>
-					<ArrowLeft aria-hidden="true" />
-					Back home
-				</Link>
+				<h1 className="mt-2 font-extrabold text-[clamp(2rem,4.4vw,3rem)] text-ink leading-[1.03] tracking-[-0.03em]">
+					Browse cases people are funding
+				</h1>
+				<p className="mt-3 max-w-[56ch] text-[15px] text-ink-soft leading-relaxed">
+					Every dollar helps fund someone's day in court. Find a case that
+					matters to you.
+				</p>
+
+				<div className="mt-8">
+					<BrowseControls />
+				</div>
+
+				{cases.length === 0 ? (
+					<div className="mt-10 flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-6 py-16 text-center">
+						<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
+							<SearchX className="size-6" aria-hidden="true" />
+						</span>
+						<p className="font-bold text-[16px] text-ink">
+							{filtered ? "No cases match your search" : "No live cases yet"}
+						</p>
+						<p className="max-w-[44ch] text-[13.5px] text-muted-foreground leading-relaxed">
+							{filtered
+								? "Try clearing a filter or searching for something else."
+								: "As soon as a case goes live and starts raising, it'll show up here."}
+						</p>
+						{filtered && (
+							<Link
+								href={"/cases" as Route}
+								className={cn(buttonVariants({ variant: "outline" }), "mt-1")}
+							>
+								Clear filters
+							</Link>
+						)}
+					</div>
+				) : (
+					<div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+						{cases.map((c) => {
+							const goal = c.goalCents / 100;
+							const raised = c.raisedCents / 100;
+							const pct =
+								goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
+							const owner = c.owner?.name ?? "A plaintiff";
+							const ownerFirst = owner.split(" ")[0];
+							return (
+								<Link
+									key={c.id}
+									href={`/cases/${c.id}` as Route}
+									className="group flex flex-col overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)] transition-[transform,box-shadow,border-color] duration-[var(--dur-base)] hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[var(--shadow-hover)]"
+								>
+									<div className="relative aspect-[16/10] overflow-hidden bg-surface-2">
+										{c.coverImageUrl ? (
+											<img
+												src={c.coverImageUrl}
+												alt=""
+												className="size-full object-cover transition-transform duration-[var(--dur-base)] group-hover:scale-[1.03]"
+											/>
+										) : (
+											<div className="flex size-full items-center justify-center text-brass-deep/40">
+												<Scale className="size-9" aria-hidden="true" />
+											</div>
+										)}
+									</div>
+									<div className="flex flex-1 flex-col p-5">
+										<div className="mb-2.5 flex flex-wrap gap-1.5">
+											<span className="rounded-[var(--radius-chip)] bg-brass-wash px-2 py-0.5 font-semibold text-[11.5px] text-brass-deep">
+												{c.category || "Case"}
+											</span>
+											<span className="rounded-[var(--radius-chip)] border border-border px-2 py-0.5 text-[11.5px] text-ink-soft">
+												{c.location || "—"}
+											</span>
+										</div>
+										<h2 className="font-bold text-[16px] text-ink leading-snug">
+											{c.title || "Untitled case"}
+										</h2>
+										<p className="mt-1 text-[12.5px] text-muted-foreground">
+											{ownerFirst}
+											{c.attorneyName ? ` · with ${c.attorneyName}` : ""}
+										</p>
+										<div className="mt-4">
+											<div className="h-2 overflow-hidden rounded-full bg-surface-2">
+												<div
+													className="h-full rounded-full bg-brass"
+													style={{ width: `${Math.max(2, pct)}%` }}
+												/>
+											</div>
+											<div className="mt-2 flex items-center justify-between text-[12.5px]">
+												<span className="font-bold text-ink tabular-nums">
+													{money(raised)} of {money(goal)}
+												</span>
+												<span className="text-muted-foreground">
+													{c.donorsCount}{" "}
+													{c.donorsCount === 1 ? "donor" : "donors"}
+												</span>
+											</div>
+										</div>
+									</div>
+								</Link>
+							);
+						})}
+					</div>
+				)}
 			</div>
 		</main>
 	);
