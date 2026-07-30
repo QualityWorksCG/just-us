@@ -1,3 +1,6 @@
+import AdminInviteEmail, {
+	adminInviteSubject,
+} from "@just-us/email/admin-invite";
 import MagicLinkEmail, { magicLinkSubject } from "@just-us/email/magic-link";
 import ResetPasswordEmail, {
 	resetPasswordSubject,
@@ -74,5 +77,20 @@ export function sendMagicLinkEmail(params: {
 		to: params.to,
 		subject: magicLinkSubject,
 		react: MagicLinkEmail({ url: params.url, name: params.name }),
+	});
+}
+
+export function sendAdminInviteEmail(params: {
+	to: string;
+	url: string;
+	inviterName?: string;
+}) {
+	return send({
+		to: params.to,
+		subject: adminInviteSubject,
+		react: AdminInviteEmail({
+			url: params.url,
+			inviterName: params.inviterName,
+		}),
 	});
 }

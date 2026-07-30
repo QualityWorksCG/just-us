@@ -66,6 +66,8 @@ const MAGIC_LINK_ERRORS: Record<string, string> = {
 	INVALID_TOKEN: "That sign-in link is invalid. Request a new one.",
 	EXPIRED_TOKEN: "That sign-in link has expired. Request a new one.",
 	ATTEMPTS_EXCEEDED: "That sign-in link was already used. Request a new one.",
+	account_blocked:
+		"This account has been blocked. Contact support if you believe this is a mistake.",
 };
 
 export function AuthScreen({
@@ -89,7 +91,8 @@ export function AuthScreen({
 	const [mode, setMode] = useState<Mode>(initialMode);
 	const [pending, setPending] = useState(false);
 
-	// Surface a magic-link verification error redirected back to /login.
+	// Surface an error handed back on the /login URL — a magic-link verification
+	// failure, or a guard that signed a blocked account out.
 	useEffect(() => {
 		if (initialError) {
 			toast.error(
@@ -178,7 +181,13 @@ export function AuthScreen({
 				},
 				onError: (ctx) => {
 					const msg = ctx.error.message || ctx.error.statusText;
-					if (ctx.error.status === 403) {
+					// A blocked or locked account is also a 403 — only an unverified
+					// email should end up on /verify-email, so branch on the code the
+					// server sends before falling back to the status.
+					const code: string | undefined = ctx.error.code;
+					if (code === "BANNED_USER" || code === "ACCOUNT_LOCKED") {
+						toast.error(msg || "You can't sign in to this account.");
+					} else if (ctx.error.status === 403) {
 						toast.error(msg || "Please verify your email to sign in.");
 						router.push("/verify-email");
 					} else {

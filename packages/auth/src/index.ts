@@ -77,6 +77,11 @@ export function createAuth() {
 		// Role, onboarding state and attorney-profile fields are all set server-side
 		// during onboarding (never trusted from the client), so input is disabled.
 		// `onboarded` is exposed on the session so guards can gate the app on it.
+		//
+		// Every column the auth layer itself reads or writes must be declared here:
+		// the adapter only maps fields it finds in the Better Auth schema and
+		// silently drops the rest, so an undeclared column is invisible to
+		// ctx.context.adapter and internalAdapter.
 		user: {
 			additionalFields: {
 				onboarded: {
@@ -88,6 +93,9 @@ export function createAuth() {
 				firmName: { type: "string", required: false, input: false },
 				barNumber: { type: "string", required: false, input: false },
 				jurisdiction: { type: "string", required: false, input: false },
+				failedLoginAttempts: { type: "number", required: false, input: false },
+				lockedUntil: { type: "date", required: false, input: false },
+				lastSignInAt: { type: "date", required: false, input: false },
 			},
 		},
 
@@ -106,8 +114,16 @@ export function createAuth() {
 		},
 
 		hooks: {
-			// Reject sign-in for a locked account before credentials are checked.
 			before: createAuthMiddleware(async (ctx) => {
+				// Every administrative mutation goes through a server action so it
+				// carries an audit entry and the last-administrator rule; the admin
+				// plugin is kept only for its sign-in ban check and access control, so
+				// its HTTP surface is closed off entirely.
+				if (ctx.path.startsWith("/admin/")) {
+					throw new APIError("NOT_FOUND");
+				}
+
+				// Reject sign-in for a locked account before credentials are checked.
 				if (ctx.path !== "/sign-in/email") return;
 				const email = String(
 					(ctx.body as { email?: string })?.email ?? "",
@@ -118,9 +134,12 @@ export function createAuth() {
 					where: [{ field: "email", value: email }],
 				})) as { lockedUntil?: Date | string | null } | null;
 				if (user?.lockedUntil && new Date(user.lockedUntil) > new Date()) {
-					throw new APIError("FORBIDDEN", {
+					// A lockout is not a block — the client branches on this code to
+					// tell the two apart (the admin plugin uses BANNED_USER).
+					throw APIError.from("FORBIDDEN", {
 						message:
 							"This account is temporarily locked after too many failed sign-in attempts. Try again later or reset your password.",
+						code: "ACCOUNT_LOCKED",
 					});
 				}
 			}),
@@ -166,12 +185,30 @@ export function createAuth() {
 			}),
 		},
 
+		// Session creation is the single point every sign-in passes through
+		// (password and magic link alike), so the last-sign-in stamp lives here.
+		// These merge with the admin plugin's own session.create.before ban check
+		// rather than replacing it — every registered hook for a model runs.
+		databaseHooks: {
+			session: {
+				create: {
+					after: async (session, ctx) => {
+						await ctx?.context.internalAdapter.updateUser(session.userId, {
+							lastSignInAt: new Date(),
+						});
+					},
+				},
+			},
+		},
+
 		plugins: [
 			admin({
 				ac: accessControl,
 				roles,
 				defaultRole: DEFAULT_ROLE,
 				adminRoles: ["administrator"],
+				bannedUserMessage:
+					"This account has been blocked. Contact support if you believe this is a mistake.",
 			}),
 			magicLink({
 				// Magic link is a returning-user sign-in convenience, not a signup
