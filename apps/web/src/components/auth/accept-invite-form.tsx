@@ -3,7 +3,7 @@
 import { Button } from "@just-us/ui/components/button";
 import { Input } from "@just-us/ui/components/input";
 import { cn } from "@just-us/ui/lib/utils";
-import { ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
@@ -13,6 +13,30 @@ import { AuthMiniShell } from "./auth-mini-shell";
 
 const inputClass =
 	"h-10 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]";
+
+function VisibilityToggle({
+	shown,
+	onToggle,
+}: {
+	shown: boolean;
+	onToggle: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onToggle}
+			aria-label={shown ? "Hide password" : "Show password"}
+			aria-pressed={shown}
+			className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-ink"
+		>
+			{shown ? (
+				<EyeOff className="size-4" aria-hidden="true" />
+			) : (
+				<Eye className="size-4" aria-hidden="true" />
+			)}
+		</button>
+	);
+}
 
 export function AcceptInviteForm({
 	token,
@@ -27,6 +51,8 @@ export function AcceptInviteForm({
 	const [name, setName] = useState("");
 	const [password, setPassword] = useState("");
 	const [confirm, setConfirm] = useState("");
+	const [showPassword, setShowPassword] = useState(false);
+	const [showConfirm, setShowConfirm] = useState(false);
 	const [errors, setErrors] = useState<Record<string, string>>({});
 	const [pending, setPending] = useState(false);
 
@@ -104,16 +130,22 @@ export function AcceptInviteForm({
 					<label htmlFor={pwId} className="font-semibold text-[13px] text-ink">
 						Password
 					</label>
-					<Input
-						id={pwId}
-						className={cn(inputClass)}
-						type="password"
-						value={password}
-						onChange={(e) => setPassword(e.target.value)}
-						placeholder="Create a password"
-						autoComplete="new-password"
-						aria-invalid={!!errors.password}
-					/>
+					<div className="relative">
+						<Input
+							id={pwId}
+							className={cn(inputClass, "w-full pr-10")}
+							type={showPassword ? "text" : "password"}
+							value={password}
+							onChange={(e) => setPassword(e.target.value)}
+							placeholder="Create a password"
+							autoComplete="new-password"
+							aria-invalid={!!errors.password}
+						/>
+						<VisibilityToggle
+							shown={showPassword}
+							onToggle={() => setShowPassword((v) => !v)}
+						/>
+					</div>
 					<p className="text-[12px] text-muted-foreground">
 						At least 8 characters, with one number or symbol.
 					</p>
@@ -125,16 +157,22 @@ export function AcceptInviteForm({
 					>
 						Confirm password
 					</label>
-					<Input
-						id={confirmId}
-						className={cn(inputClass)}
-						type="password"
-						value={confirm}
-						onChange={(e) => setConfirm(e.target.value)}
-						placeholder="Re-enter your password"
-						autoComplete="new-password"
-						aria-invalid={!!errors.password}
-					/>
+					<div className="relative">
+						<Input
+							id={confirmId}
+							className={cn(inputClass, "w-full pr-10")}
+							type={showConfirm ? "text" : "password"}
+							value={confirm}
+							onChange={(e) => setConfirm(e.target.value)}
+							placeholder="Re-enter your password"
+							autoComplete="new-password"
+							aria-invalid={!!errors.password}
+						/>
+						<VisibilityToggle
+							shown={showConfirm}
+							onToggle={() => setShowConfirm((v) => !v)}
+						/>
+					</div>
 				</div>
 				{errors.password && (
 					<p className="text-[12px] text-danger">{errors.password}</p>
