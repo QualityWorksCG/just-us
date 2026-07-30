@@ -36,6 +36,15 @@ import { getRoleNav, visibleNavItems } from "@/lib/dashboard-nav";
  */
 const CONTENT_COLUMN = "w-full px-6 sm:px-10 lg:px-12";
 
+/**
+ * The sidebar's brand block and the content header's title bar are two separate
+ * bars whose bottom borders read as one continuous line across the viewport, so
+ * they have to be exactly the same height. Pinning both to a fixed height keeps
+ * them locked together — deriving the height from padding lets the taller
+ * contents (the size-9 bell vs. the 30px brandmark) pull the borders apart.
+ */
+const CHROME_BAR_HEIGHT = "h-16";
+
 function initials(name: string) {
 	return (
 		name
@@ -92,7 +101,10 @@ export function AppShell({
 				<SidebarHeader className="p-0">
 					<Link
 						href="/"
-						className="flex items-center gap-3 border-sidebar-border border-b px-[18px] py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+						className={cn(
+							CHROME_BAR_HEIGHT,
+							"flex items-center gap-3 border-sidebar-border border-b px-[18px] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0",
+						)}
 					>
 						<Brandmark size={30} />
 						{/* Wordmark is dropped in the icon rail; the mark alone carries it. */}
@@ -187,7 +199,13 @@ export function AppShell({
 					collapses. Keep CONTENT_COLUMN identical in both places.
 				*/}
 				<header className="sticky top-0 z-30 border-border border-b bg-surface">
-					<div className={cn(CONTENT_COLUMN, "flex items-center gap-3 py-5")}>
+					<div
+						className={cn(
+							CONTENT_COLUMN,
+							CHROME_BAR_HEIGHT,
+							"flex items-center gap-3",
+						)}
+					>
 						<SidebarTrigger className="-ml-1 text-ink-soft" />
 						<span className="flex-1 truncate font-bold text-[14px] text-ink">
 							{current?.title}

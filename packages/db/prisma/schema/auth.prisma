@@ -38,6 +38,10 @@ model User {
   accounts Account[]
   cases    Case[]
 
+  // Public directory profile. Only attorneys have one, and only once they've
+  // filled it in — see AttorneyProfile.
+  attorneyProfile AttorneyProfile?
+
   @@unique([email])
   @@map("user")
 }

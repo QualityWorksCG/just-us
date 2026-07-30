@@ -1,0 +1,98 @@
+// How an attorney charges for the work. Drives whether a fee range is
+// meaningful: a flat/hourly/quoted attorney can state one, a contingency
+// attorney charges a share of the recovery instead.
+enum FeeApproach {
+  flat
+  hourly
+  contingency
+  quoted_per_case
+}
+
+// Review state of attorney-written free text. Free text is held back from the
+// public directory until an administrator approves it, and drops back to
+// `pending` whenever the attorney edits it.
+enum ModerationStatus {
+  pending
+  approved
+  rejected
+}
+
+/// The attorney's public directory profile — everything the attorney enters
+/// themselves and can edit at will ("Group A"). Separate from `User` because it
+/// is public-facing, moderated, and only exists for attorneys; the account
+/// fields captured at sign-up (bar number, jurisdiction) stay on `User`.
+///
+/// A row is created the first time the attorney saves their profile, so its
+/// absence means "not filled in yet" rather than "empty profile".
+///
+/// Every attorney-entered column is nullable, because the form autosaves as a
+/// draft — the same split the case wizard uses (see `saveDraft` vs
+/// `publishCase` in cases.ts). "Required" fields are required to be
+/// *directory-ready*, not to be stored, so a half-filled profile persists
+/// rather than being lost. Readiness is derived from the columns, not stored, so
+/// it can never drift from the values it describes.
+model AttorneyProfile {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  // Identity. legalName must match the bar record — it is what the directory
+  // shows and what bar verification is checked against.
+  legalName String?
+  firmName  String?
+
+  // Single primary office. officeState holds a US_STATES value (see
+  // @just-us/auth/jurisdiction) — stored as a string like `User.jurisdiction`
+  // so the two compare directly.
+  officeCity  String?
+  officeState String?
+
+  contactEmail String?
+  contactPhone String?
+  websiteUrl   String?
+
+  /// Vercel Blob URL of the attorney's headshot.
+  headshotUrl String?
+
+  /// Controlled vocabulary only — see PRACTICE_AREAS in the web app's
+  /// attorney-profile lib. At least one is needed to be directory-ready.
+  practiceAreas String[] @default([])
+
+  /// Optional share of practice per area, as `{ "<area>": <pct> }`. Either left
+  /// empty or set for the selected areas totalling 100 — never partial.
+  practiceAreaShares Json?
+
+  /// Controlled vocabulary only — see LANGUAGES.
+  languages String[] @default([])
+
+  /// Whether the attorney is currently taking on new matters. Drives whether
+  /// they surface in the representation queue.
+  acceptingNewCases   Boolean @default(true)
+  /// Whether they will meet a prospective client remotely.
+  virtualConsultation Boolean @default(false)
+
+  feeApproach FeeApproach?
+
+  /// Indicative fee range in whole cents (like `Case.goalCents`). Not collected
+  /// for contingency work, where the fee is a share of the recovery.
+  feeRangeMinCents Int?
+  feeRangeMaxCents Int?
+
+  /// Attorney-written blurb, 600 chars max. Moderated before it can appear
+  /// publicly — see `bioStatus`.
+  bio        String?
+  /// Education and prior roles, 400 chars max.
+  background String?
+
+  /// Moderation state of `bio`. Reset to `pending` on every edit, so an
+  /// approved bio cannot be swapped for unreviewed text after the fact.
+  bioStatus     ModerationStatus @default(pending)
+  bioReviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([officeState])
+  @@index([acceptingNewCases])
+  @@map("attorney_profile")
+}
