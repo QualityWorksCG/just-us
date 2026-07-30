@@ -17,7 +17,22 @@ export function activeBlockWhere(at: Date): Prisma.UserWhereInput {
 	};
 }
 
-function whereForUsers(filter: UserListFilter, at: Date): Prisma.UserWhereInput {
+/**
+ * Explicit complement of activeBlockWhere. Never-blocked accounts have
+ * banned = NULL (the column has no default), and NOT (banned = true AND ...)
+ * evaluates to NULL for them under SQL three-valued logic — a Prisma NOT would
+ * silently exclude every such row from "not blocked".
+ */
+export function notActiveBlockWhere(at: Date): Prisma.UserWhereInput {
+	return {
+		OR: [{ banned: null }, { banned: false }, { banExpires: { lte: at } }],
+	};
+}
+
+function whereForUsers(
+	filter: UserListFilter,
+	at: Date,
+): Prisma.UserWhereInput {
 	const where: Prisma.UserWhereInput = {};
 	if (filter.q) {
 		where.OR = [
@@ -32,11 +47,9 @@ function whereForUsers(filter: UserListFilter, at: Date): Prisma.UserWhereInput 
 		where.emailVerified = filter.verified;
 	}
 	if (filter.blocked !== undefined) {
-		if (filter.blocked) {
-			where.AND = [activeBlockWhere(at)];
-		} else {
-			where.NOT = [activeBlockWhere(at)];
-		}
+		where.AND = [
+			filter.blocked ? activeBlockWhere(at) : notActiveBlockWhere(at),
+		];
 	}
 	return where;
 }
@@ -111,7 +124,11 @@ export type BlockUserResult =
 	| { ok: true }
 	| {
 			ok: false;
-			code: "not_found" | "self_block" | "already_blocked" | "last_administrator";
+			code:
+				| "not_found"
+				| "self_block"
+				| "already_blocked"
+				| "last_administrator";
 	  };
 
 /**
@@ -141,7 +158,7 @@ export async function blockUser(
 
 			if (target.role === "administrator") {
 				const activeAdmins = await tx.user.count({
-					where: { role: "administrator", NOT: [activeBlockWhere(at)] },
+					where: { role: "administrator", AND: [notActiveBlockWhere(at)] },
 				});
 				if (activeAdmins <= 1) {
 					return { ok: false, code: "last_administrator" };
