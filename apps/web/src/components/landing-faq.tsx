@@ -22,7 +22,7 @@ const faqs = [
 	},
 	{
 		q: "How do I know a case is real?",
-		a: "A person on our vetting team reviews every case — story, evidence, and identity — before it can be listed or funded. Every attorney verifies their bar standing per jurisdiction before their profile activates. AI helps flag gaps, but it never decides.",
+		a: "Every case is tied to a real, bar-verified attorney the plaintiff chose — attorneys confirm their standing per jurisdiction before they appear. Plaintiffs post their own story and evidence, and you follow every case to its outcome. AI can help flag gaps, but it never decides.",
 	},
 	{
 		q: "What does JustUs earn?",

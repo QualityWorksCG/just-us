@@ -1,0 +1,56 @@
+import { getOwnedCase } from "@just-us/db/cases";
+
+import { CaseWizard, type WizardInitial } from "@/components/cases/case-wizard";
+import { requireOnboarded, requireRole } from "@/lib/auth-server";
+
+// Full-page case-creation wizard. A plaintiff can run several cases, so this
+// only resumes a draft when `?draft=<id>` is given; otherwise it starts fresh.
+export default async function NewCasePage({
+	searchParams,
+}: {
+	searchParams: Promise<{ draft?: string }>;
+}) {
+	await requireRole("plaintiff");
+	const session = await requireOnboarded();
+	// Prefill the case's state from the jurisdiction captured at onboarding (JUS-12).
+	const jurisdiction =
+		(session.user as { jurisdiction?: string | null }).jurisdiction ?? "";
+
+	const draftId = (await searchParams)?.draft;
+	const source = draftId ? await getOwnedCase(draftId, session.user.id) : null;
+
+	const initial: WizardInitial | null = source
+		? {
+				id: source.id,
+				title: source.title,
+				category: source.category,
+				location: source.location,
+				story: source.story,
+				goalCents: source.goalCents,
+				payoutType: source.payoutType,
+				attorney: source.attorneyName
+					? {
+							name: source.attorneyName,
+							firm: source.attorneyFirm ?? "",
+							area: source.attorneyArea ?? "",
+							location: source.attorneyLocation ?? "",
+							email: source.attorneyEmail ?? "",
+							phone: source.attorneyPhone ?? "",
+						}
+					: null,
+				evidence: Array.isArray(source.evidence)
+					? (source.evidence as { name: string; size: number }[])
+					: [],
+				coverImageUrl: source.coverImageUrl,
+				images: source.images ?? [],
+			}
+		: null;
+
+	return (
+		<CaseWizard
+			name={session.user.name}
+			jurisdiction={jurisdiction}
+			initial={initial}
+		/>
+	);
+}

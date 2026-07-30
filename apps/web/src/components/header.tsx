@@ -6,9 +6,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { authClient } from "@/lib/auth-client";
+
 import { Brandmark } from "./brandmark";
-import { ModeToggle } from "./mode-toggle";
-import UserMenu from "./user-menu";
 
 const links = [
 	{ href: "/cases", label: "Donate" },
@@ -16,18 +16,22 @@ const links = [
 	{ href: "/attorneys", label: "For attorneys" },
 ] as const;
 
-// Full-bleed auth flows render their own chrome — hide the site header there.
+// Full-bleed auth flows and the dashboard render their own chrome — hide the
+// site header there.
 const CHROME_LESS_ROUTES = [
+	"/dashboard",
 	"/login",
 	"/reset-password",
 	"/verify-email",
 	"/onboarding",
+	"/cases/new",
 	"/terms",
 	"/privacy",
 ];
 
 export default function Header() {
 	const pathname = usePathname();
+	const { data: session } = authClient.useSession();
 	const [scrolled, setScrolled] = useState(false);
 
 	useEffect(() => {
@@ -41,13 +45,18 @@ export default function Header() {
 		return null;
 	}
 
+	// Signed-in users navigate from the app shell, not the marketing header.
+	if (session) {
+		return null;
+	}
+
 	return (
 		<header
 			className={cn(
 				"sticky top-0 z-50 border-b transition-[background,box-shadow,border-color] duration-200",
 				scrolled
 					? "border-border bg-paper/90 shadow-[var(--shadow-rest)] backdrop-blur-md"
-					: "border-transparent bg-transparent",
+					: "border-line/60 bg-transparent",
 			)}
 		>
 			<div className="mx-auto flex h-16 max-w-[1180px] items-center justify-between gap-4 px-6">
@@ -79,7 +88,6 @@ export default function Header() {
 				</nav>
 
 				<div className="flex items-center gap-2">
-					<ModeToggle />
 					<Link
 						href="/login"
 						className={cn(
@@ -98,7 +106,6 @@ export default function Header() {
 					>
 						Start your case
 					</Link>
-					<UserMenu />
 				</div>
 			</div>
 		</header>
