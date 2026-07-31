@@ -1,5 +1,4 @@
 import type { DirectoryProfile } from "@just-us/db/attorney-directory";
-import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	ChevronLeft,
@@ -8,7 +7,6 @@ import {
 	Lock,
 	Mail,
 	Phone,
-	Send,
 	ShieldCheck,
 } from "lucide-react";
 import type { Route } from "next";
@@ -20,6 +18,7 @@ import {
 	Rating,
 	yearsLicensed,
 } from "@/components/attorneys/attorney-card";
+import { ContactAttorneyButton } from "@/components/attorneys/contact-attorney-button";
 import { FEE_APPROACHES } from "@/lib/attorney-profile";
 
 /**
@@ -417,16 +416,11 @@ export function AttorneyProfileView({
 							whether to take it. If they accept, you agree a fee together and
 							it becomes your funding goal.
 						</p>
-						<Link
-							href="/cases/new"
-							className={cn(
-								buttonVariants({ size: "lg" }),
-								"mt-4 w-full justify-center",
-							)}
-						>
-							<Send aria-hidden="true" />
-							Contact
-						</Link>
+						<ContactAttorneyButton
+							attorneyName={attorney.legalName ?? ""}
+							size="lg"
+							className="mt-4 w-full justify-center"
+						/>
 					</Card>
 
 					<Card>

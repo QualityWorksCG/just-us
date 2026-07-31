@@ -84,8 +84,8 @@ export function ContactAttorneyButton({
 							className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed"
 						>
 							There's no message box — {firstName} decides from the case itself:
-							what happened, where, and what you're asking for. So the next screen
-							is the case form.
+							what happened, where, and what you're asking for. So the next
+							screen is the case form.
 						</p>
 
 						<ul className="mt-4 flex flex-col gap-2.5">

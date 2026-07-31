@@ -2,9 +2,10 @@
 import type { DirectoryAttorney } from "@just-us/db/attorney-directory";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { Eye, Send } from "lucide-react";
+import { Eye } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
+import { ContactAttorneyButton } from "@/components/attorneys/contact-attorney-button";
 import { FEE_APPROACHES } from "@/lib/attorney-profile";
 
 /** Years licensed, derived so it can't go stale. Null when we don't know. */
@@ -223,17 +224,13 @@ export function AttorneyCard({
 						View profile
 					</Link>
 					{/* Contact routes through case submission: an attorney needs the case
-					    to decide, so there is nothing to send them without one. */}
-					<Link
-						href="/cases/new"
-						className={cn(
-							buttonVariants({ size: "sm" }),
-							"w-full justify-center",
-						)}
-					>
-						<Send aria-hidden="true" />
-						Contact
-					</Link>
+					    to decide, so there is nothing to send them without one. The button
+					    explains that before moving them, rather than dropping them into the
+					    wizard unannounced. */}
+					<ContactAttorneyButton
+						attorneyName={attorney.legalName}
+						className="w-full justify-center"
+					/>
 				</div>
 			</div>
 		</article>
