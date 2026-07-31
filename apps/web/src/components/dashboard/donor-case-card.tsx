@@ -17,7 +17,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { toggleSaveAction } from "@/app/dashboard/donor-actions";
+import { toggleSaveAction } from "@/app/(app)/donor-actions";
 import type { DonorCase } from "@/components/dashboard/donor-case";
 
 function money(n: number) {

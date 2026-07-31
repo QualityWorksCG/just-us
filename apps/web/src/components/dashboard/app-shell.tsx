@@ -23,18 +23,32 @@ import { usePathname } from "next/navigation";
 
 import { Brandmark } from "@/components/brandmark";
 import { authClient } from "@/lib/auth-client";
-import { getRoleNav, visibleNavItems } from "@/lib/dashboard-nav";
+import {
+	findScreenByPath,
+	getRoleNav,
+	HOME_PATH,
+	navPath,
+	visibleNavItems,
+} from "@/lib/dashboard-nav";
 
 /**
- * Shared by the dashboard header and page body so the header title and the page
- * heading always sit on the same left edge, at any window width and in both
- * sidebar states.
+ * Shared by the dashboard header and page body so the bar's controls line up with
+ * the page's own left edge, at any window width and in both sidebar states.
  *
  * Full-bleed by design: the content fills whatever width the sidebar leaves, with
  * only gutter padding. No max-width and no centring — the page grows with the
  * viewport instead of stranding a fixed column in the middle of a wide screen.
  */
 const CONTENT_COLUMN = "w-full px-6 sm:px-10 lg:px-12";
+
+/**
+ * The sidebar's brand block and the content header bar are two separate
+ * bars whose bottom borders read as one continuous line across the viewport, so
+ * they have to be exactly the same height. Pinning both to a fixed height keeps
+ * them locked together — deriving the height from padding lets the taller
+ * contents (the size-9 bell vs. the 30px brandmark) pull the borders apart.
+ */
+const CHROME_BAR_HEIGHT = "h-16";
 
 function initials(name: string) {
 	return (
@@ -68,13 +82,14 @@ export function AppShell({
 	const nav = getRoleNav(role);
 	const items = visibleNavItems(role, flags);
 
-	const activeSlug =
-		pathname === "/dashboard"
-			? ""
-			: (pathname.replace(/^\/dashboard\/?/, "").split("/")[0] ?? "");
-	// Title lookup uses the unfiltered list so a flagged screen still names itself
-	// correctly during the render right after it's switched off.
-	const current = nav.items.find((i) => i.slug === activeSlug) ?? items[0];
+	// The screen this URL belongs to — its title is the page heading in the bar
+	// below, and its slug marks the active nav entry. Resolved from the registry
+	// rather than by parsing the URL: screens sit at the top level and a couple of
+	// them don't match their slug, so the path is the only thing that identifies
+	// them. Falls back to the unfiltered list so a screen still names itself during
+	// the render right after its flag is switched off.
+	const current = findScreenByPath(role, pathname ?? "") ?? items[0];
+	const activeSlug = current?.slug;
 
 	async function signOut() {
 		await authClient.signOut();
@@ -90,9 +105,15 @@ export function AppShell({
 			*/}
 			<Sidebar collapsible="icon">
 				<SidebarHeader className="p-0">
+					{/* The role home, not `/` — a signed-in user is redirected off the
+					    marketing page anyway (see proxy.ts), so pointing the mark there
+					    would only bounce them back via a round trip. */}
 					<Link
-						href="/"
-						className="flex items-center gap-3 border-sidebar-border border-b px-[18px] py-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+						href={HOME_PATH as Route}
+						className={cn(
+							CHROME_BAR_HEIGHT,
+							"flex items-center gap-3 border-sidebar-border border-b px-[18px] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0",
+						)}
 					>
 						<Brandmark size={30} />
 						{/* Wordmark is dropped in the icon rail; the mark alone carries it. */}
@@ -116,9 +137,7 @@ export function AppShell({
 					<SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
 						<SidebarMenu className="gap-0.5">
 							{items.map((item) => {
-								const href = (
-									item.slug ? `/dashboard/${item.slug}` : "/dashboard"
-								) as Route;
+								const href = navPath(item) as Route;
 								const active = item.slug === activeSlug;
 								return (
 									<SidebarMenuItem key={item.slug || "home"}>
@@ -181,17 +200,36 @@ export function AppShell({
 			<div className="flex min-w-0 flex-1 flex-col bg-paper">
 				{/*
 					The header bar spans full width (border + background reach the edges) but
-					its contents share the same centred, max-width column as <main> below —
-					otherwise the header title sits flush left while the page heading is
-					centred, and the gap between them changes every time the sidebar
-					collapses. Keep CONTENT_COLUMN identical in both places.
+					its contents share the same column as <main> below, so the sidebar
+					toggle sits on the same left edge as the page heading beneath it.
+					Keep CONTENT_COLUMN identical in both places.
 				*/}
 				<header className="sticky top-0 z-30 border-border border-b bg-surface">
-					<div className={cn(CONTENT_COLUMN, "flex items-center gap-3 py-5")}>
+					<div
+						className={cn(
+							CONTENT_COLUMN,
+							CHROME_BAR_HEIGHT,
+							"flex items-center gap-3",
+						)}
+					>
 						<SidebarTrigger className="-ml-1 text-ink-soft" />
-						<span className="flex-1 truncate font-bold text-[14px] text-ink">
+						{/*
+							The screen title lives here and only here — pages no longer repeat
+							it. It's the page's <h1>, not a decorative label: the title comes
+							from the route, so this is the real document heading and marking it
+							up as one keeps a single, correct h1 per screen. Pages with a
+							heading of their own (a greeting, a case title) use <h2> beneath it.
+						*/}
+						{/*
+							Sized as a heading, not a label. It carries the weight the old
+							on-page h1 had (extrabold, negative tracking) at a size that still
+							clears the 64px bar — the bell is the tallest thing in here at 36px,
+							so there's room to be assertive without pushing the bar's border out
+							of line with the sidebar's.
+						*/}
+						<h1 className="flex-1 truncate font-extrabold text-[19px] text-ink tracking-[-0.02em]">
 							{current?.title}
-						</span>
+						</h1>
 						<span
 							className="flex size-9 items-center justify-center rounded-full border border-border text-ink-soft"
 							aria-hidden="true"

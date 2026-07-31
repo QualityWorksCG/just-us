@@ -6,6 +6,7 @@ import {
 	type Role,
 	roleHasPermission,
 } from "@just-us/auth";
+import { isBlocked } from "@just-us/auth/user-status";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -49,6 +50,19 @@ export async function requireVerifiedSession() {
 	if (!session.user.emailVerified) {
 		redirect("/verify-email");
 	}
+	// Blocking deletes the account's sessions, so this only ever catches one that
+	// outlived the block (a cached cookie session, say). Sign out so the stale
+	// cookie can't keep being presented.
+	const banFields = session.user as {
+		banned?: boolean | null;
+		banExpires?: Date | string | null;
+	};
+	if (isBlocked(banFields)) {
+		try {
+			await auth.api.signOut({ headers: await headers() });
+		} catch {}
+		redirect("/login?mode=signin&error=account_blocked");
+	}
 	return session;
 }
 
@@ -68,14 +82,14 @@ export async function requireOnboarded() {
 
 /**
  * Require the current user to hold one of the allowed roles. Verified session is
- * implied. Sends unauthorized users to /dashboard (their own home) rather than
+ * implied. Sends unauthorized users to /home (their own home) rather than
  * leaking the existence of the resource. (JUS-9)
  */
 export async function requireRole(...allowed: Role[]) {
 	const session = await requireVerifiedSession();
 	const role = (session.user as { role?: Role }).role;
 	if (!role || !allowed.includes(role)) {
-		redirect("/dashboard");
+		redirect("/home");
 	}
 	return { session, role };
 }
@@ -94,7 +108,29 @@ export async function requirePermission(permission: Permission) {
 	const session = await requireVerifiedSession();
 	const role = (session.user as { role?: Role }).role;
 	if (!role || !roleHasPermission(role, permission)) {
-		redirect("/dashboard");
+		redirect("/home");
 	}
 	return { session, role };
+}
+
+export type AdminGuard =
+	| {
+			ok: true;
+			userId: string;
+			session: NonNullable<Awaited<ReturnType<typeof getSession>>>;
+	  }
+	| { ok: false; error: string };
+
+/**
+ * Non-redirecting administrator check for mutations. A non-admin hitting an
+ * admin endpoint directly must get a denial the caller can render, not the
+ * redirect the require* helpers issue.
+ */
+export async function guardAdministrator(): Promise<AdminGuard> {
+	const session = await getSession();
+	const role = (session?.user as { role?: Role } | undefined)?.role;
+	if (!session?.user.emailVerified || role !== "administrator") {
+		return { ok: false, error: "You are not permitted to do that." };
+	}
+	return { ok: true, userId: session.user.id, session };
 }

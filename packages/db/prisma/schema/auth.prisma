@@ -25,7 +25,8 @@ model User {
   firmName  String?
   barNumber String?
 
-  // Better Auth admin plugin: ban state (used here for account lockout too).
+  // Administrator-initiated block, distinct from the automated lockout below.
+  // Null banExpires means indefinite; a past banExpires means the block lapsed.
   banned     Boolean?
   banReason  String?
   banExpires DateTime?
@@ -34,9 +35,25 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  // Written by the session.create hook in packages/auth on every sign-in.
+  lastSignInAt DateTime?
+
   sessions Session[]
   accounts Account[]
   cases    Case[]
+
+  // Public directory profile. Only attorneys have one, and only once they've
+  // filled it in — see AttorneyProfile.
+  attorneyProfile AttorneyProfile?
+
+  // Attorney side of representation (JUS-25). Seeking cases this attorney has
+  // expressed interest in, and the cases they were matched to.
+  representationInterests AttorneyRequest[]
+  matches                 Match[]
+
+  // Administration (JUS-67): invitations this user sent, and their audit trail.
+  sentAdminInvitations AdminInvitation[] @relation("AdminInvitationInviter")
+  auditEntries         AuditLog[]        @relation("AuditLogActor")
 
   @@unique([email])
   @@map("user")

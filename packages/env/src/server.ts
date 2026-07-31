@@ -48,9 +48,6 @@ export const env = createEnv({
 		// app boots without it (uploads simply fail with a clear error).
 		BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
 		EMAIL_SOURCE: z.string().min(1).default("just-us <onboarding@resend.dev>"),
-		// Invite code required to self-register as an administrator (JUS-11).
-		// When unset, administrator sign-up is disabled entirely.
-		ADMIN_INVITE_CODE: z.string().min(1).optional(),
 		NODE_ENV: z
 			.enum(["development", "production", "test"])
 			.default("development"),

@@ -12,7 +12,7 @@ import { Switch } from "@just-us/ui/components/switch";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { toggleFlagAction } from "@/app/dashboard/flag-actions";
+import { toggleFlagAction } from "@/app/(app)/flag-actions";
 
 /**
  * Administrator control for feature flags (JUS-13).

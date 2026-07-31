@@ -11,7 +11,7 @@ import {
 	softDeleteCase,
 	updateOwnedCase,
 } from "@just-us/db/cases";
-import { acceptRequest, declineRequest } from "@just-us/db/requests";
+import { acceptInterest, declineInterest } from "@just-us/db/requests";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -145,7 +145,7 @@ export async function deleteCaseAction(id: string): Promise<DeleteCaseResult> {
 
 	try {
 		await deleteDraft(id, session.user.id);
-		revalidatePath("/dashboard/cases");
+		revalidatePath("/my-cases");
 		return { ok: true };
 	} catch {
 		return { ok: false, error: "Couldn't delete the draft. Please try again." };
@@ -160,7 +160,7 @@ export async function restoreCaseAction(id: string): Promise<DeleteCaseResult> {
 		if (res.count === 0) {
 			return { ok: false, error: "Couldn't find that case to restore." };
 		}
-		revalidatePath("/dashboard/cases");
+		revalidatePath("/my-cases");
 		return { ok: true };
 	} catch {
 		return { ok: false, error: "Couldn't restore the case. Please try again." };
@@ -178,8 +178,8 @@ export async function deleteOwnedCaseAction(
 	}
 	try {
 		await softDeleteCase(id, session.user.id);
-		revalidatePath("/dashboard/cases");
-		revalidatePath("/dashboard");
+		revalidatePath("/my-cases");
+		revalidatePath("/home");
 		return { ok: true };
 	} catch {
 		return { ok: false, error: "Couldn't delete the case. Please try again." };
@@ -193,24 +193,39 @@ export async function recordShareAction(id: string): Promise<DeleteCaseResult> {
 		const res = await incrementShareCount(id, session.user.id);
 		if (res.count === 0)
 			return { ok: false, error: "Couldn't find that case." };
-		revalidatePath(`/dashboard/cases/${id}`);
+		revalidatePath(`/my-cases/${id}`);
 		return { ok: true };
 	} catch {
 		return { ok: false, error: "Couldn't record the share." };
 	}
 }
 
-/** Accept an attorney's request — sets them on the case and returns the case id
- *  so the plaintiff can go on to agree the fee and publish it live. */
-export async function acceptRequestAction(
-	requestId: string,
+const ACCEPT_INTEREST_ERRORS = {
+	not_found: "Couldn't find that expression of interest.",
+	// JUS-24's gate at the point of matching. Worth its own message: the plaintiff
+	// hasn't done anything wrong, and the attorney may well be verified later.
+	not_verified:
+		"This attorney's bar standing isn't verified, so they can't take your case yet.",
+	already_matched: "You've already chosen an attorney for this case.",
+} as const;
+
+/**
+ * Take an interested attorney forward — the plaintiff initiating contact, which
+ * is the only way this path can resolve (JUS-25). Sets them on the case and
+ * returns the case id so the plaintiff can go on to agree the fee and publish.
+ */
+export async function acceptInterestAction(
+	interestId: string,
 ): Promise<CreateCaseResult> {
 	const { session } = await requireRole("plaintiff");
 	try {
-		const res = await acceptRequest(requestId, session.user.id);
-		if (!res) return { ok: false, error: "Couldn't find that request." };
-		revalidatePath(`/dashboard/cases/${res.caseId}/requests`);
-		revalidatePath("/dashboard/cases");
+		const res = await acceptInterest(interestId, session.user.id);
+		if (!res.ok) {
+			return { ok: false, error: ACCEPT_INTEREST_ERRORS[res.reason] };
+		}
+		revalidatePath(`/my-cases/${res.caseId}/requests`);
+		revalidatePath("/my-cases");
+		revalidatePath("/home");
 		return { ok: true, caseId: res.caseId };
 	} catch {
 		return {
@@ -220,16 +235,17 @@ export async function acceptRequestAction(
 	}
 }
 
-/** Decline a pending attorney request. */
-export async function declineRequestAction(
-	requestId: string,
+/** Decline an open expression of interest. */
+export async function declineInterestAction(
+	interestId: string,
 	caseId: string,
 ): Promise<DeleteCaseResult> {
 	const { session } = await requireRole("plaintiff");
 	try {
-		const count = await declineRequest(requestId, session.user.id);
+		const count = await declineInterest(interestId, session.user.id);
 		if (count === 0) return { ok: false, error: "Request already handled." };
-		revalidatePath(`/dashboard/cases/${caseId}/requests`);
+		revalidatePath(`/my-cases/${caseId}/requests`);
+		revalidatePath("/home");
 		return { ok: true };
 	} catch {
 		return {
@@ -279,9 +295,9 @@ export async function updateCaseDetailsAction(
 		if (res.count === 0) {
 			return { ok: false, error: "Couldn't find that case to update." };
 		}
-		revalidatePath(`/dashboard/cases/${id}`);
-		revalidatePath("/dashboard/cases");
-		revalidatePath("/dashboard");
+		revalidatePath(`/my-cases/${id}`);
+		revalidatePath("/my-cases");
+		revalidatePath("/home");
 		return { ok: true, caseId: id };
 	} catch {
 		return {

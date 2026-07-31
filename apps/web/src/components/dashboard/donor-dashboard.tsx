@@ -170,7 +170,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 							day in court.
 						</p>
 						<Link
-							href={"/dashboard/discover" as Route}
+							href={"/discover" as Route}
 							className={cn(buttonVariants({ size: "sm" }), "mt-1")}
 						>
 							<Compass data-icon="inline-start" aria-hidden="true" />
@@ -203,7 +203,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 					<h2 className="font-bold text-ink text-lg">Saved for later</h2>
 					{data.saved.length > 0 && (
 						<Link
-							href={"/dashboard/saved" as Route}
+							href={"/saved" as Route}
 							className="inline-flex items-center gap-1 font-semibold text-[13px] text-brass-deep hover:underline"
 						>
 							View all saved
@@ -228,7 +228,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 							Save cases while you browse to keep them handy here.
 						</p>
 						<Link
-							href={"/dashboard/discover" as Route}
+							href={"/discover" as Route}
 							className={cn(
 								buttonVariants({ variant: "outline", size: "sm" }),
 								"mt-1",
