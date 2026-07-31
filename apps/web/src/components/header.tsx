@@ -24,6 +24,7 @@ const CHROME_LESS_ROUTES = [
 	...APP_PATHS,
 	"/login",
 	"/reset-password",
+	"/accept-invite",
 	"/verify-email",
 	"/onboarding",
 	"/cases/new",

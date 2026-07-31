@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "e2e:jus67": "bun jus67-e2e.ts"
   },
   "dependencies": {
     "@just-us/auth": "workspace:*",
@@ -34,6 +35,7 @@
     "@types/node": "^20",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "playwright": "^1.62.1",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
   }

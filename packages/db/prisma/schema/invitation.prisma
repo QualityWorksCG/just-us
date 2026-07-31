@@ -1,0 +1,20 @@
+// Administrator invitations. Single-use, time-limited: the raw token is
+// emailed and only its SHA-256 hash is stored. State is derived, never stored:
+// accepted > revoked > expired > pending. At most one pending invitation per
+// email, enforced in the data layer (uniqueness only applies while pending).
+model AdminInvitation {
+  id        String @id @default(cuid())
+  email     String
+  tokenHash String @unique
+
+  invitedById String
+  invitedBy   User   @relation("AdminInvitationInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([email])
+  @@map("admin_invitation")
+}
