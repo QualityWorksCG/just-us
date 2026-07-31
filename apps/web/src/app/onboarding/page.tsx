@@ -11,7 +11,7 @@ export default async function OnboardingPage() {
 	const session = await requireVerifiedSession();
 
 	if ((session.user as { onboarded?: boolean }).onboarded) {
-		redirect("/dashboard");
+		redirect("/home");
 	}
 
 	return <OnboardingFlow name={session.user.name} />;

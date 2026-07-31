@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import {
 	updateJurisdictionAction,
 	verifyAttorneyAction,
-} from "@/app/dashboard/profile/verification-actions";
+} from "@/app/(app)/profile/verification-actions";
 import {
 	STATUS_COPY,
 	type VerificationSource,

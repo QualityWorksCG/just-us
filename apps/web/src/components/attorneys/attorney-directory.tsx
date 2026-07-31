@@ -11,17 +11,20 @@ import { DirectoryControls } from "@/components/attorneys/directory-controls";
  * The directory body: filters, result count, cards, and the standing disclaimer.
  *
  * Shared by the public `/attorneys` page and the plaintiff's
- * `/dashboard/attorneys` screen. One component rather than two, because the
+ * `/find-attorney` screen. One component rather than two, because the
  * promises in the footer — listed by your chosen sort, never ranked for your case
  * — have to hold identically in both places, and a copy would drift.
  */
 export function AttorneyDirectory({
 	attorneys,
+	profileBasePath,
 	practiceAreas,
 	states,
 	filtered,
 }: {
 	attorneys: DirectoryAttorney[];
+	/** Passed to each card — see `AttorneyCard.profileBasePath`. */
+	profileBasePath?: string;
 	practiceAreas: string[];
 	states: string[];
 	/** Whether any filter is active, which changes the empty-state wording. */
@@ -61,7 +64,11 @@ export function AttorneyDirectory({
 				) : (
 					<div className="mt-5 flex flex-col gap-4">
 						{attorneys.map((attorney) => (
-							<AttorneyCard key={attorney.id} attorney={attorney} />
+							<AttorneyCard
+								key={attorney.id}
+								attorney={attorney}
+								profileBasePath={profileBasePath}
+							/>
 						))}
 					</div>
 				)}

@@ -76,8 +76,12 @@ const listSelect = {
 } as const;
 
 /** Average of published review ratings, or null when there are none. Rounded to
- *  one decimal, which is the precision the directory displays. */
-function averageRating(reviews: { rating: number }[]): number | null {
+ *  one decimal, which is the precision the directory displays.
+ *
+ *  Exported because the representation inbox shows the same attorneys (JUS-25) —
+ *  two copies of this could round differently and show one attorney two ratings
+ *  in two places. */
+export function averageRating(reviews: { rating: number }[]): number | null {
 	if (!reviews.length) return null;
 	const total = reviews.reduce((sum, r) => sum + r.rating, 0);
 	return Math.round((total / reviews.length) * 10) / 10;

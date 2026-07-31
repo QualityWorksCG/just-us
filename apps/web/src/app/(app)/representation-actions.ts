@@ -1,0 +1,61 @@
+"use server";
+
+import { expressInterest } from "@just-us/db/representation";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+import { requireRole } from "@/lib/auth-server";
+
+/**
+ * The attorney side of the Seeking Representation queue (JUS-25).
+ *
+ * Expressing interest is the *only* thing an attorney can do to a case they have
+ * no relationship with. There is deliberately no action here that sends anything
+ * to the plaintiff — no message, no note, no contact request — because the
+ * plaintiff must be the one to initiate contact after seeing the interest on
+ * their dashboard. That rule is enforced at this boundary rather than by leaving
+ * a field out of a form:
+ *
+ *   - the schema is `.strict()`, so a hand-rolled payload carrying a `message`
+ *     is rejected outright instead of quietly ignored, and
+ *   - the only parameter is a case id. There is nothing to attach a message to
+ *     even if the schema let one through.
+ */
+const expressInterestSchema = z.object({ caseId: z.string().min(1) }).strict();
+
+export type ExpressInterestActionResult =
+	| { ok: true }
+	| { ok: false; error: string };
+
+/** Record this attorney's interest in representing a seeking case. */
+export async function expressInterestAction(
+	input: unknown,
+): Promise<ExpressInterestActionResult> {
+	const { session } = await requireRole("attorney");
+
+	const parsed = expressInterestSchema.safeParse(input);
+	if (!parsed.success) {
+		return { ok: false, error: "Couldn't record your interest." };
+	}
+
+	try {
+		const res = await expressInterest(parsed.data.caseId, session.user.id);
+		if (!res.ok) {
+			return { ok: false, error: FAILURE_MESSAGES[res.reason] };
+		}
+		revalidatePath("/home");
+		return { ok: true };
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't record your interest. Please try again.",
+		};
+	}
+}
+
+const FAILURE_MESSAGES = {
+	not_verified:
+		"Your bar standing has to be verified before you can express interest.",
+	unavailable: "That case is no longer seeking representation.",
+	already_expressed: "You've already expressed interest in this case.",
+} as const;

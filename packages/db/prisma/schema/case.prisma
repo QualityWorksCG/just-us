@@ -60,42 +60,117 @@ model Case {
   // can appear in the "Deleted" filter and be restored, not hard-deleted.
   deletedAt   DateTime?
 
-  // Attorneys requesting to represent this case (the "seeking" inbox).
+  // Attorneys who have expressed interest in representing this case (the
+  // "seeking" inbox).
   requests AttorneyRequest[]
+
+  // The attorney representing this case, once one is matched. Its absence is
+  // what puts a `seeking` case in the attorney queue — see listSeekingQueue.
+  match Match?
 
   @@index([ownerId])
   @@index([status])
   @@map("case")
 }
 
+// Lifecycle of an attorney's expression of interest. JUS-25 words these as
+// open/viewed/responded/declined; the names below are the ones the plaintiff
+// inbox already uses, so the mapping is spelled out rather than renamed.
+//
+//   pending  — expressed, the plaintiff hasn't seen it yet ("open")
+//   viewed   — the plaintiff has seen it on their dashboard
+//   accepted — the plaintiff took it forward, which is what creates the Match
+//              ("responded")
+//   declined — the plaintiff passed on it
 enum RequestStatus {
   pending
+  viewed
   accepted
   declined
 }
 
-// An attorney's request to represent a `seeking` case. Created from the (future)
-// attorney side; the plaintiff reviews these in the requests inbox and accepts
-// one. Attorney display fields are denormalized so the inbox renders standalone;
-// `attorneyId` links to the requesting attorney's User once that side exists.
+// An attorney's expression of interest in representing a `seeking` case
+// (JUS-25). Written by the attorney-side queue; the plaintiff reviews these in
+// the requests inbox and takes one forward.
+//
+// Deliberately minimal: it records *who* is interested in *what*, and when.
+// There is no message, note, or contact column, because an expression of
+// interest must not open a channel to the plaintiff — it surfaces on the
+// plaintiff's dashboard and the plaintiff decides whether to make contact. A
+// note attached here would be attorney-to-plaintiff contact by another name.
+//
+// Nothing about the attorney is copied onto the row either. Their name, firm,
+// practice areas, rating, and bar standing are all read live from their
+// directory profile when the inbox renders, so a lapsed verification or a
+// changed rating can never be shown stale from a snapshot taken weeks earlier.
+//
+// One row per attorney per case, enforced by the unique constraint: an attorney
+// the plaintiff declined cannot express interest again, so a decline is final
+// rather than an invitation to keep asking.
 model AttorneyRequest {
   id     String @id @default(cuid())
   case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseId String
 
-  attorneyId   String
-  attorneyName String
-  firm         String?
-  area         String?
-  location     String?
-  rating       Float?
-  casesCount   Int?
-  message      String
+  attorney   User   @relation(fields: [attorneyId], references: [id], onDelete: Cascade)
+  attorneyId String
 
   status    RequestStatus @default(pending)
   createdAt DateTime      @default(now())
+  // When the plaintiff first saw it — what `viewed` means, kept as a timestamp
+  // so "how long has this sat unread" stays answerable.
+  viewedAt  DateTime?
 
+  // Set if this expression of interest is the one the plaintiff took forward.
+  match Match?
+
+  @@unique([caseId, attorneyId])
   @@index([caseId])
   @@index([status])
   @@map("attorney_request")
+}
+
+// How a case and its attorney came to be matched — the three paths this epic
+// defines. Recorded so a match can always be traced back to the route that
+// produced it: JustUs performs no matching of its own, and this column is the
+// record of that.
+//
+//   directory          — the plaintiff found them in the directory (JUS-22)
+//   bring_your_own     — the plaintiff brought their own attorney (JUS-23)
+//   expressed_interest — the attorney expressed interest in a seeking case and
+//                        the plaintiff took it forward (JUS-25)
+enum MatchOrigin {
+  directory
+  bring_your_own
+  expressed_interest
+}
+
+// A case and the attorney representing it.
+//
+// One per case — `caseId` is unique, so a case cannot be matched twice, and the
+// row's absence is what keeps a `seeking` case in the attorney queue.
+//
+// Only the expressed-interest path writes rows today (see acceptRequest). The
+// other two origins exist in the enum because the epic's other stories record
+// them; JUS-23 and JUS-26 wire them up.
+model Match {
+  id String @id @default(cuid())
+
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId String @unique
+
+  attorney   User   @relation(fields: [attorneyId], references: [id], onDelete: Cascade)
+  attorneyId String
+
+  origin MatchOrigin
+
+  // The expression of interest this came out of, when origin is
+  // expressed_interest. Null for the other two paths, which have no such record.
+  request   AttorneyRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  requestId String?          @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([attorneyId])
+  @@map("case_match")
 }

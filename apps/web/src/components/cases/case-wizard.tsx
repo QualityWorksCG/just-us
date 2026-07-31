@@ -268,7 +268,7 @@ export function CaseWizard({
 
 	function back() {
 		if (step === 1) {
-			window.location.assign("/dashboard");
+			window.location.assign("/home");
 			return;
 		}
 		setStep((s) => Math.max(1, s - 1));
@@ -395,7 +395,7 @@ export function CaseWizard({
 		});
 		if (res.ok) {
 			toast.success("Progress saved — pick up where you left off anytime.");
-			window.location.assign("/dashboard");
+			window.location.assign("/home");
 		} else {
 			toast.error(res.error);
 			setSaving(false);
@@ -567,9 +567,7 @@ export function CaseWizard({
 					<div className="mt-6 flex items-center justify-center gap-2.5">
 						<Link
 							href={
-								(caseId
-									? `/dashboard/cases/${caseId}/requests`
-									: "/dashboard/cases") as Route
+								(caseId ? `/my-cases/${caseId}/requests` : "/my-cases") as Route
 							}
 							className={cn(buttonVariants({ size: "lg" }), "px-5")}
 						>
@@ -577,7 +575,7 @@ export function CaseWizard({
 							<ArrowRight data-icon="inline-end" aria-hidden="true" />
 						</Link>
 						<Link
-							href="/dashboard"
+							href="/home"
 							className={cn(
 								buttonVariants({ variant: "outline", size: "lg" }),
 								"px-5",
@@ -673,18 +671,14 @@ export function CaseWizard({
 
 					<div className="mt-8 flex flex-wrap items-center justify-center gap-3">
 						<Link
-							href={
-								(caseId
-									? `/dashboard/cases/${caseId}`
-									: "/dashboard/cases") as Route
-							}
+							href={(caseId ? `/my-cases/${caseId}` : "/my-cases") as Route}
 							className={cn(buttonVariants({ size: "lg" }), "px-6")}
 						>
 							<ArrowRight data-icon="inline-start" aria-hidden="true" />
 							Manage your case
 						</Link>
 						<Link
-							href={"/dashboard/cases" as Route}
+							href={"/my-cases" as Route}
 							className={cn(
 								buttonVariants({ variant: "outline", size: "lg" }),
 								"px-6",

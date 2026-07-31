@@ -42,6 +42,11 @@ model User {
   // filled it in — see AttorneyProfile.
   attorneyProfile AttorneyProfile?
 
+  // Attorney side of representation (JUS-25). Seeking cases this attorney has
+  // expressed interest in, and the cases they were matched to.
+  representationInterests AttorneyRequest[]
+  matches                 Match[]
+
   @@unique([email])
   @@map("user")
 }

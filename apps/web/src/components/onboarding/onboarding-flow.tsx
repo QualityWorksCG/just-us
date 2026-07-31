@@ -157,9 +157,7 @@ export function OnboardingFlow({ name }: { name: string }) {
 				// session (role + onboarded), avoiding any stale client cache. New
 				// plaintiffs go straight into creating their case; everyone else lands
 				// on their dashboard.
-				window.location.assign(
-					role === "plaintiff" ? "/cases/new" : "/dashboard",
-				);
+				window.location.assign(role === "plaintiff" ? "/cases/new" : "/home");
 			} else {
 				if (result.fieldErrors) setErrors(result.fieldErrors);
 				toast.error(result.error);

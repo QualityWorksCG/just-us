@@ -10,6 +10,7 @@ import {
 	Flag,
 	Folder,
 	Gauge,
+	Hand,
 	Heart,
 	Hourglass,
 	type LucideIcon,
@@ -45,6 +46,11 @@ export type CaseSummary = {
 	attorneyArea: string | null;
 	attorneyLocation: string | null;
 	createdAt: string;
+	/** Attorneys who have expressed interest in representing this case and are
+	 *  still awaiting a decision (JUS-25). */
+	interestCount: number;
+	/** How many of those the plaintiff hasn't seen yet — the "new" badge. */
+	newInterestCount: number;
 };
 
 function readinessOf(c: CaseSummary) {
@@ -214,9 +220,9 @@ function NoCase({ firstName }: { firstName: string }) {
 	return (
 		<div className="flex flex-col gap-6">
 			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
+				<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
 					Welcome, {firstName}
-				</h1>
+				</h2>
 				<p className="mt-1.5 text-[14.5px] text-ink-soft">
 					You haven't started a case yet. Tell us what happened and we'll take
 					it from there.
@@ -268,6 +274,7 @@ function SingleCaseDashboard({
 	c: CaseSummary;
 }) {
 	const isLive = c.status === "live";
+	const isSeeking = c.status === "seeking";
 	const goal = c.goalCents / 100;
 	const raised = c.raisedCents / 100;
 	const pct = goal > 0 ? Math.round((raised / goal) * 100) : 0;
@@ -313,9 +320,9 @@ function SingleCaseDashboard({
 		<div className="flex flex-col gap-6">
 			{/* Header */}
 			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
+				<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
 					Welcome back, {firstName}
-				</h1>
+				</h2>
 				<p className="mt-1.5 text-[14.5px] text-ink-soft">
 					{isLive
 						? "Your campaign is live — here's how it's going."
@@ -333,13 +340,31 @@ function SingleCaseDashboard({
 					tone="green"
 					bar={pct}
 				/>
-				<StatCard
-					icon={Users}
-					label="Donors"
-					value={String(c.donorsCount)}
-					sub={c.donorsCount === 0 ? "no backers yet" : "backers so far"}
-					tone="cream"
-				/>
+				{/* A case still out to attorneys can't have donors — that slot is worth
+				    more showing who has put themselves forward. */}
+				{isSeeking && !hasAttorney ? (
+					<StatCard
+						icon={Hand}
+						label="Attorneys interested"
+						value={String(c.interestCount)}
+						sub={
+							c.interestCount === 0
+								? "none yet — you can also choose one yourself"
+								: c.newInterestCount > 0
+									? `${c.newInterestCount} you haven't seen yet`
+									: "waiting on your decision"
+						}
+						tone="cream"
+					/>
+				) : (
+					<StatCard
+						icon={Users}
+						label="Donors"
+						value={String(c.donorsCount)}
+						sub={c.donorsCount === 0 ? "no backers yet" : "backers so far"}
+						tone="cream"
+					/>
+				)}
 				<StatCard
 					icon={Gauge}
 					label="Case readiness"
@@ -378,7 +403,7 @@ function SingleCaseDashboard({
 								Share campaign
 							</button>
 							<Link
-								href={`/dashboard/cases/${c.id}` as Route}
+								href={`/my-cases/${c.id}` as Route}
 								className={cn(
 									buttonVariants({ variant: "outline", size: "sm" }),
 									"h-9",
@@ -466,6 +491,39 @@ function SingleCaseDashboard({
 									<MessageCircle data-icon="inline-start" aria-hidden="true" />
 									Message {c.attorneyName?.split(" ")[0]}
 								</button>
+							</>
+						) : isSeeking ? (
+							/* Out to attorneys: what matters here is who has put themselves
+							   forward, which is the only thing that moves this case on. The
+							   plaintiff makes contact from the inbox — an attorney cannot
+							   reach them (JUS-25). */
+							<>
+								<div className="flex items-center gap-3">
+									<span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
+										<Hand className="size-4" aria-hidden="true" />
+									</span>
+									<div>
+										<p className="font-bold text-[15px] text-ink">
+											{c.interestCount === 0
+												? "No interest yet"
+												: `${c.interestCount} ${c.interestCount === 1 ? "attorney" : "attorneys"} interested`}
+										</p>
+										<p className="text-[12.5px] text-muted-foreground">
+											{c.interestCount === 0
+												? "your case is out to attorneys"
+												: c.newInterestCount > 0
+													? `${c.newInterestCount} you haven't seen yet`
+													: "you decide who to approach"}
+										</p>
+									</div>
+								</div>
+								<Link
+									href={`/my-cases/${c.id}/requests` as Route}
+									className={cn(buttonVariants(), "mt-4 w-full")}
+								>
+									{c.interestCount === 0 ? "View your case" : "Review interest"}
+									<ArrowRight data-icon="inline-end" aria-hidden="true" />
+								</Link>
 							</>
 						) : (
 							<>
@@ -570,9 +628,9 @@ function CasesOverview({
 	return (
 		<div className="flex flex-col gap-6">
 			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
+				<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
 					Welcome back, {firstName}
-				</h1>
+				</h2>
 				<p className="mt-1.5 text-[14.5px] text-ink-soft">
 					You have {cases.length} cases — here's your portfolio at a glance.
 				</p>
@@ -630,7 +688,7 @@ function CasesOverview({
 						))}
 					</ul>
 					<Link
-						href={"/dashboard/cases" as Route}
+						href={"/my-cases" as Route}
 						className="mt-3 inline-flex items-center justify-center gap-1 border-border border-t pt-4 font-semibold text-[13px] text-brass-deep hover:underline"
 					>
 						{cases.length > 3
@@ -655,7 +713,7 @@ function CasesOverview({
 					</div>
 					{cases.length > 3 && (
 						<Link
-							href={"/dashboard/cases" as Route}
+							href={"/my-cases" as Route}
 							className="mt-4 inline-flex items-center justify-center gap-1 border-border border-t pt-4 font-semibold text-[13px] text-brass-deep hover:underline"
 						>
 							View all {cases.length} cases
@@ -697,7 +755,12 @@ function CaseRow({ c }: { c: CaseSummary }) {
 			}
 		: isSeeking
 			? {
-					text: "Seeking attorney",
+					// The count is on the badge because it's the one thing on this row
+					// that needs the plaintiff, and the row is otherwise inert.
+					text:
+						c.interestCount > 0
+							? `${c.interestCount} interested`
+							: "Seeking attorney",
 					cls: "bg-brass-wash text-brass-deep",
 					dot: "bg-brass-deep",
 				}
@@ -710,9 +773,9 @@ function CaseRow({ c }: { c: CaseSummary }) {
 	// Drafts resume in the wizard; live cases open Manage; seeking opens requests.
 	const href = (
 		isLive
-			? `/dashboard/cases/${c.id}`
+			? `/my-cases/${c.id}`
 			: isSeeking
-				? `/dashboard/cases/${c.id}/requests`
+				? `/my-cases/${c.id}/requests`
 				: `/cases/new?draft=${c.id}`
 	) as Route;
 
@@ -744,7 +807,9 @@ function CaseRow({ c }: { c: CaseSummary }) {
 						{isLive
 							? ` · ${money(raised)} of ${money(goal)} · ${pct}%`
 							: isSeeking
-								? " · out to attorneys"
+								? c.newInterestCount > 0
+									? ` · ${c.newInterestCount} new to review`
+									: " · out to attorneys"
 								: ` · ${readiness}% ready`}
 					</p>
 				</div>
@@ -790,21 +855,32 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 			</button>
 		);
 	} else if (isSeeking) {
-		heading = "Seeking representation";
+		const interested = c.interestCount;
+		heading =
+			interested > 0
+				? `${interested} ${interested === 1 ? "attorney" : "attorneys"} interested`
+				: "Seeking representation";
 		avatar = (
 			<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
-				<Hourglass className="size-5" aria-hidden="true" />
+				{interested > 0 ? (
+					<Hand className="size-5" aria-hidden="true" />
+				) : (
+					<Hourglass className="size-5" aria-hidden="true" />
+				)}
 			</span>
 		);
 		action = (
 			<Link
-				href={`/dashboard/cases/${c.id}/requests` as Route}
+				href={`/my-cases/${c.id}/requests` as Route}
 				className={cn(
-					buttonVariants({ variant: "outline", size: "sm" }),
+					buttonVariants({
+						variant: interested > 0 ? "default" : "outline",
+						size: "sm",
+					}),
 					"h-9 shrink-0",
 				)}
 			>
-				Review requests
+				{interested > 0 ? "Review interest" : "View case"}
 				<ArrowRight data-icon="inline-end" aria-hidden="true" />
 			</Link>
 		);
@@ -867,7 +943,7 @@ function StepTracker({
 
 	// Resume this case's wizard while it's in progress; once live, manage it.
 	const resume = `/cases/new?draft=${caseId}` as Route;
-	const manage = `/dashboard/cases/${caseId}` as Route;
+	const manage = `/my-cases/${caseId}` as Route;
 
 	// The one thing that needs the plaintiff next — always with somewhere to go.
 	let next: { text: string; href: Route; cta: string };

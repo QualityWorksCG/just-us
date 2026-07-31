@@ -95,7 +95,21 @@ export function HeadshotFrame({
 	);
 }
 
-export function AttorneyCard({ attorney }: { attorney: DirectoryAttorney }) {
+export function AttorneyCard({
+	attorney,
+	profileBasePath = "/attorneys",
+}: {
+	attorney: DirectoryAttorney;
+	/**
+	 * Where this card's "View profile" link points, without the id.
+	 *
+	 * The public directory sends visitors to `/attorneys/<id>`; the in-app
+	 * directory has to send a signed-in plaintiff to `/find-attorney/<id>`, which
+	 * is the same profile inside the dashboard shell. Linking them to the public
+	 * page dropped them out of the app with no sidebar and no way back.
+	 */
+	profileBasePath?: string;
+}) {
 	const years = yearsLicensed(attorney.admittedYear);
 
 	const details = [
@@ -199,7 +213,7 @@ export function AttorneyCard({ attorney }: { attorney: DirectoryAttorney }) {
 
 				<div className="flex shrink-0 flex-col gap-1.5 sm:w-[118px]">
 					<Link
-						href={`/attorneys/${attorney.id}` as Route}
+						href={`${profileBasePath}/${attorney.id}` as Route}
 						className={cn(
 							buttonVariants({ variant: "outline", size: "sm" }),
 							"w-full justify-center",

@@ -49,7 +49,7 @@ import { toast } from "sonner";
 import {
 	type SaveAttorneyProfileInput,
 	saveAttorneyProfileAction,
-} from "@/app/dashboard/profile/actions";
+} from "@/app/(app)/profile/actions";
 import {
 	AttorneyVerification,
 	VerificationBadge,

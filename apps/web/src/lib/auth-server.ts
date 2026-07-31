@@ -68,14 +68,14 @@ export async function requireOnboarded() {
 
 /**
  * Require the current user to hold one of the allowed roles. Verified session is
- * implied. Sends unauthorized users to /dashboard (their own home) rather than
+ * implied. Sends unauthorized users to /home (their own home) rather than
  * leaking the existence of the resource. (JUS-9)
  */
 export async function requireRole(...allowed: Role[]) {
 	const session = await requireVerifiedSession();
 	const role = (session.user as { role?: Role }).role;
 	if (!role || !allowed.includes(role)) {
-		redirect("/dashboard");
+		redirect("/home");
 	}
 	return { session, role };
 }
@@ -94,7 +94,7 @@ export async function requirePermission(permission: Permission) {
 	const session = await requireVerifiedSession();
 	const role = (session.user as { role?: Role }).role;
 	if (!role || !roleHasPermission(role, permission)) {
-		redirect("/dashboard");
+		redirect("/home");
 	}
 	return { session, role };
 }
