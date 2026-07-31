@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { APP_PATHS } from "@/lib/dashboard-nav";
 
 import { Brandmark } from "./brandmark";
 
@@ -16,10 +17,11 @@ const links = [
 	{ href: "/attorneys", label: "For attorneys" },
 ] as const;
 
-// Full-bleed auth flows and the dashboard render their own chrome — hide the
-// site header there.
+// Full-bleed auth flows and legal pages render their own chrome — hide the site
+// header there. The app's own screens are covered by APP_PATHS, which the nav
+// registry derives, so adding a screen can't leave a stray marketing header on it.
 const CHROME_LESS_ROUTES = [
-	"/dashboard",
+	...APP_PATHS,
 	"/login",
 	"/reset-password",
 	"/accept-invite",

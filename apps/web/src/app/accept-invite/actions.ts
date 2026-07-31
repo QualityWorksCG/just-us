@@ -104,5 +104,5 @@ export async function acceptInviteAction(
 
 	// redirect() throws NEXT_REDIRECT — it must stay outside the try above so the
 	// catch can't swallow it.
-	redirect(signedIn ? "/dashboard" : "/login?mode=signin");
+	redirect(signedIn ? "/home" : "/login?mode=signin");
 }

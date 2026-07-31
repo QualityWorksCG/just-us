@@ -42,6 +42,16 @@ model User {
   accounts Account[]
   cases    Case[]
 
+  // Public directory profile. Only attorneys have one, and only once they've
+  // filled it in — see AttorneyProfile.
+  attorneyProfile AttorneyProfile?
+
+  // Attorney side of representation (JUS-25). Seeking cases this attorney has
+  // expressed interest in, and the cases they were matched to.
+  representationInterests AttorneyRequest[]
+  matches                 Match[]
+
+  // Administration (JUS-67): invitations this user sent, and their audit trail.
   sentAdminInvitations AdminInvitation[] @relation("AdminInvitationInviter")
   auditEntries         AuditLog[]        @relation("AuditLogActor")
 

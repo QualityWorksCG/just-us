@@ -25,7 +25,7 @@ export function VerifyEmailPrompt({
 		if (!email) return;
 		setPending(true);
 		await authClient.sendVerificationEmail(
-			{ email, callbackURL: "/dashboard" },
+			{ email, callbackURL: "/home" },
 			{
 				onSuccess: () => {
 					toast.success("Verification email sent.");

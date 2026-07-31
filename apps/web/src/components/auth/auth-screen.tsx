@@ -172,12 +172,12 @@ export function AuthScreen({
 			{
 				email: siEmail.trim(),
 				password: siPassword,
-				callbackURL: "/dashboard",
+				callbackURL: "/home",
 			},
 			{
 				onSuccess: () => {
 					toast.success("Signed in");
-					router.push("/dashboard");
+					router.push("/home");
 				},
 				onError: (ctx) => {
 					const msg = ctx.error.message || ctx.error.statusText;
@@ -209,7 +209,7 @@ export function AuthScreen({
 		await authClient.signIn.magicLink(
 			{
 				email: target,
-				callbackURL: "/dashboard",
+				callbackURL: "/home",
 				errorCallbackURL: "/login?mode=signin",
 			},
 			{

@@ -26,12 +26,20 @@ import {
 } from "lucide-react";
 
 export type NavItem = {
-	/** Path segment after /dashboard; "" is the role home. */
+	/** The screen's identity, used to look it up and to key the sidebar. "" is the
+	 *  role home. Not the URL — see `path`. */
 	slug: string;
 	label: string;
 	icon: LucideIcon;
 	title: string;
 	sub: string;
+	/**
+	 * URL for this screen, when it isn't simply `/<slug>`. App screens live at the
+	 * top level rather than behind a shared prefix, which means a couple of them
+	 * would otherwise claim a path the public site already owns — so those say
+	 * where they really live instead. Read it through `navPath`, never directly.
+	 */
+	path?: string;
 	/**
 	 * Gate this screen behind a feature flag (JUS-13). Absent means always shown.
 	 * The flag hides the nav entry AND the route rejects when off — see
@@ -95,6 +103,9 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 			},
 			{
 				slug: "cases",
+				// `/cases` is the public browse-cases page, so the plaintiff's own
+				// cases live at `/my-cases`.
+				path: "/my-cases",
 				label: "My cases",
 				icon: Folder,
 				title: "My cases",
@@ -102,6 +113,9 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 			},
 			{
 				slug: "attorneys",
+				// `/attorneys` is the public directory. This is the same directory
+				// inside the app shell, so it needs a path of its own.
+				path: "/find-attorney",
 				label: "Find an attorney",
 				icon: Gavel,
 				title: "Find an attorney",
@@ -152,11 +166,17 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				slug: "",
 				label: "Representation queue",
 				icon: Inbox,
-				title: "Representation queue",
-				sub: "Plaintiffs seeking representation in your jurisdiction and practice areas.",
+				title: "Seeking representation",
+				// Says "browse and filter" rather than promising the queue is already
+				// narrowed to this attorney: nothing is filtered unless they ask, so
+				// they can see every case that needs someone (JUS-25).
+				sub: "Cases that need an attorney. Browse the public summaries, filter by category or state, and put yourself forward — the plaintiff decides whether to take it further.",
 			},
 			{
 				slug: "cases",
+				// Shares `/my-cases` with the plaintiff screen of the same name; that
+				// route serves each role its own view.
+				path: "/my-cases",
 				label: "My cases",
 				icon: Briefcase,
 				title: "My cases",
@@ -251,6 +271,58 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 		],
 	},
 };
+
+/** Where every signed-in user starts. Each role's home renders different
+ *  content, but they share one URL — `/` belongs to the marketing site. */
+export const HOME_PATH = "/home";
+
+/**
+ * The URL for a nav item. `/<slug>` for most screens, `HOME_PATH` for the role
+ * home, or the item's own `path` where the obvious name is already taken by a
+ * public page.
+ *
+ * Everything that links to a screen goes through this, so the sidebar and the
+ * routes can't disagree about where a screen lives.
+ */
+export function navPath(item: NavItem): string {
+	if (item.path) return item.path;
+	return item.slug ? `/${item.slug}` : HOME_PATH;
+}
+
+/**
+ * The nav item a URL belongs to, for highlighting the sidebar. Matches the
+ * longest path first, so `/my-cases/abc/requests` resolves to the My cases entry
+ * rather than to whichever item happens to be checked first.
+ */
+export function findScreenByPath(
+	role: Role | string | null | undefined,
+	pathname: string,
+): NavItem | undefined {
+	const items = [...getRoleNav(role).items].sort(
+		(a, b) => navPath(b).length - navPath(a).length,
+	);
+	return items.find((item) => {
+		const path = navPath(item);
+		return pathname === path || pathname.startsWith(`${path}/`);
+	});
+}
+
+/**
+ * Every top-level path the app shell owns.
+ *
+ * The marketing header uses this to stay out of the way. It already hides itself
+ * for a signed-in user, but the client session arrives a beat after the first
+ * paint — without this the marketing header would flash across an app screen on
+ * every hard load, which is what the old `/dashboard` prefix used to prevent for
+ * free.
+ */
+export const APP_PATHS: string[] = [
+	...new Set(
+		Object.values(DASHBOARD_NAV).flatMap((nav) => nav.items.map(navPath)),
+	),
+	// Not a nav entry: the attorney's case view, reached from the queue (JUS-25).
+	"/queue",
+];
 
 const FALLBACK_ROLE: Role = "donor";
 

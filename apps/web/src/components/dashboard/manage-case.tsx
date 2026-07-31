@@ -118,10 +118,10 @@ const METRIC_TONES: Record<
 		label: "text-dark-fg/70",
 	},
 	gold: {
-		card: "bg-gold-bright",
-		chip: "bg-surface/60 text-gold-bright-ink",
-		value: "text-gold-bright-ink",
-		label: "text-gold-bright-ink/75",
+		card: "bg-gradient-to-br from-[color-mix(in_oklch,var(--gold-bright)_72%,var(--brass-wash))] to-[color-mix(in_oklch,var(--gold-bright)_92%,var(--brass-wash))]",
+		chip: "bg-surface/70 text-brass-deep",
+		value: "text-ink",
+		label: "text-brass-deep",
 	},
 };
 
@@ -279,7 +279,7 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 			const res = await deleteOwnedCaseAction(data.id);
 			if (res.ok) {
 				toast.success("Case deleted — restore it anytime from Deleted.");
-				router.push("/dashboard/cases");
+				router.push("/my-cases");
 			} else {
 				toast.error(res.error);
 				setConfirmOpen(false);
@@ -320,7 +320,12 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 			{tab === "overview" ? (
 				<div className="flex flex-col gap-6">
 					{/* Hero goal panel */}
-					<section className="relative overflow-hidden rounded-[var(--radius-card-lg)] bg-gold-bright p-6 shadow-[var(--shadow-rest)] sm:p-8">
+					{/* Gold, but not a flat slab of it. `bg-gold-bright` (#ebc15e) at full
+					    saturation is fine on a chip or an icon tile; across a panel this size
+					    it shouted. Mixing it toward `--brass-wash` — 72% at the top corner to
+					    92% at the bottom — keeps the panel unmistakably gold while the slight
+					    gradient stops it reading as one hard block of colour. */}
+					<section className="relative overflow-hidden rounded-[var(--radius-card-lg)] border border-brass/25 bg-gradient-to-br from-[color-mix(in_oklch,var(--gold-bright)_72%,var(--brass-wash))] to-[color-mix(in_oklch,var(--gold-bright)_92%,var(--brass-wash))] p-6 shadow-[var(--shadow-rest)] sm:p-8">
 						<div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
 							<div className="min-w-0">
 								<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-surface/80 px-2.5 py-1 font-mono font-semibold text-[10px] text-brass-deep uppercase tracking-[0.1em]">
@@ -332,14 +337,14 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 											: "Draft — not live yet"}
 								</span>
 								<div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-									<span className="font-extrabold text-[44px] text-gold-bright-ink tabular-nums leading-none tracking-[-0.03em]">
+									<span className="font-extrabold text-[44px] text-ink tabular-nums leading-none tracking-[-0.03em]">
 										{money(raised)}
 									</span>
-									<span className="text-[14px] text-gold-bright-ink/80">
+									<span className="text-[14px] text-ink/75">
 										{goal > 0 ? (
 											<>
 												raised of{" "}
-												<span className="font-bold text-gold-bright-ink">
+												<span className="font-bold text-ink">
 													{money(goal)}
 												</span>{" "}
 												goal
@@ -357,7 +362,7 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 												style={{ width: `${Math.max(3, pct)}%` }}
 											/>
 										</div>
-										<p className="mt-2 font-semibold text-[13px] text-gold-bright-ink">
+										<p className="mt-2 font-semibold text-[13px] text-ink">
 											{pct}% of the way there
 											{raised === 0 ? " — just launched" : ""}
 										</p>

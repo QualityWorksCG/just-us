@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { inviteAdminAction } from "@/app/dashboard/users/invite-actions";
+import { inviteAdminAction } from "@/app/(app)/users/invite-actions";
 
 export function InviteAdminDialog() {
 	const router = useRouter();

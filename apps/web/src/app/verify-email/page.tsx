@@ -10,7 +10,7 @@ export default async function VerifyEmailPage() {
 
 	// Already verified — nothing to do here.
 	if (session?.user?.emailVerified) {
-		redirect("/dashboard");
+		redirect("/home");
 	}
 
 	return (

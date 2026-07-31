@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
 
-import { unblockUserAction } from "@/app/dashboard/users/actions";
+import { unblockUserAction } from "@/app/(app)/users/actions";
 
 export function UnblockUserButton({ userId }: { userId: string }) {
 	const router = useRouter();

@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { blockUserAction } from "@/app/dashboard/users/actions";
+import { blockUserAction } from "@/app/(app)/users/actions";
 
 /** Earliest selectable expiry — a block that lapses today is a block that never was. */
 function tomorrow() {
