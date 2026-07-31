@@ -104,7 +104,7 @@ export async function inviteAdminAction(email: string): Promise<InviteResult> {
 		};
 	}
 
-	revalidatePath("/dashboard/users");
+	revalidatePath("/users");
 	return { ok: true };
 }
 
@@ -128,7 +128,7 @@ export async function revokeInviteAction(id: string): Promise<InviteResult> {
 		};
 	}
 
-	revalidatePath("/dashboard/users");
+	revalidatePath("/users");
 	return { ok: true };
 }
 
@@ -177,6 +177,6 @@ export async function resendInviteAction(id: string): Promise<InviteResult> {
 		};
 	}
 
-	revalidatePath("/dashboard/users");
+	revalidatePath("/users");
 	return { ok: true };
 }

@@ -82,7 +82,7 @@ export async function blockUserAction(
 		};
 	}
 
-	revalidatePath("/dashboard/users");
+	revalidatePath("/users");
 	return { ok: true };
 }
 
@@ -107,6 +107,6 @@ export async function unblockUserAction(
 		};
 	}
 
-	revalidatePath("/dashboard/users");
+	revalidatePath("/users");
 	return { ok: true };
 }

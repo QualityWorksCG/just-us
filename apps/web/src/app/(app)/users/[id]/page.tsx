@@ -125,7 +125,7 @@ export default async function UserDetailPage({
 		<div className="flex flex-col gap-6">
 			<div>
 				<BackLink
-					href={"/dashboard/users" as Route}
+					href={"/users" as Route}
 					label="Back to users"
 					className="mb-3"
 				/>

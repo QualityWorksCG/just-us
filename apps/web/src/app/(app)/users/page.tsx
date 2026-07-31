@@ -110,7 +110,7 @@ function pageHref(base: URLSearchParams, page: number) {
 	const next = new URLSearchParams(base);
 	if (page > 1) next.set("page", String(page));
 	const qs = next.toString();
-	return (qs ? `/dashboard/users?${qs}` : "/dashboard/users") as Route;
+	return (qs ? `/users?${qs}` : "/users") as Route;
 }
 
 const COLUMNS = "lg:grid-cols-[2fr_100px_120px_1.4fr_100px_100px]";
@@ -311,7 +311,7 @@ export default async function UsersPage({
 						>
 							<Cell label="Account">
 								<Link
-									href={`/dashboard/users/${u.id}` as Route}
+									href={`/users/${u.id}` as Route}
 									className="block min-w-0"
 								>
 									<p className="truncate font-semibold text-[13.5px] text-ink hover:text-brass-deep">

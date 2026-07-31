@@ -470,9 +470,7 @@ async function userRows(page: Page): Promise<UserRow[]> {
 	return page.evaluate(() => {
 		const rows: UserRow[] = [];
 		for (const link of Array.from(
-			document.querySelectorAll<HTMLAnchorElement>(
-				'a[href^="/dashboard/users/"]',
-			),
+			document.querySelectorAll<HTMLAnchorElement>('a[href^="/users/"]'),
 		)) {
 			const row = link.closest<HTMLElement>("div.grid");
 			if (!row) continue;
@@ -542,14 +540,14 @@ try {
 
 	await step(
 		1,
-		"Admin signs in and lands on /dashboard with admin nav",
+		"Admin signs in and lands on /home with admin nav",
 		async (note) => {
 			currentPage = admin;
 			await admin.goto(`${BASE}/login?mode=signin`, {
 				waitUntil: "networkidle",
 			});
 			await submitSignIn(admin, EMAILS.admin, PASSWORD, note);
-			await admin.waitForURL(/\/dashboard$/, { timeout: 30000 });
+			await admin.waitForURL(/\/home$/, { timeout: 30000 });
 			note(`final URL ${admin.url()}`);
 			await waitForShell(admin);
 			const nav = await poll(
@@ -566,11 +564,8 @@ try {
 			assert(users, "nav has no Users item");
 			assert(audit, "nav has no Audit log item");
 			note(`Users → ${users.href}; Audit log → ${audit.href}`);
-			assert(users.href === "/dashboard/users", `Users href was ${users.href}`);
-			assert(
-				audit.href === "/dashboard/audit",
-				`Audit log href was ${audit.href}`,
-			);
+			assert(users.href === "/users", `Users href was ${users.href}`);
+			assert(audit.href === "/audit", `Audit log href was ${audit.href}`);
 		},
 	);
 
@@ -579,7 +574,7 @@ try {
 		"Users list: search, role filter, blocked filter",
 		async (note) => {
 			currentPage = admin;
-			await admin.goto(`${BASE}/dashboard/users`, { waitUntil: "networkidle" });
+			await admin.goto(`${BASE}/users`, { waitUntil: "networkidle" });
 
 			await setSearch(admin, `${TAG}-donor`, note);
 			const rows = await poll(
@@ -602,7 +597,7 @@ try {
 				`expected a Verified pill, got ${JSON.stringify(pills)}`,
 			);
 
-			await admin.goto(`${BASE}/dashboard/users?q=${TAG}`, {
+			await admin.goto(`${BASE}/users?q=${TAG}`, {
 				waitUntil: "networkidle",
 			});
 			const all = await poll("all three seeded rows", async () => {
@@ -624,7 +619,7 @@ try {
 				`the role filter returned ${donorIds.join(", ")}`,
 			);
 
-			await admin.goto(`${BASE}/dashboard/users?q=${TAG}&blocked=yes`, {
+			await admin.goto(`${BASE}/users?q=${TAG}&blocked=yes`, {
 				waitUntil: "networkidle",
 			});
 			const blockedRows = await userRows(admin);
@@ -644,28 +639,28 @@ try {
 
 	await step(
 		3,
-		"Donor signs in; admin routes redirect to /dashboard",
+		"Donor signs in; admin routes redirect to /home",
 		async (note) => {
 			currentPage = donor;
 			await donor.goto(`${BASE}/login?mode=signin`, {
 				waitUntil: "networkidle",
 			});
 			await submitSignIn(donor, EMAILS.donor, PASSWORD, note);
-			await donor.waitForURL(/\/dashboard$/, { timeout: 30000 });
+			await donor.waitForURL(/\/home$/, { timeout: 30000 });
 			await waitForShell(donor);
 			note(`donor landed on ${donor.url()}`);
 
-			await donor.goto(`${BASE}/dashboard/users`, { waitUntil: "networkidle" });
-			note(`/dashboard/users → ${donor.url()}`);
+			await donor.goto(`${BASE}/users`, { waitUntil: "networkidle" });
+			note(`/users → ${donor.url()}`);
 			assert(
-				new URL(donor.url()).pathname === "/dashboard",
-				`expected /dashboard, got ${donor.url()}`,
+				new URL(donor.url()).pathname === "/home",
+				`expected /home, got ${donor.url()}`,
 			);
-			await donor.goto(`${BASE}/dashboard/audit`, { waitUntil: "networkidle" });
-			note(`/dashboard/audit → ${donor.url()}`);
+			await donor.goto(`${BASE}/audit`, { waitUntil: "networkidle" });
+			note(`/audit → ${donor.url()}`);
 			assert(
-				new URL(donor.url()).pathname === "/dashboard",
-				`expected /dashboard, got ${donor.url()}`,
+				new URL(donor.url()).pathname === "/home",
+				`expected /home, got ${donor.url()}`,
 			);
 
 			await waitForShell(donor);
@@ -673,13 +668,11 @@ try {
 			note(`donor nav: ${nav.map((i) => i.text).join(" | ")}`);
 			assert(nav.length > 1, "the donor sidebar rendered no nav items");
 			assert(
-				!nav.some((i) => i.text === "Users" || i.href === "/dashboard/users"),
+				!nav.some((i) => i.text === "Users" || i.href === "/users"),
 				"the donor nav exposes a Users item",
 			);
 			assert(
-				!nav.some(
-					(i) => i.text === "Audit log" || i.href === "/dashboard/audit",
-				),
+				!nav.some((i) => i.text === "Audit log" || i.href === "/audit"),
 				"the donor nav exposes an Audit log item",
 			);
 		},
@@ -687,7 +680,7 @@ try {
 
 	await step(4, "Admin blocks the donor from the detail page", async (note) => {
 		currentPage = admin;
-		await admin.goto(`${BASE}/dashboard/users/${donorId}`, {
+		await admin.goto(`${BASE}/users/${donorId}`, {
 			waitUntil: "networkidle",
 		});
 		note(`detail page for ${donorId}`);
@@ -725,13 +718,13 @@ try {
 		"Blocked donor's live session is revoked server-side",
 		async (note) => {
 			currentPage = donor;
-			await donor.goto(`${BASE}/dashboard`, { waitUntil: "networkidle" });
+			await donor.goto(`${BASE}/home`, { waitUntil: "networkidle" });
 			await poll(
 				"/login after the block",
 				async () => new URL(donor.url()).pathname === "/login",
 				20000,
 			);
-			note(`donor reload of /dashboard → ${donor.url()}`);
+			note(`donor reload of /home → ${donor.url()}`);
 		},
 	);
 
@@ -755,7 +748,7 @@ try {
 		"Invite lifecycle through the UI (send, resend, revoke)",
 		async (note) => {
 			currentPage = admin;
-			await admin.goto(`${BASE}/dashboard/users`, { waitUntil: "networkidle" });
+			await admin.goto(`${BASE}/users`, { waitUntil: "networkidle" });
 			await clearToasts(admin);
 			await admin.getByRole("button", { name: /Invite administrator/ }).click();
 			const dialog = admin.getByRole("dialog");
@@ -829,7 +822,7 @@ try {
 		"Inviting an address that already has an account is rejected",
 		async (note) => {
 			currentPage = admin;
-			await admin.goto(`${BASE}/dashboard/users`, { waitUntil: "networkidle" });
+			await admin.goto(`${BASE}/users`, { waitUntil: "networkidle" });
 			await clearToasts(admin);
 			await admin.getByRole("button", { name: /Invite administrator/ }).click();
 			const dialog = admin.getByRole("dialog");
@@ -846,7 +839,7 @@ try {
 		"Administrator cannot block their own account",
 		async (note) => {
 			currentPage = admin;
-			await admin.goto(`${BASE}/dashboard/users/${TAG}-admin`, {
+			await admin.goto(`${BASE}/users/${TAG}-admin`, {
 				waitUntil: "networkidle",
 			});
 			const text = await bodyText(admin);
@@ -888,7 +881,7 @@ try {
 
 	await step(7, "Unblock restores sign-in for the donor", async (note) => {
 		currentPage = admin;
-		await admin.goto(`${BASE}/dashboard/users/${donorId}`, {
+		await admin.goto(`${BASE}/users/${donorId}`, {
 			waitUntil: "networkidle",
 		});
 		await clearToasts(admin);
@@ -909,7 +902,7 @@ try {
 		currentPage = donor;
 		await donor.goto(`${BASE}/login?mode=signin`, { waitUntil: "networkidle" });
 		await submitSignIn(donor, EMAILS.donor, PASSWORD, note);
-		await donor.waitForURL(/\/dashboard$/, { timeout: 45000 });
+		await donor.waitForURL(/\/home$/, { timeout: 45000 });
 		await waitForShell(donor);
 		note(`donor signed in again → ${donor.url()}`);
 	});
@@ -955,7 +948,7 @@ try {
 		);
 
 		currentPage = admin;
-		await admin.goto(`${BASE}/dashboard/users?q=${TAG}-locky`, {
+		await admin.goto(`${BASE}/users?q=${TAG}-locky`, {
 			waitUntil: "networkidle",
 		});
 		const rows = await poll("the locky row", async () => {
@@ -1014,7 +1007,7 @@ try {
 			rlCount = 1;
 			rlLast = Date.now();
 			await invitee.getByRole("button", { name: /Accept invitation/ }).click();
-			await invitee.waitForURL(/\/dashboard$/, { timeout: 40000 });
+			await invitee.waitForURL(/\/home$/, { timeout: 40000 });
 			note(`accepted → ${invitee.url()}`);
 			await waitForShell(invitee);
 			const nav = await navItems(invitee);
@@ -1040,7 +1033,7 @@ try {
 		"Audit log records every administrative action",
 		async (note) => {
 			currentPage = admin;
-			await admin.goto(`${BASE}/dashboard/audit`, { waitUntil: "networkidle" });
+			await admin.goto(`${BASE}/audit`, { waitUntil: "networkidle" });
 			const text = await bodyText(admin);
 			const expected = [
 				"User blocked",

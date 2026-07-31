@@ -187,7 +187,7 @@ export default async function AuditLogPage({
 								<Cell label="Target">
 									{e.targetType === "user" && e.targetId ? (
 										<Link
-											href={`/dashboard/users/${e.targetId}` as Route}
+											href={`/users/${e.targetId}` as Route}
 											className="break-all font-mono text-[12px] text-brass-deep hover:underline"
 										>
 											{e.targetId}
@@ -216,7 +216,7 @@ export default async function AuditLogPage({
 			{totalPages > 1 && (
 				<div className="flex items-center justify-between border-border border-t pt-5">
 					<Link
-						href={`/dashboard/audit?page=${page - 1}` as Route}
+						href={`/audit?page=${page - 1}` as Route}
 						aria-disabled={page <= 1}
 						className={cn(
 							buttonVariants({ variant: "outline", size: "sm" }),
@@ -231,7 +231,7 @@ export default async function AuditLogPage({
 						Page {page} of {totalPages}
 					</span>
 					<Link
-						href={`/dashboard/audit?page=${page + 1}` as Route}
+						href={`/audit?page=${page + 1}` as Route}
 						aria-disabled={page >= totalPages}
 						className={cn(
 							buttonVariants({ variant: "outline", size: "sm" }),

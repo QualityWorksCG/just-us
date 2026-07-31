@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import {
 	resendInviteAction,
 	revokeInviteAction,
-} from "@/app/dashboard/users/invite-actions";
+} from "@/app/(app)/users/invite-actions";
 
 export function InvitationRowActions({ id }: { id: string }) {
 	const router = useRouter();
