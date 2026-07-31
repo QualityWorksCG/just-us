@@ -12,7 +12,6 @@
         "BETTER_AUTH_URL",
         "RESEND_API_KEY",
         "EMAIL_SOURCE",
-        "ADMIN_INVITE_CODE",
         "SKIP_ENV_VALIDATION",
         "NODE_ENV"
       ],
