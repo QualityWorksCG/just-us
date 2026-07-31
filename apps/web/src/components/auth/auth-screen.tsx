@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { signUpAction } from "@/app/login/actions";
+import { accountExistsAction, signUpAction } from "@/app/login/actions";
 import { Brandmark } from "@/components/brandmark";
 import { authClient } from "@/lib/auth-client";
 
@@ -197,6 +197,17 @@ export function AuthScreen({
 			return;
 		}
 		setPending(true);
+		// Magic-link signup is disabled, so an unregistered email would otherwise
+		// only fail after the user clicks the emailed link. Check up front and give
+		// a clear message instead.
+		const exists = await accountExistsAction(target);
+		if (!exists) {
+			toast.error(
+				"No account found for that email. Create an account first, then use the magic link to sign in.",
+			);
+			setPending(false);
+			return;
+		}
 		await authClient.signIn.magicLink(
 			{
 				email: target,

@@ -62,10 +62,42 @@ model Case {
 
   // Attorneys requesting to represent this case (the "seeking" inbox).
   requests AttorneyRequest[]
+  // Donor bookmarks and donations against this case.
+  saves     SavedCase[]
+  donations Donation[]
 
   @@index([ownerId])
   @@index([status])
   @@map("case")
+}
+
+// A donor bookmarking a case to come back to. `userId` is the donor's User id
+// (kept as a plain id to avoid a back-relation on the auth User model).
+model SavedCase {
+  id        String   @id @default(cuid())
+  userId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, caseId])
+  @@index([userId])
+  @@map("saved_case")
+}
+
+// A donation a donor made to a case. No payments are wired yet, so rows are
+// created only once that exists; the donor screens read from here (empty for now).
+model Donation {
+  id          String   @id @default(cuid())
+  donorId     String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId      String
+  amountCents Int
+  createdAt   DateTime @default(now())
+
+  @@index([donorId])
+  @@index([caseId])
+  @@map("donation")
 }
 
 enum RequestStatus {

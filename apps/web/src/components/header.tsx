@@ -98,7 +98,7 @@ export default function Header() {
 						Sign in
 					</Link>
 					<Link
-						href="/login"
+						href="/login?mode=create"
 						className={cn(
 							buttonVariants({ size: "sm" }),
 							"hidden h-9 px-4 text-sm sm:inline-flex",

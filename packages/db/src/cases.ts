@@ -23,8 +23,9 @@ export type CaseFields = {
 	/** How the plaintiff receives raised funds. */
 	payoutType?: string | null;
 	attorney?: CaseAttorney | null;
-	/** Uploaded evidence metadata; actual files aren't stored yet. */
-	evidence?: { name: string; size: number }[];
+	/** Evidence: uploaded files (name + size) or links (name + url). Files aren't
+	 *  stored yet — only their metadata. */
+	evidence?: { name: string; size?: number; url?: string }[];
 	/** Vercel Blob URL of the cover image. */
 	coverImageUrl?: string | null;
 	/** Vercel Blob URLs of the gallery images. */

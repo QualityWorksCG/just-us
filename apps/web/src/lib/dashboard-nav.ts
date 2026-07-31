@@ -54,14 +54,21 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 		items: [
 			{
 				slug: "",
-				label: "Browse cases",
+				label: "Dashboard",
+				icon: LayoutDashboard,
+				title: "Your giving dashboard",
+				sub: "Your giving at a glance — here's the difference you're making.",
+			},
+			{
+				slug: "discover",
+				label: "Discover cases",
 				icon: Compass,
-				title: "Browse cases",
-				sub: "Every case here has a bar-verified attorney the plaintiff chose, and an agreed fee. Donations are gifts.",
+				title: "Discover cases",
+				sub: "Find a case that matters to you — save it, share it, or back it today.",
 			},
 			{
 				slug: "saved",
-				label: "Saved cases",
+				label: "Saved",
 				icon: Bookmark,
 				title: "Saved cases",
 				sub: "Cases you've saved to come back to.",
@@ -71,7 +78,14 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "My donations",
 				icon: HeartHandshake,
 				title: "My donations",
-				sub: "Every case you've backed, with its latest status.",
+				sub: "Every gift you've given, and the causes behind them.",
+			},
+			{
+				slug: "updates",
+				label: "Updates",
+				icon: Megaphone,
+				title: "Updates",
+				sub: "The latest from the cases you're backing.",
 			},
 			{
 				slug: "settings",

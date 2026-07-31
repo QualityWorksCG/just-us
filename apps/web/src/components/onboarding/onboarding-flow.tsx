@@ -23,6 +23,7 @@ import {
 	CircleCheck,
 	FileText,
 	Heart,
+	LogOut,
 	type LucideIcon,
 	Scale,
 	ShieldCheck,
@@ -32,6 +33,7 @@ import { toast } from "sonner";
 
 import { completeOnboardingAction } from "@/app/onboarding/actions";
 import { Brandmark } from "@/components/brandmark";
+import { authClient } from "@/lib/auth-client";
 import { BAR_NUMBER_MESSAGE, isValidBarNumber } from "@/lib/validation";
 
 type Role = "plaintiff" | "donor" | "attorney";
@@ -93,6 +95,11 @@ export function OnboardingFlow({ name }: { name: string }) {
 		jurisdiction: useId(),
 	};
 	const firstName = name.trim().split(" ")[0] || "there";
+
+	async function signOut() {
+		await authClient.signOut();
+		window.location.assign("/");
+	}
 
 	const [step, setStep] = useState<1 | 2>(1);
 	const [role, setRole] = useState<Role | null>(null);
@@ -179,19 +186,29 @@ export function OnboardingFlow({ name }: { name: string }) {
 					<Brandmark size={30} />
 					<span className="font-bold text-[15px] tracking-tight">JustUs</span>
 				</div>
-				<div className="flex items-center gap-3">
-					<span className="font-mono font-semibold text-[12px] text-muted-foreground uppercase tracking-[0.1em]">
-						Step {step} of 2
-					</span>
-					<div className="flex gap-1.5">
-						<span className="h-1.5 w-7 rounded-full bg-brass" />
-						<span
-							className={cn(
-								"h-1.5 w-7 rounded-full",
-								step >= 2 ? "bg-brass" : "bg-brass-wash",
-							)}
-						/>
+				<div className="flex items-center gap-4">
+					<div className="flex items-center gap-3">
+						<span className="font-mono font-semibold text-[12px] text-muted-foreground uppercase tracking-[0.1em]">
+							Step {step} of 2
+						</span>
+						<div className="flex gap-1.5">
+							<span className="h-1.5 w-7 rounded-full bg-brass" />
+							<span
+								className={cn(
+									"h-1.5 w-7 rounded-full",
+									step >= 2 ? "bg-brass" : "bg-brass-wash",
+								)}
+							/>
+						</div>
 					</div>
+					<button
+						type="button"
+						onClick={signOut}
+						className="inline-flex items-center gap-1.5 border-border border-l pl-4 font-semibold text-[13px] text-muted-foreground transition-colors hover:text-ink"
+					>
+						<LogOut className="size-4" aria-hidden="true" />
+						Sign out
+					</button>
 				</div>
 			</header>
 

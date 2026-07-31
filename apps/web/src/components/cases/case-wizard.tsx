@@ -49,11 +49,15 @@ import { toast } from "sonner";
 
 import {
 	createCaseAction,
+	deleteCaseAction,
 	publishForAttorneysAction,
 	saveCaseDraftAction,
 } from "@/app/cases/actions";
 import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
+
+/** A piece of evidence: an uploaded file (has `size`) or a link (has `url`). */
+export type EvidenceItem = { name: string; size?: number; url?: string };
 
 export type WizardInitial = {
 	id: string;
@@ -71,7 +75,7 @@ export type WizardInitial = {
 		email: string;
 		phone: string;
 	} | null;
-	evidence: { name: string; size: number }[];
+	evidence: EvidenceItem[];
 	coverImageUrl: string | null;
 	images: string[];
 };
@@ -186,14 +190,17 @@ export function CaseWizard({
 	// The draft row this wizard is bound to (created on first save / publish).
 	const [caseId, setCaseId] = useState<string | null>(initial?.id ?? null);
 	const [saving, setSaving] = useState(false);
+	const [discardOpen, setDiscardOpen] = useState(false);
+	const [discarding, setDiscarding] = useState(false);
 
 	// Step 1 — the story
 	const [story, setStory] = useState(initial?.story ?? "");
 	const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
 	const [refining, setRefining] = useState(false);
-	const [evidence, setEvidence] = useState<{ name: string; size: number }[]>(
+	const [evidence, setEvidence] = useState<EvidenceItem[]>(
 		initial?.evidence ?? [],
 	);
+	const [linkUrl, setLinkUrl] = useState("");
 
 	// Step 2 — the basics
 	const [category, setCategory] = useState(initial?.category || "Employment");
@@ -402,6 +409,21 @@ export function CaseWizard({
 		}
 	}
 
+	// Abandon the wizard without saving. If a draft was already persisted (a fresh
+	// draft or a resumed one), remove it — deleteCaseAction is draft-only, so a
+	// resumed live/seeking case is never deleted, only left as-is.
+	async function discard() {
+		setDiscarding(true);
+		if (caseId) {
+			try {
+				await deleteCaseAction(caseId);
+			} catch {
+				// best effort — leave anyway
+			}
+		}
+		window.location.assign("/dashboard/cases");
+	}
+
 	// Polish the story with OpenAI — facts and voice preserved, clarity improved.
 	async function refineWithAI() {
 		if (story.trim().length < 20)
@@ -466,6 +488,24 @@ export function CaseWizard({
 			size: f.size,
 		}));
 		setEvidence((p) => [...p, ...files]);
+	}
+
+	function addLink() {
+		let url = linkUrl.trim();
+		if (!url) return;
+		// Be forgiving — prefix a scheme so "example.com/doc" is accepted.
+		if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+		try {
+			const parsed = new URL(url);
+			if (evidence.some((e) => e.url === parsed.href)) {
+				toast.error("That link is already added.");
+				return;
+			}
+			setEvidence((p) => [...p, { name: parsed.hostname, url: parsed.href }]);
+			setLinkUrl("");
+		} catch {
+			toast.error("Enter a valid link (e.g. https://…).");
+		}
 	}
 
 	function copyLink() {
@@ -939,15 +979,72 @@ export function CaseWizard({
 						})}
 					</ol>
 				</div>
-				<button
-					type="button"
-					onClick={saveAndExit}
-					disabled={saving}
-					className="flex items-center gap-2 font-medium text-[13px] text-muted-foreground transition-colors hover:text-ink disabled:opacity-60"
-				>
-					<ArrowLeft className="size-4" aria-hidden="true" />
-					{saving ? "Saving…" : "Save & exit"}
-				</button>
+				<div className="flex flex-col gap-3">
+					<button
+						type="button"
+						onClick={saveAndExit}
+						disabled={saving || discarding}
+						className="flex items-center gap-2 font-medium text-[13px] text-muted-foreground transition-colors hover:text-ink disabled:opacity-60"
+					>
+						<ArrowLeft className="size-4" aria-hidden="true" />
+						{saving ? "Saving…" : "Save & exit"}
+					</button>
+					<button
+						type="button"
+						onClick={() => setDiscardOpen(true)}
+						disabled={saving || discarding}
+						className="flex items-center gap-2 font-medium text-[13px] text-danger/80 transition-colors hover:text-danger disabled:opacity-60"
+					>
+						<X className="size-4" aria-hidden="true" />
+						Discard case
+					</button>
+				</div>
+
+				{discardOpen && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+						<button
+							type="button"
+							aria-label="Keep editing"
+							disabled={discarding}
+							onClick={() => setDiscardOpen(false)}
+							className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+						/>
+						<div
+							role="dialog"
+							aria-modal="true"
+							className="relative w-full max-w-[400px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 text-left shadow-[var(--shadow-modal)]"
+						>
+							<div className="mb-3 flex size-11 items-center justify-center rounded-full bg-danger/10 text-danger">
+								<X className="size-5" aria-hidden="true" />
+							</div>
+							<h2 className="font-bold text-[17px] text-ink">
+								Discard this case?
+							</h2>
+							<p className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed">
+								You'll lose anything you haven't saved
+								{caseId ? ", and this draft will be removed" : ""}. This can't
+								be undone.
+							</p>
+							<div className="mt-5 flex justify-end gap-2.5">
+								<Button
+									variant="outline"
+									disabled={discarding}
+									onClick={() => setDiscardOpen(false)}
+								>
+									Keep editing
+								</Button>
+								<Button
+									disabled={discarding}
+									onClick={discard}
+									className={cn("bg-danger text-white hover:bg-danger/90")}
+								>
+									<X data-icon="inline-start" aria-hidden="true" />
+									{discarding ? "Discarding…" : "Discard case"}
+								</Button>
+							</div>
+						</div>
+					</div>
+				)}
 			</aside>
 
 			{/* Main — only this column scrolls */}
@@ -1325,28 +1422,73 @@ export function CaseWizard({
 											hidden
 											onChange={onPickEvidence}
 										/>
-										{evidence.map((f) => (
+
+										{/* Or add a link as evidence */}
+										<div className="mt-2.5 flex gap-2">
+											<Input
+												value={linkUrl}
+												onChange={(e) => setLinkUrl(e.target.value)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") {
+														e.preventDefault();
+														addLink();
+													}
+												}}
+												placeholder="Or paste a link — article, record, video…"
+												className="h-10 flex-1 bg-surface"
+											/>
+											<Button
+												type="button"
+												onClick={addLink}
+												className="h-10 shrink-0"
+											>
+												<Link2 data-icon="inline-start" aria-hidden="true" />
+												Add link
+											</Button>
+										</div>
+
+										{evidence.map((f, i) => (
 											<div
-												key={f.name}
+												key={`${f.url ?? f.name}-${i}`}
 												className="mt-2.5 flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-surface px-3.5 py-2.5"
 											>
-												<FileText
-													className="size-4 text-brass-deep"
-													aria-hidden="true"
-												/>
-												<span className="flex-1 truncate text-[13.5px] text-ink">
-													{f.name}
-												</span>
-												<span className="text-[12px] text-muted-foreground tabular-nums">
-													{formatSize(f.size)}
-												</span>
+												{f.url ? (
+													<>
+														<Link2
+															className="size-4 shrink-0 text-brass-deep"
+															aria-hidden="true"
+														/>
+														<a
+															href={f.url}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="flex-1 truncate text-[13.5px] text-brass-deep hover:underline"
+														>
+															{f.name}
+														</a>
+														<span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.06em]">
+															Link
+														</span>
+													</>
+												) : (
+													<>
+														<FileText
+															className="size-4 shrink-0 text-brass-deep"
+															aria-hidden="true"
+														/>
+														<span className="flex-1 truncate text-[13.5px] text-ink">
+															{f.name}
+														</span>
+														<span className="text-[12px] text-muted-foreground tabular-nums">
+															{f.size != null ? formatSize(f.size) : ""}
+														</span>
+													</>
+												)}
 												<button
 													type="button"
-													aria-label="Remove file"
+													aria-label="Remove evidence"
 													onClick={() =>
-														setEvidence((p) =>
-															p.filter((x) => x.name !== f.name),
-														)
+														setEvidence((p) => p.filter((_, idx) => idx !== i))
 													}
 													className="text-muted-foreground hover:text-ink"
 												>
@@ -1786,7 +1928,7 @@ export function CaseWizard({
 										{[
 											"Title & one-line summary",
 											"Your story",
-											`Evidence attached (${evidence.length} file${evidence.length === 1 ? "" : "s"})`,
+											`Evidence attached (${evidence.length} item${evidence.length === 1 ? "" : "s"})`,
 											"Attorney chosen · fee agreed",
 										].map((item) => (
 											<li
