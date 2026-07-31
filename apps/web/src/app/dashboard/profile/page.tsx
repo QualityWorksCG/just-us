@@ -4,8 +4,16 @@ import {
 	type AttorneyProfileData,
 	AttorneyProfileForm,
 } from "@/components/dashboard/attorney-profile-form";
+import type { VerificationView } from "@/components/dashboard/attorney-verification";
+import type { VerificationSource } from "@/lib/attorney-verification";
 import { requireRole } from "@/lib/auth-server";
 import { findScreen } from "@/lib/dashboard-nav";
+
+/**
+ * A bar check measures ~11s. Headroom over that, because a verification killed
+ * mid-flight looks identical to one that found nothing.
+ */
+export const maxDuration = 60;
 
 /**
  * The attorney's own directory profile ("Group A" — attorney-entered, public,
@@ -19,6 +27,7 @@ export default async function AttorneyProfilePage() {
 	const user = session.user as typeof session.user & {
 		firmName?: string | null;
 		jurisdiction?: string | null;
+		barNumber?: string | null;
 	};
 
 	const screen = findScreen("attorney", "profile");
@@ -47,6 +56,34 @@ export default async function AttorneyProfilePage() {
 			}
 		: null;
 
+	// The newest check drives the badge; `sources` is a Json column, only ever
+	// written by the verification action as a validated array.
+	const lastCheck = saved?.verifications[0];
+	const verification: VerificationView = {
+		status: saved?.verificationStatus ?? "unverified",
+		verifiedAt: saved?.verifiedAt ?? null,
+		barNumber: saved?.user.barNumber ?? user.barNumber ?? null,
+		jurisdiction: saved?.user.jurisdiction ?? user.jurisdiction ?? null,
+		latest: lastCheck
+			? {
+					createdAt: lastCheck.createdAt,
+					confidence: lastCheck.confidence,
+					isLicensedAttorney: lastCheck.isLicensedAttorney,
+					inGoodStanding: lastCheck.inGoodStanding,
+					licenseStatusText: lastCheck.licenseStatusText,
+					officialRecordUrl: lastCheck.officialRecordUrl,
+					matchedName: lastCheck.matchedName,
+					matchedBarNumber: lastCheck.matchedBarNumber,
+					matchedJurisdiction: lastCheck.matchedJurisdiction,
+					disciplinaryNotes: lastCheck.disciplinaryNotes,
+					summary: lastCheck.summary,
+					sources: (lastCheck.sources ?? []) as VerificationSource[],
+					checkedName: lastCheck.checkedName,
+					checkedJurisdiction: lastCheck.checkedJurisdiction,
+				}
+			: null,
+	};
+
 	return (
 		<div>
 			<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
@@ -65,6 +102,7 @@ export default async function AttorneyProfilePage() {
 						firmName: user.firmName ?? null,
 						jurisdiction: user.jurisdiction ?? null,
 					}}
+					verification={verification}
 				/>
 			</div>
 		</div>

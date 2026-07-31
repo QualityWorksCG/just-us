@@ -1,5 +1,8 @@
 import { Prisma } from "../prisma/generated/client";
-import type { FeeApproach } from "../prisma/generated/enums";
+import type {
+	FeeApproach,
+	VerificationStatus,
+} from "../prisma/generated/enums";
 import prisma from "./index";
 
 /**
@@ -33,10 +36,19 @@ export type AttorneyProfileDraft = {
 	background?: string | null;
 };
 
-/** The signed-in attorney's own profile, moderation state included. Null until
- *  the first autosave creates a row. */
+/**
+ * The signed-in attorney's own profile, with the account fields verification
+ * needs (bar number and licensing state live on `User`, from sign-up) and the
+ * newest check. Null until the first autosave creates a row.
+ */
 export async function getAttorneyProfile(userId: string) {
-	return prisma.attorneyProfile.findUnique({ where: { userId } });
+	return prisma.attorneyProfile.findUnique({
+		where: { userId },
+		include: {
+			user: { select: { barNumber: true, jurisdiction: true, name: true } },
+			verifications: { orderBy: { createdAt: "desc" }, take: 1 },
+		},
+	});
 }
 
 /**
@@ -94,6 +106,100 @@ export async function saveAttorneyProfile(
 			bioStatus: fields.bio ? "pending" : "approved",
 		},
 		update: { ...data, ...moderation },
+	});
+}
+
+/** A recorded bar-standing check. `status` is decided by policy in the web app,
+ *  not taken from the model — see `decideStatus`. */
+export type VerificationRecord = {
+	status: VerificationStatus;
+	confidence: number;
+	isLicensedAttorney: boolean | null;
+	inGoodStanding: boolean | null;
+	licenseStatusText: string | null;
+	matchedName: string | null;
+	matchedBarNumber: string | null;
+	matchedJurisdiction: string | null;
+	disciplinaryNotes: string | null;
+	summary: string;
+	/** The licensee record the model reported reading, or null. Decides the badge. */
+	officialRecordUrl: string | null;
+	sources: { url: string; title: string }[];
+	checkedName: string | null;
+	checkedJurisdiction: string | null;
+	model: string;
+	triggeredBy: string | null;
+};
+
+/**
+ * Record a check and move the profile's badge to match, in one transaction.
+ *
+ * The two writes are inseparable: `AttorneyProfile.verificationStatus` is a cache
+ * of the newest check, and a badge that disagreed with its own evidence would be
+ * worse than no badge. `verifiedAt` is only ever advanced, never cleared, so a
+ * later downgrade still leaves a record of when the profile was last trusted.
+ */
+export async function recordVerification(
+	profileId: string,
+	record: VerificationRecord,
+) {
+	return prisma.$transaction(async (tx) => {
+		const created = await tx.attorneyVerification.create({
+			data: { profileId, ...record },
+		});
+		await tx.attorneyProfile.update({
+			where: { id: profileId },
+			data: {
+				verificationStatus: record.status,
+				...(record.status === "verified" ? { verifiedAt: new Date() } : {}),
+			},
+		});
+		return created;
+	});
+}
+
+/**
+ * Change the attorney's licensing jurisdiction (held on `User` from sign-up).
+ *
+ * Any existing badge is dropped in the same transaction. A `verified` status
+ * earned against a Georgia bar record says nothing about a California claim, so
+ * carrying it across a jurisdiction change would leave the badge asserting
+ * something no check ever established. `verifiedAt` is left alone — it records
+ * when the profile was last trusted, which remains true of the old jurisdiction.
+ *
+ * Past `verifications` rows are kept: they name the jurisdiction they ran
+ * against, so they stay meaningful as history.
+ */
+export async function updateAttorneyJurisdiction(
+	userId: string,
+	jurisdiction: string,
+) {
+	return prisma.$transaction(async (tx) => {
+		const before = await tx.user.findUnique({
+			where: { id: userId },
+			select: { jurisdiction: true },
+		});
+		if (before?.jurisdiction === jurisdiction) {
+			return { changed: false, badgeCleared: false };
+		}
+
+		await tx.user.update({ where: { id: userId }, data: { jurisdiction } });
+
+		// updateMany so a profile that doesn't exist yet is a no-op, not a throw.
+		const cleared = await tx.attorneyProfile.updateMany({
+			where: { userId, verificationStatus: { not: "unverified" } },
+			data: { verificationStatus: "unverified" },
+		});
+		return { changed: true, badgeCleared: cleared.count > 0 };
+	});
+}
+
+/** Every check for a profile, newest first — the evidence trail behind a badge. */
+export async function listVerifications(profileId: string, take = 10) {
+	return prisma.attorneyVerification.findMany({
+		where: { profileId },
+		orderBy: { createdAt: "desc" },
+		take,
 	});
 }
 

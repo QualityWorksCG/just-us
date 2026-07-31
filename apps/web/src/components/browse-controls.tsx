@@ -1,8 +1,23 @@
 "use client";
 
 import { US_STATES } from "@just-us/auth/jurisdiction";
+import {
+	Combobox,
+	ComboboxContent,
+	ComboboxEmpty,
+	ComboboxInput,
+	ComboboxItem,
+	ComboboxList,
+} from "@just-us/ui/components/combobox";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@just-us/ui/components/select";
 import { cn } from "@just-us/ui/lib/utils";
-import { ChevronDown, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -81,15 +96,7 @@ export function BrowseControls() {
 				</form>
 
 				<div className="flex gap-3">
-					<Dropdown
-						label={state || "All states"}
-						value={state}
-						onChange={(v) => apply({ state: v || null })}
-						options={[
-							{ value: "", label: "All states" },
-							...US_STATES.map((s) => ({ value: s, label: s })),
-						]}
-					/>
+					<StateCombobox value={state} onChange={(v) => apply({ state: v })} />
 					<Dropdown
 						label={SORTS.find((s) => s.value === sort)?.label ?? "Trending"}
 						value={sort}
@@ -144,6 +151,41 @@ function Pill({
 	);
 }
 
+/** Fifty states is too many to scroll, so this one is typed into. Clearing the
+ *  field clears the filter. */
+function StateCombobox({
+	value,
+	onChange,
+}: {
+	value: string;
+	onChange: (value: string | null) => void;
+}) {
+	return (
+		<Combobox
+			items={US_STATES as unknown as string[]}
+			value={value}
+			onValueChange={(next: string | null) => onChange(next || null)}
+		>
+			<ComboboxInput
+				placeholder="All states"
+				aria-label="Filter by state"
+				className="h-12 w-[190px] rounded-[var(--radius-pill)] border-border px-4 font-semibold text-[13.5px]"
+			/>
+			<ComboboxContent>
+				<ComboboxEmpty>No matches</ComboboxEmpty>
+				<ComboboxList>
+					{(option: string) => (
+						<ComboboxItem key={option} value={option}>
+							{option}
+						</ComboboxItem>
+					)}
+				</ComboboxList>
+			</ComboboxContent>
+		</Combobox>
+	);
+}
+
+/** Sort has three fixed options — a menu is faster than a search field. */
 function Dropdown({
 	label,
 	value,
@@ -156,23 +198,27 @@ function Dropdown({
 	options: { value: string; label: string }[];
 }) {
 	return (
-		<div className="relative">
-			<select
-				value={value}
-				onChange={(e) => onChange(e.target.value)}
+		<Select
+			value={value}
+			onValueChange={(next: string | null) => onChange(next ?? "")}
+		>
+			<SelectTrigger
 				aria-label={label}
-				className="h-12 cursor-pointer appearance-none rounded-[var(--radius-pill)] border border-border bg-surface pr-9 pl-4 font-semibold text-[13.5px] text-ink outline-none transition-colors focus:border-brass-deep"
+				className="h-12 w-auto gap-2 rounded-[var(--radius-pill)] border-border px-4 font-semibold text-[13.5px] text-ink"
 			>
-				{options.map((o) => (
-					<option key={o.value} value={o.value}>
-						{o.label}
-					</option>
+				<SelectValue />
+			</SelectTrigger>
+			<SelectContent className="max-h-[300px]">
+				{options.map((option) => (
+					<SelectItem
+						key={option.value}
+						value={option.value}
+						className="text-[14px]"
+					>
+						{option.label}
+					</SelectItem>
 				))}
-			</select>
-			<ChevronDown
-				className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
-				aria-hidden="true"
-			/>
-		</div>
+			</SelectContent>
+		</Select>
 	);
 }

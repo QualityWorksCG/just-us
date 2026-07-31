@@ -29,6 +29,7 @@ import {
 	Phone,
 	Save,
 	Scale,
+	ShieldCheck,
 	Sparkles,
 	Upload,
 	User as UserIcon,
@@ -49,6 +50,11 @@ import {
 	type SaveAttorneyProfileInput,
 	saveAttorneyProfileAction,
 } from "@/app/dashboard/profile/actions";
+import {
+	AttorneyVerification,
+	VerificationBadge,
+	type VerificationView,
+} from "@/components/dashboard/attorney-verification";
 import {
 	BACKGROUND_MAX,
 	BIO_MAX,
@@ -140,6 +146,9 @@ const TABS = [
 		fields: ["feeApproach", "feeRangeMinCents", "feeRangeMaxCents"],
 	},
 	{ key: "about", label: "About you", fields: ["bio", "background"] },
+	// Read-only: the attorney triggers a check but enters nothing, so there is
+	// no field here that can be invalid or missing.
+	{ key: "verification", label: "Verification", fields: [] },
 ] as const;
 
 type Tab = (typeof TABS)[number]["key"];
@@ -453,9 +462,11 @@ function CharCount({ value, max }: { value: string; max: number }) {
 export function AttorneyProfileForm({
 	profile,
 	account,
+	verification,
 }: {
 	profile: AttorneyProfileData | null;
 	account: AttorneyAccount;
+	verification: VerificationView;
 }) {
 	const ids = {
 		legalName: useId(),
@@ -827,6 +838,9 @@ export function AttorneyProfileForm({
 									Ready for the directory
 								</span>
 							)}
+							{/* Bar standing is a separate gate from completeness — a finished
+							    profile still doesn't go public unverified. */}
+							<VerificationBadge status={verification.status} />
 						</div>
 						<p className="mt-0.5 text-[13px] text-muted-foreground leading-relaxed">
 							{pct === 100
@@ -1474,6 +1488,16 @@ export function AttorneyProfileForm({
 							</div>
 						</Field>
 					</div>
+				</Section>
+			)}
+
+			{tab === "verification" && (
+				<Section
+					icon={ShieldCheck}
+					title="Bar verification"
+					sub="We check your licence against public bar records. Verified listings carry a badge plaintiffs can see."
+				>
+					<AttorneyVerification data={verification} />
 				</Section>
 			)}
 
