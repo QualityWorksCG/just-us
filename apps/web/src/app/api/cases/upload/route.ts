@@ -1,4 +1,4 @@
-import { type HandleUploadBody, handleUpload } from "@vercel/blob/client";
+import type { HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
 import { getRole } from "@/lib/auth-server";
@@ -10,6 +10,9 @@ import { getRole } from "@/lib/auth-server";
 export async function POST(request: Request): Promise<NextResponse> {
 	const body = (await request.json()) as HandleUploadBody;
 	try {
+		// Loading the Blob server helper at request time avoids evaluating its
+		// Vercel CLI/OIDC dependency while Next is collecting build metadata.
+		const { handleUpload } = await import("@vercel/blob/client");
 		const result = await handleUpload({
 			body,
 			request,
