@@ -16,7 +16,7 @@ import { cn } from "@just-us/ui/lib/utils";
 import { upload } from "@vercel/blob/client";
 import {
 	Eye,
-	Heart,
+	HandCoins,
 	ImageIcon,
 	Link2,
 	type LucideIcon,
@@ -396,7 +396,7 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 					{/* Metrics */}
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 						<Metric
-							icon={Heart}
+							icon={HandCoins}
 							label={data.donorsCount === 1 ? "donor" : "donors"}
 							value={String(data.donorsCount)}
 							tone="green"

@@ -4,7 +4,7 @@ import {
 	ArrowRight,
 	Bookmark,
 	Compass,
-	Heart,
+	HandCoins,
 	type LucideIcon,
 	Megaphone,
 	Scale,
@@ -103,7 +103,6 @@ function Stat({
 }
 
 export type DonorDashboardData = {
-	firstName: string;
 	totalCents: number;
 	casesBacked: number;
 	savedCount: number;
@@ -114,19 +113,14 @@ export type DonorDashboardData = {
 export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Welcome back, {data.firstName}
-				</h1>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					Your giving at a glance — here's the difference you're making.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				Your giving at a glance — here's the difference you're making.
+			</p>
 
 			{/* Stats */}
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<Stat
-					icon={Heart}
+					icon={HandCoins}
 					value={money(data.totalCents / 100)}
 					label="Total donated"
 					tone="green"
@@ -158,7 +152,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 						Cases you're backing
 					</h2>
 					<div className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border border-dashed bg-paper/40 px-6 py-10 text-center">
-						<Heart
+						<HandCoins
 							className="size-6 text-muted-foreground"
 							aria-hidden="true"
 						/>
@@ -242,7 +236,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 
 			{/* Trust footer */}
 			<div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-border bg-surface/60 px-5 py-3.5 text-[12.5px] text-ink-soft leading-relaxed">
-				<Heart
+				<HandCoins
 					className="mt-0.5 size-4 shrink-0 text-brass-deep"
 					aria-hidden="true"
 				/>

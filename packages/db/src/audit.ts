@@ -43,7 +43,10 @@ export async function writeAudit(
 	});
 }
 
-export async function listAuditEntries(opts?: { skip?: number; take?: number }) {
+export async function listAuditEntries(opts?: {
+	skip?: number;
+	take?: number;
+}) {
 	return prisma.auditLog.findMany({
 		orderBy: { createdAt: "desc" },
 		skip: opts?.skip,

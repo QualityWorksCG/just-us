@@ -1,9 +1,15 @@
 "use client";
 
 import { Button } from "@just-us/ui/components/button";
+import { Calendar } from "@just-us/ui/components/calendar";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@just-us/ui/components/popover";
 import { Textarea } from "@just-us/ui/components/textarea";
 import { cn } from "@just-us/ui/lib/utils";
-import { Ban } from "lucide-react";
+import { Ban, CalendarIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -13,8 +19,27 @@ import { blockUserAction } from "@/app/(app)/users/actions";
 /** Earliest selectable expiry — a block that lapses today is a block that never was. */
 function tomorrow() {
 	const date = new Date();
+	date.setHours(0, 0, 0, 0);
 	date.setDate(date.getDate() + 1);
-	return date.toISOString().slice(0, 10);
+	return date;
+}
+
+/** Same shape the users table prints dates in, so the two never disagree. */
+const dayFmt = new Intl.DateTimeFormat("en-GB", {
+	day: "2-digit",
+	month: "short",
+	year: "numeric",
+});
+
+/**
+ * The wire format the block action parses: a plain calendar day. Built from the
+ * local parts rather than toISOString(), which would hand back the previous day
+ * for any administrator west of UTC.
+ */
+function toISODate(date: Date) {
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	return `${date.getFullYear()}-${month}-${day}`;
 }
 
 export function BlockUserDialog({
@@ -28,7 +53,8 @@ export function BlockUserDialog({
 	const ids = { title: useId(), reason: useId(), expires: useId() };
 	const [open, setOpen] = useState(false);
 	const [reason, setReason] = useState("");
-	const [expiresAt, setExpiresAt] = useState("");
+	const [expiresAt, setExpiresAt] = useState<Date>();
+	const [pickerOpen, setPickerOpen] = useState(false);
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [pending, startTransition] = useTransition();
 
@@ -36,11 +62,14 @@ export function BlockUserDialog({
 	useEffect(() => {
 		if (!open) return;
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape" && !pending) setOpen(false);
+			// Escape belongs to the calendar while it's open. Without this the first
+			// Escape would tear down the whole dialog — and the typed reason with it —
+			// when all the administrator meant was to back out of the date.
+			if (e.key === "Escape" && !pending && !pickerOpen) setOpen(false);
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
-	}, [open, pending]);
+	}, [open, pending, pickerOpen]);
 
 	function close() {
 		setOpen(false);
@@ -53,13 +82,13 @@ export function BlockUserDialog({
 			const res = await blockUserAction({
 				userId,
 				reason,
-				expiresAt: expiresAt || undefined,
+				expiresAt: expiresAt ? toISODate(expiresAt) : undefined,
 			});
 			if (res.ok) {
 				toast.success("Account blocked.");
 				setOpen(false);
 				setReason("");
-				setExpiresAt("");
+				setExpiresAt(undefined);
 				router.refresh();
 			} else {
 				if (res.fieldErrors) setFieldErrors(res.fieldErrors);
@@ -141,15 +170,59 @@ export function BlockUserDialog({
 								>
 									Blocked until
 								</label>
-								<input
-									id={ids.expires}
-									type="date"
-									value={expiresAt}
-									min={tomorrow()}
-									onChange={(e) => setExpiresAt(e.target.value)}
-									aria-invalid={!!fieldErrors.expiresAt}
-									className="h-10 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]"
-								/>
+								<Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+									<PopoverTrigger
+										render={
+											<button
+												id={ids.expires}
+												type="button"
+												aria-invalid={!!fieldErrors.expiresAt}
+												className={cn(
+													"flex h-10 w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-left text-[14px] transition-colors hover:border-brass-deep aria-invalid:border-danger",
+													!expiresAt && "text-muted-foreground",
+												)}
+											>
+												{expiresAt ? dayFmt.format(expiresAt) : "Indefinitely"}
+												<CalendarIcon
+													className="size-4 shrink-0 text-muted-foreground"
+													aria-hidden="true"
+												/>
+											</button>
+										}
+									/>
+									<PopoverContent align="start" className="w-auto gap-0 p-0">
+										<Calendar
+											mode="single"
+											selected={expiresAt}
+											onSelect={(date) => {
+												setExpiresAt(date);
+												setPickerOpen(false);
+											}}
+											// A block has to outlast today to mean anything, so
+											// today and everything before it isn't selectable — and
+											// the calendar opens on the first month that is.
+											disabled={{ before: tomorrow() }}
+											defaultMonth={expiresAt ?? tomorrow()}
+											startMonth={tomorrow()}
+											captionLayout="dropdown"
+											autoFocus
+										/>
+										{expiresAt && (
+											<div className="border-border border-t p-2">
+												<button
+													type="button"
+													onClick={() => {
+														setExpiresAt(undefined);
+														setPickerOpen(false);
+													}}
+													className="font-semibold text-[12.5px] text-ink-soft transition-colors hover:text-brass-deep"
+												>
+													Clear — block indefinitely
+												</button>
+											</div>
+										)}
+									</PopoverContent>
+								</Popover>
 								{fieldErrors.expiresAt ? (
 									<p className="text-[12px] text-danger">
 										{fieldErrors.expiresAt}

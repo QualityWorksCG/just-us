@@ -84,6 +84,31 @@ export async function countUsers(filter: UserListFilter) {
 	return prisma.user.count({ where: whereForUsers(filter, new Date()) });
 }
 
+/**
+ * Counts for the role facet row: for each role, how many accounts you'd get by
+ * picking it — with the search and the other filters still applied, but *not*
+ * the role filter itself. Leaving the active role out is the whole point: with
+ * it applied every other role would read 0, so the counts would stop being a
+ * preview of where each pill leads and the row couldn't be used to navigate.
+ *
+ * `total` is counted rather than summed from the groups so the All pill stays
+ * right even if a row's role is null.
+ */
+export async function userRoleCounts(filter: UserListFilter) {
+	const at = new Date();
+	const { role: _ignored, ...withoutRole } = filter;
+	const where = whereForUsers(withoutRole, at);
+	const [total, byRole] = await Promise.all([
+		prisma.user.count({ where }),
+		prisma.user.groupBy({ by: ["role"], where, _count: { _all: true } }),
+	]);
+	const roles: Record<string, number> = {};
+	for (const row of byRole) {
+		roles[row.role] = row._count._all;
+	}
+	return { total, roles };
+}
+
 /** Totals for the filter pills in one round trip. */
 export async function userCounts() {
 	const at = new Date();

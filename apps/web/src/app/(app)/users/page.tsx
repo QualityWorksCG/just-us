@@ -6,6 +6,7 @@ import {
 	listUsers,
 	type UserListFilter,
 	userCounts,
+	userRoleCounts,
 } from "@just-us/db/users";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
@@ -14,6 +15,10 @@ import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import {
+	FilterPending,
+	FilterTransition,
+} from "@/components/dashboard/filter-transition";
 import { InvitationRowActions } from "@/components/dashboard/invitation-row-actions";
 import { InviteAdminDialog } from "@/components/dashboard/invite-admin-dialog";
 import { UserFilters } from "@/components/dashboard/user-filters";
@@ -55,6 +60,18 @@ function expiresIn(date: Date) {
 	const h = Math.floor(m / 60);
 	if (h < 24) return `in ${h}h`;
 	return `in ${Math.floor(h / 24)}d`;
+}
+
+/** Up to two initials for the row avatar; an em dash when there's no name. */
+function initials(name: string) {
+	return (
+		name
+			.trim()
+			.split(/\s+/)
+			.slice(0, 2)
+			.map((p) => p[0]?.toUpperCase() ?? "")
+			.join("") || "—"
+	);
 }
 
 const PILL =
@@ -170,8 +187,9 @@ export default async function UsersPage({
 		filter.verified !== undefined ||
 		filter.blocked !== undefined;
 
-	const [counts, invitations, total] = await Promise.all([
+	const [counts, roleCounts, invitations, total] = await Promise.all([
 		userCounts(),
+		userRoleCounts(filter),
 		listPendingInvitations(),
 		countUsers(filter),
 	]);
@@ -200,202 +218,217 @@ export default async function UsersPage({
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Users
-				</h1>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					Plaintiffs, donors, attorneys, and administrators.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				Plaintiffs, donors, attorneys, and administrators.
+			</p>
 
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<p className="font-semibold text-[13.5px] text-ink-soft tabular-nums">
-					{filtered
-						? `${total} of ${counts.total} ${accounts}`
-						: `${counts.total} ${accounts}`}
-				</p>
-				<InviteAdminDialog />
-			</div>
-
-			{invitations.length > 0 && (
-				<div className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
-					<div className="border-border border-b px-5 py-3.5">
-						<h2 className="font-bold text-[15px] text-ink">
-							Pending invitations
-						</h2>
-						<p className="mt-0.5 text-[12.5px] text-muted-foreground">
-							Administrator invitations that haven't been accepted yet.
+			<FilterTransition>
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<FilterPending>
+						<p className="font-semibold text-[13.5px] text-ink-soft tabular-nums">
+							{filtered
+								? `${total} of ${counts.total} ${accounts}`
+								: `${counts.total} ${accounts}`}
 						</p>
-					</div>
+					</FilterPending>
+					<InviteAdminDialog />
+				</div>
 
-					<div
-						className={cn("hidden gap-x-4 px-5 py-3 sm:grid", INVITE_COLUMNS)}
-					>
-						<span className={HEAD}>Invitation</span>
-						<span className={HEAD}>Invited by</span>
-						<span className={HEAD}>Expires</span>
-						<span className={HEAD}>Actions</span>
-					</div>
-
-					{invitations.map((inv) => (
-						<div
-							key={inv.id}
-							className={cn(
-								"grid grid-cols-1 items-center gap-x-4 gap-y-2.5 border-border border-t px-5 py-4 sm:gap-y-0",
-								INVITE_COLUMNS,
-							)}
-						>
-							<Cell label="Invitation" at="sm">
-								<p className="truncate font-semibold text-[13.5px] text-ink">
-									{inv.email}
-								</p>
-								<p className="mt-0.5 text-[11.5px] text-muted-foreground">
-									Sent {stamp(inv.createdAt)} · {ago(inv.createdAt)}
-								</p>
-							</Cell>
-
-							<Cell label="Invited by" at="sm">
-								<p className="truncate text-[13px] text-ink-soft">
-									{inv.invitedBy.name}
-								</p>
-							</Cell>
-
-							<Cell label="Expires" at="sm">
-								<p className="text-[13px] text-ink tabular-nums">
-									{dayFmt.format(inv.expiresAt)}
-								</p>
-								<p className="mt-0.5 text-[11.5px] text-muted-foreground">
-									{expiresIn(inv.expiresAt)}
-								</p>
-							</Cell>
-
-							<Cell label="Actions" at="sm">
-								<InvitationRowActions id={inv.id} />
-							</Cell>
+				{invitations.length > 0 && (
+					<div className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
+						<div className="border-border border-b px-5 py-3.5">
+							<h2 className="font-bold text-[15px] text-ink">
+								Pending invitations
+							</h2>
+							<p className="mt-0.5 text-[12.5px] text-muted-foreground">
+								Administrator invitations that haven't been accepted yet.
+							</p>
 						</div>
-					))}
-				</div>
-			)}
 
-			<UserFilters />
-
-			{users.length === 0 ? (
-				<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface px-6 py-16 text-center shadow-[var(--shadow-rest)]">
-					<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
-						<Users className="size-6" aria-hidden="true" />
-					</span>
-					<p className="font-bold text-[16px] text-ink">No accounts match.</p>
-					<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
-						Clear the search or the filters above to see every account.
-					</p>
-				</div>
-			) : (
-				<div className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
-					<div className={cn("hidden gap-x-4 px-5 py-3 lg:grid", COLUMNS)}>
-						<span className={HEAD}>Account</span>
-						<span className={HEAD}>Role</span>
-						<span className={HEAD}>Jurisdiction</span>
-						<span className={HEAD}>Status</span>
-						<span className={HEAD}>Joined</span>
-						<span className={HEAD}>Last sign-in</span>
-					</div>
-
-					{users.map((u) => (
 						<div
-							key={u.id}
-							className={cn(
-								"grid grid-cols-1 gap-x-4 gap-y-2.5 border-border border-t px-5 py-4 lg:gap-y-0",
-								COLUMNS,
-							)}
+							className={cn("hidden gap-x-4 px-5 py-3 sm:grid", INVITE_COLUMNS)}
 						>
-							<Cell label="Account">
-								<Link
-									href={`/users/${u.id}` as Route}
-									className="block min-w-0"
-								>
-									<p className="truncate font-semibold text-[13.5px] text-ink hover:text-brass-deep">
-										{u.name}
+							<span className={HEAD}>Invitation</span>
+							<span className={HEAD}>Invited by</span>
+							<span className={HEAD}>Expires</span>
+							<span className={HEAD}>Actions</span>
+						</div>
+
+						{invitations.map((inv) => (
+							<div
+								key={inv.id}
+								className={cn(
+									"grid grid-cols-1 items-center gap-x-4 gap-y-2.5 border-border border-t px-5 py-4 sm:gap-y-0",
+									INVITE_COLUMNS,
+								)}
+							>
+								<Cell label="Invitation" at="sm">
+									<p className="truncate font-semibold text-[13.5px] text-ink">
+										{inv.email}
 									</p>
-									<p className="truncate text-[11.5px] text-muted-foreground">
-										{u.email}
+									<p className="mt-0.5 text-[11.5px] text-muted-foreground">
+										Sent {stamp(inv.createdAt)} · {ago(inv.createdAt)}
 									</p>
-								</Link>
-							</Cell>
+								</Cell>
 
-							<Cell label="Role">
-								<p className="text-[13px] text-ink-soft capitalize">{u.role}</p>
-							</Cell>
+								<Cell label="Invited by" at="sm">
+									<p className="truncate text-[13px] text-ink-soft">
+										{inv.invitedBy.name}
+									</p>
+								</Cell>
 
-							<Cell label="Jurisdiction">
-								<p className="truncate text-[13px] text-ink-soft">
-									{u.jurisdiction || "—"}
-								</p>
-							</Cell>
+								<Cell label="Expires" at="sm">
+									<p className="text-[13px] text-ink tabular-nums">
+										{dayFmt.format(inv.expiresAt)}
+									</p>
+									<p className="mt-0.5 text-[11.5px] text-muted-foreground">
+										{expiresIn(inv.expiresAt)}
+									</p>
+								</Cell>
 
-							<Cell label="Status">
-								<div className="flex flex-wrap gap-1.5">
-									{statusPills(u).map((p) => (
-										<span key={p.text} className={cn(PILL, p.cls)}>
-											<span className={cn("size-1.5 rounded-full", p.dot)} />
-											{p.text}
-										</span>
-									))}
-								</div>
-							</Cell>
+								<Cell label="Actions" at="sm">
+									<InvitationRowActions id={inv.id} />
+								</Cell>
+							</div>
+						))}
+					</div>
+				)}
 
-							<Cell label="Joined">
-								<p className="text-[12.5px] text-ink tabular-nums">
-									{dayFmt.format(u.createdAt)}
-								</p>
-							</Cell>
+				<UserFilters counts={roleCounts} />
 
-							<Cell label="Last sign-in">
-								<p
+				<FilterPending className="flex flex-col gap-6">
+					{users.length === 0 ? (
+						<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface px-6 py-16 text-center shadow-[var(--shadow-rest)]">
+							<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
+								<Users className="size-6" aria-hidden="true" />
+							</span>
+							<p className="font-bold text-[16px] text-ink">
+								No accounts match.
+							</p>
+							<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
+								Clear the search or the filters above to see every account.
+							</p>
+						</div>
+					) : (
+						<div className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
+							<div className={cn("hidden gap-x-4 px-5 py-3 lg:grid", COLUMNS)}>
+								<span className={HEAD}>Account</span>
+								<span className={HEAD}>Role</span>
+								<span className={HEAD}>Jurisdiction</span>
+								<span className={HEAD}>Status</span>
+								<span className={HEAD}>Joined</span>
+								<span className={HEAD}>Last sign-in</span>
+							</div>
+
+							{users.map((u) => (
+								<div
+									key={u.id}
 									className={cn(
-										"text-[12.5px] tabular-nums",
-										u.lastSignInAt ? "text-ink" : "text-muted-foreground",
+										"grid grid-cols-1 gap-x-4 gap-y-2.5 border-border border-t px-5 py-4 lg:gap-y-0",
+										COLUMNS,
 									)}
 								>
-									{u.lastSignInAt ? dayFmt.format(u.lastSignInAt) : "Never"}
-								</p>
-							</Cell>
-						</div>
-					))}
-				</div>
-			)}
+									<Cell label="Account">
+										<Link
+											href={`/users/${u.id}` as Route}
+											className="group flex min-w-0 items-center gap-3"
+										>
+											<span
+												className="flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-pill)] bg-ink font-bold text-[12px] text-paper"
+												aria-hidden="true"
+											>
+												{initials(u.name)}
+											</span>
+											<span className="min-w-0">
+												<p className="truncate font-semibold text-[13.5px] text-ink group-hover:text-brass-deep">
+													{u.name}
+												</p>
+												<p className="truncate text-[11.5px] text-muted-foreground">
+													{u.email}
+												</p>
+											</span>
+										</Link>
+									</Cell>
 
-			{totalPages > 1 && (
-				<div className="flex items-center justify-between border-border border-t pt-5">
-					<Link
-						href={pageHref(base, page - 1)}
-						aria-disabled={page <= 1}
-						className={cn(
-							buttonVariants({ variant: "outline", size: "sm" }),
-							"h-9",
-							page <= 1 && "pointer-events-none opacity-40",
-						)}
-					>
-						<ArrowLeft data-icon="inline-start" aria-hidden="true" />
-						Previous
-					</Link>
-					<span className="text-[13px] text-muted-foreground">
-						Page {page} of {totalPages}
-					</span>
-					<Link
-						href={pageHref(base, page + 1)}
-						aria-disabled={page >= totalPages}
-						className={cn(
-							buttonVariants({ variant: "outline", size: "sm" }),
-							"h-9",
-							page >= totalPages && "pointer-events-none opacity-40",
-						)}
-					>
-						Next
-						<ArrowRight data-icon="inline-end" aria-hidden="true" />
-					</Link>
-				</div>
-			)}
+									<Cell label="Role">
+										<p className="text-[13px] text-ink-soft capitalize">
+											{u.role}
+										</p>
+									</Cell>
+
+									<Cell label="Jurisdiction">
+										<p className="truncate text-[13px] text-ink-soft">
+											{u.jurisdiction || "—"}
+										</p>
+									</Cell>
+
+									<Cell label="Status">
+										<div className="flex flex-wrap gap-1.5">
+											{statusPills(u).map((p) => (
+												<span key={p.text} className={cn(PILL, p.cls)}>
+													<span
+														className={cn("size-1.5 rounded-full", p.dot)}
+													/>
+													{p.text}
+												</span>
+											))}
+										</div>
+									</Cell>
+
+									<Cell label="Joined">
+										<p className="text-[12.5px] text-ink tabular-nums">
+											{dayFmt.format(u.createdAt)}
+										</p>
+									</Cell>
+
+									<Cell label="Last sign-in">
+										<p
+											className={cn(
+												"text-[12.5px] tabular-nums",
+												u.lastSignInAt ? "text-ink" : "text-muted-foreground",
+											)}
+										>
+											{u.lastSignInAt ? dayFmt.format(u.lastSignInAt) : "Never"}
+										</p>
+									</Cell>
+								</div>
+							))}
+						</div>
+					)}
+
+					{totalPages > 1 && (
+						<div className="flex items-center justify-between border-border border-t pt-5">
+							<Link
+								href={pageHref(base, page - 1)}
+								aria-disabled={page <= 1}
+								className={cn(
+									buttonVariants({ variant: "outline", size: "sm" }),
+									"h-9",
+									page <= 1 && "pointer-events-none opacity-40",
+								)}
+							>
+								<ArrowLeft data-icon="inline-start" aria-hidden="true" />
+								Previous
+							</Link>
+							<span className="text-[13px] text-muted-foreground">
+								Page {page} of {totalPages}
+							</span>
+							<Link
+								href={pageHref(base, page + 1)}
+								aria-disabled={page >= totalPages}
+								className={cn(
+									buttonVariants({ variant: "outline", size: "sm" }),
+									"h-9",
+									page >= totalPages && "pointer-events-none opacity-40",
+								)}
+							>
+								Next
+								<ArrowRight data-icon="inline-end" aria-hidden="true" />
+							</Link>
+						</div>
+					)}
+				</FilterPending>
+			</FilterTransition>
 		</div>
 	);
 }

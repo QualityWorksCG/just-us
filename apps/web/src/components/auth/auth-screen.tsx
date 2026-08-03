@@ -60,9 +60,12 @@ function Field({
 	);
 }
 
+const NO_ACCOUNT_MAGIC_LINK =
+	"No account found for that email. Create an account first, then use the magic link to sign in.";
+
 const MAGIC_LINK_ERRORS: Record<string, string> = {
-	new_user_signup_disabled:
-		"No account found for that email. Create an account first, then use the magic link to sign in.",
+	new_user_signup_disabled: NO_ACCOUNT_MAGIC_LINK,
+	USER_NOT_FOUND: NO_ACCOUNT_MAGIC_LINK,
 	INVALID_TOKEN: "That sign-in link is invalid. Request a new one.",
 	EXPIRED_TOKEN: "That sign-in link has expired. Request a new one.",
 	ATTEMPTS_EXCEEDED: "That sign-in link was already used. Request a new one.",
@@ -181,15 +184,22 @@ export function AuthScreen({
 				},
 				onError: (ctx) => {
 					const msg = ctx.error.message || ctx.error.statusText;
-					// A blocked or locked account is also a 403 — only an unverified
-					// email should end up on /verify-email, so branch on the code the
-					// server sends before falling back to the status.
+					// Only an unverified address belongs on /verify-email. The status
+					// alone can't identify it — a block and a lockout are 403 too, and
+					// a wrong password is a 401 that must never leave the form — so
+					// match the server's code and treat anything unrecognised as a
+					// plain sign-in failure.
 					const code: string | undefined = ctx.error.code;
-					if (code === "BANNED_USER" || code === "ACCOUNT_LOCKED") {
-						toast.error(msg || "You can't sign in to this account.");
-					} else if (ctx.error.status === 403) {
-						toast.error(msg || "Please verify your email to sign in.");
-						router.push("/verify-email");
+					if (code === "EMAIL_NOT_VERIFIED") {
+						toast.error("Please verify your email to sign in.");
+						// The sign-in failed, so there is no session for the prompt to
+						// read the address from — carry it over so it can offer a resend
+						// instead of dead-ending on "sign in to resend".
+						router.push(
+							`/verify-email?email=${encodeURIComponent(siEmail.trim())}`,
+						);
+					} else if (code === "INVALID_EMAIL_OR_PASSWORD") {
+						toast.error("Incorrect email or password.");
 					} else {
 						toast.error(msg || "Could not sign in.");
 					}
@@ -197,6 +207,13 @@ export function AuthScreen({
 			},
 		);
 		setPending(false);
+	}
+
+	function promptCreateAccount(target: string) {
+		toast.error(NO_ACCOUNT_MAGIC_LINK);
+		setEmail(target);
+		setSiEmail(target);
+		setMode("create");
 	}
 
 	async function handleMagicLink() {
@@ -207,13 +224,11 @@ export function AuthScreen({
 		}
 		setPending(true);
 		// Magic-link signup is disabled, so an unregistered email would otherwise
-		// only fail after the user clicks the emailed link. Check up front and give
-		// a clear message instead.
+		// only fail after the user clicks the emailed link. Check up front and
+		// send them to create-account instead of a dead-end inbox message.
 		const exists = await accountExistsAction(target);
 		if (!exists) {
-			toast.error(
-				"No account found for that email. Create an account first, then use the magic link to sign in.",
-			);
+			promptCreateAccount(target);
 			setPending(false);
 			return;
 		}
@@ -228,7 +243,16 @@ export function AuthScreen({
 					toast.success("Check your email for a one-time sign-in link.");
 				},
 				onError: (ctx) => {
-					toast.error(ctx.error.message || "Could not send the link.");
+					const code = ctx.error.code;
+					if (code === "USER_NOT_FOUND" || code === "new_user_signup_disabled") {
+						promptCreateAccount(target);
+						return;
+					}
+					toast.error(
+						(code && MAGIC_LINK_ERRORS[code]) ||
+							ctx.error.message ||
+							"Could not send the link.",
+					);
 				},
 			},
 		);

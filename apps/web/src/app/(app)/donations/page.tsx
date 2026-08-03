@@ -1,6 +1,6 @@
 import { donorStats, listDonations } from "@just-us/db/donations";
 import { cn } from "@just-us/ui/lib/utils";
-import { HeartHandshake, Scale, Trophy } from "lucide-react";
+import { HandCoins, Scale, Trophy } from "lucide-react";
 
 import { requireRole } from "@/lib/auth-server";
 
@@ -30,20 +30,15 @@ export default async function DonationsPage() {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					My donations
-				</h1>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					Every gift you've given, and the causes behind them.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				Every gift you've given, and the causes behind them.
+			</p>
 
 			{/* Stats */}
 			<div className="grid gap-4 sm:grid-cols-3">
 				<div className="rounded-[var(--radius-card)] bg-green-soft p-5 shadow-[var(--shadow-rest)]">
 					<span className="mb-4 flex size-9 items-center justify-center rounded-lg bg-surface text-green-deep">
-						<HeartHandshake className="size-[18px]" aria-hidden="true" />
+						<HandCoins className="size-[18px]" aria-hidden="true" />
 					</span>
 					<p className="font-extrabold text-[28px] text-ink tabular-nums leading-none tracking-[-0.02em]">
 						{money(stats.totalCents / 100)}
@@ -78,7 +73,7 @@ export default async function DonationsPage() {
 			<section className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
 				{rows.length === 0 ? (
 					<div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
-						<HeartHandshake
+						<HandCoins
 							className="size-7 text-muted-foreground"
 							aria-hidden="true"
 						/>

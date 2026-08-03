@@ -22,7 +22,7 @@ import {
 	Check,
 	CircleCheck,
 	FileText,
-	Heart,
+	HandCoins,
 	LogOut,
 	type LucideIcon,
 	Scale,
@@ -63,7 +63,7 @@ const ROLES: {
 		value: "donor",
 		label: "I want to help fund cases",
 		article: "a donor",
-		icon: Heart,
+		icon: HandCoins,
 		blurb:
 			"Give any amount to cases you believe in and follow them to the outcome.",
 		points: [
@@ -435,7 +435,7 @@ export function OnboardingFlow({ name }: { name: string }) {
 								) : (
 									<div className="flex items-start gap-3">
 										<span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
-											<Heart className="size-5" aria-hidden="true" />
+											<HandCoins className="size-5" aria-hidden="true" />
 										</span>
 										<p className="text-[14px] text-ink-soft leading-relaxed">
 											You're all set to fund cases. Give any amount to a case

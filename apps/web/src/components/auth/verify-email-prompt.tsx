@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@just-us/ui/components/button";
+import { cn } from "@just-us/ui/lib/utils";
 import { MailCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -54,33 +55,42 @@ export function VerifyEmailPrompt({
 			}
 		>
 			<div className="flex flex-col gap-2.5">
-				{signedIn && email ? (
-					<>
-						<Button
-							type="button"
-							size="lg"
-							className="w-full"
-							onClick={resend}
-							disabled={pending}
-						>
-							{pending ? "Sending…" : "Resend verification email"}
-						</Button>
-						<Button
-							type="button"
-							variant="ghost"
-							size="lg"
-							className="w-full"
-							onClick={signOut}
-						>
-							Sign out
-						</Button>
-					</>
+				{/* Resend needs the address, not a session — someone whose sign-in was
+				    blocked on verification arrives here signed out and still has to be
+				    able to ask for another link. */}
+				{email ? (
+					<Button
+						type="button"
+						size="lg"
+						className="w-full"
+						onClick={resend}
+						disabled={pending}
+					>
+						{pending ? "Sending…" : "Resend verification email"}
+					</Button>
+				) : null}
+				{signedIn ? (
+					<Button
+						type="button"
+						variant="ghost"
+						size="lg"
+						className="w-full"
+						onClick={signOut}
+					>
+						Sign out
+					</Button>
 				) : (
 					<Link
 						href="/login?mode=signin"
-						className="inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] bg-primary font-medium text-[14px] text-primary-foreground hover:bg-primary/90"
+						className={cn(
+							"inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-control)] font-medium text-[14px]",
+							// Secondary once resend is the primary action above it.
+							email
+								? "text-ink hover:bg-surface-2"
+								: "bg-primary text-primary-foreground hover:bg-primary/90",
+						)}
 					>
-						Go to sign in
+						Back to sign in
 					</Link>
 				)}
 			</div>

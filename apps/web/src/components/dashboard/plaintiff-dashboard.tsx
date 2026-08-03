@@ -11,7 +11,7 @@ import {
 	Folder,
 	Gauge,
 	Hand,
-	Heart,
+	HandCoins,
 	Hourglass,
 	type LucideIcon,
 	Megaphone,
@@ -216,18 +216,13 @@ function EmptyState({
 }
 
 // No case row yet — the plaintiff hasn't started the wizard.
-function NoCase({ firstName }: { firstName: string }) {
+function NoCase() {
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Welcome, {firstName}
-				</h2>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					You haven't started a case yet. Tell us what happened and we'll take
-					it from there.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				You haven't started a case yet. Tell us what happened and we'll take it
+				from there.
+			</p>
 			<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface px-6 py-14 text-center shadow-[var(--shadow-rest)]">
 				<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
 					<FilePlus2 className="size-6" aria-hidden="true" />
@@ -249,30 +244,16 @@ function NoCase({ firstName }: { firstName: string }) {
 	);
 }
 
-export function PlaintiffDashboard({
-	name,
-	cases,
-}: {
-	name: string;
-	cases: CaseSummary[];
-}) {
-	const firstName = name.trim().split(" ")[0] || "there";
+export function PlaintiffDashboard({ cases }: { cases: CaseSummary[] }) {
 	const first = cases[0];
-	if (!first) return <NoCase firstName={firstName} />;
+	if (!first) return <NoCase />;
 	// A plaintiff can run several cases. With one, show the detailed view; with
 	// more, show a portfolio so nothing implies there's only a single case.
-	if (cases.length > 1)
-		return <CasesOverview firstName={firstName} cases={cases} />;
-	return <SingleCaseDashboard firstName={firstName} c={first} />;
+	if (cases.length > 1) return <CasesOverview cases={cases} />;
+	return <SingleCaseDashboard c={first} />;
 }
 
-function SingleCaseDashboard({
-	firstName,
-	c,
-}: {
-	firstName: string;
-	c: CaseSummary;
-}) {
+function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 	const isLive = c.status === "live";
 	const isSeeking = c.status === "seeking";
 	const goal = c.goalCents / 100;
@@ -319,16 +300,11 @@ function SingleCaseDashboard({
 	return (
 		<div className="flex flex-col gap-6">
 			{/* Header */}
-			<div>
-				<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Welcome back, {firstName}
-				</h2>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					{isLive
-						? "Your campaign is live — here's how it's going."
-						: "Your case at a glance — where it stands and what needs you next."}
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				{isLive
+					? "Your campaign is live — here's how it's going."
+					: "Your case at a glance — where it stands and what needs you next."}
+			</p>
 
 			{/* Stat row — all values from the case row */}
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -598,7 +574,7 @@ function SingleCaseDashboard({
 function TrustFooter() {
 	return (
 		<div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-border bg-surface/60 px-5 py-3.5 text-[12.5px] text-ink-soft leading-relaxed">
-			<Heart
+			<HandCoins
 				className="mt-0.5 size-4 shrink-0 text-brass-deep"
 				aria-hidden="true"
 			/>
@@ -612,13 +588,7 @@ function TrustFooter() {
 // Portfolio view for plaintiffs running more than one case: aggregate totals up
 // top, then every case listed with its own status so none of it reads as "your
 // one case".
-function CasesOverview({
-	firstName,
-	cases,
-}: {
-	firstName: string;
-	cases: CaseSummary[];
-}) {
+function CasesOverview({ cases }: { cases: CaseSummary[] }) {
 	const totalRaised = cases.reduce((s, c) => s + c.raisedCents, 0) / 100;
 	const totalGoal = cases.reduce((s, c) => s + c.goalCents, 0) / 100;
 	const totalDonors = cases.reduce((s, c) => s + c.donorsCount, 0);
@@ -627,14 +597,9 @@ function CasesOverview({
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Welcome back, {firstName}
-				</h2>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					You have {cases.length} cases — here's your portfolio at a glance.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				You have {cases.length} cases — here's your portfolio at a glance.
+			</p>
 
 			{/* Totals across every case */}
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

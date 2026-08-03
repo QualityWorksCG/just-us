@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, Share2 } from "lucide-react";
+import { HandCoins, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 /** Back / Share buttons on the public case page. Donations aren't wired up yet,
@@ -24,7 +24,7 @@ export function PublicCaseActions({ sharePath }: { sharePath: string }) {
 				onClick={back}
 				className="inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brass px-5 font-bold text-[15px] text-white transition-colors hover:bg-brass-deep"
 			>
-				<Heart className="size-[18px]" aria-hidden="true" />
+				<HandCoins className="size-[18px]" aria-hidden="true" />
 				Back this case
 			</button>
 			<button

@@ -15,14 +15,9 @@ export default async function SavedPage() {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Saved cases
-				</h1>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					Cases you've saved to come back to.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				Cases you've saved to come back to.
+			</p>
 
 			{cases.length === 0 ? (
 				<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-6 py-16 text-center">

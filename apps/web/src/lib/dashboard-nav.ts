@@ -9,7 +9,7 @@ import {
 	Compass,
 	Folder,
 	Gavel,
-	HeartHandshake,
+	HandCoins,
 	Inbox,
 	LayoutDashboard,
 	type LucideIcon,
@@ -84,7 +84,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 			{
 				slug: "donations",
 				label: "My donations",
-				icon: HeartHandshake,
+				icon: HandCoins,
 				title: "My donations",
 				sub: "Every gift you've given, and the causes behind them.",
 			},

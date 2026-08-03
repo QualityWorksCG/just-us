@@ -4,6 +4,7 @@
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	Bookmark,
+	HandCoins,
 	Heart,
 	Home,
 	type LucideIcon,
@@ -188,7 +189,7 @@ export function DonorCaseCard({
 						onClick={back}
 						className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brass px-4 font-semibold text-[13.5px] text-white transition-colors hover:bg-brass-deep"
 					>
-						<Heart className="size-4" aria-hidden="true" />
+						<HandCoins className="size-4" aria-hidden="true" />
 						Back this case
 					</button>
 					{variant === "full" && (

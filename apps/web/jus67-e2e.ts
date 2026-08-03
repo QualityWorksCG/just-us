@@ -16,14 +16,14 @@
  *
  * Run from apps/web:  bun run e2e:jus67
  *
- * Allow 4-5 minutes. Two checks have to sit out the sign-in rate-limit window
- * before the account-lockout message can surface at all.
+ * Allow a few minutes. Sign-in attempts are IP rate-limited; the suite mirrors
+ * that budget so a 429 never masks the account-lockout or block checks.
  */
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { auth } from "@just-us/auth";
+import { auth, SIGN_IN_RATE_LIMIT_MAX } from "@just-us/auth";
 import { generateInviteToken } from "@just-us/auth/invite-token";
 import prisma from "@just-us/db";
 import { createInvitation } from "@just-us/db/invitations";
@@ -356,11 +356,11 @@ async function bodyText(page: Page) {
 // ------------------------------------------------------- sign-in rate limiting
 
 /**
- * The auth layer allows three /sign-in/email requests per 60s, keyed by IP, and
- * the counter only resets once 60s have passed since the *previous* request — so
- * any request inside the window extends it. This mirrors that counter rather
- * than guessing, because a 4th request would come back 429 and the check under
- * test would never run.
+ * The auth layer allows SIGN_IN_RATE_LIMIT_MAX /sign-in/email requests per 60s,
+ * keyed by IP, and the counter only resets once 60s have passed since the
+ * *previous* request — so any request inside the window extends it. This
+ * mirrors that counter rather than guessing, because blowing the budget would
+ * come back 429 and the check under test would never run.
  */
 const WINDOW_MS = 66000;
 let rlCount = 0;
@@ -379,11 +379,6 @@ async function freshSignInWindow(note: Note) {
 	rlLast = 0;
 }
 
-function resetSignInWindow() {
-	rlCount = 0;
-	rlLast = 0;
-}
-
 /** Records one sign-in request, waiting first if the window is already full. */
 async function throttleSignIn(note: Note) {
 	for (;;) {
@@ -393,7 +388,7 @@ async function throttleSignIn(note: Note) {
 			rlLast = now;
 			return;
 		}
-		if (rlCount < 3) {
+		if (rlCount < SIGN_IN_RATE_LIMIT_MAX) {
 			rlCount += 1;
 			rlLast = now;
 			return;
@@ -924,10 +919,8 @@ try {
 			await sleep(500);
 		}
 
-		note("waiting 66s for the sign-in rate window to reset");
-		await sleep(WINDOW_MS);
-		resetSignInWindow();
-
+		// Rate limit sits above the lockout threshold, so the next attempt reaches
+		// the ACCOUNT_LOCKED before-hook without waiting out the IP window.
 		await locky.goto(`${BASE}/login?mode=signin`, { waitUntil: "networkidle" });
 		await submitSignIn(locky, EMAILS.locky, "WrongPass!000", note);
 		const locked = await poll(

@@ -16,7 +16,12 @@ export default async function LoginPage({
 	}
 
 	const { mode, error } = await searchParams;
-	const initialMode: Mode = mode === "create" ? "create" : "signin";
+	// A clicked magic link for an unknown email lands here with
+	// new_user_signup_disabled — send them to create-account instead of sign-in.
+	const initialMode: Mode =
+		mode === "create" || error === "new_user_signup_disabled"
+			? "create"
+			: "signin";
 
 	return <AuthScreen initialMode={initialMode} initialError={error} />;
 }

@@ -61,7 +61,7 @@ export default async function DashboardHome({
 			interestCount: interests[c.id]?.open ?? 0,
 			newInterestCount: interests[c.id]?.unseen ?? 0,
 		}));
-		return <PlaintiffDashboard name={session.user.name} cases={cases} />;
+		return <PlaintiffDashboard cases={cases} />;
 	}
 
 	if (role === "donor") {
@@ -73,7 +73,6 @@ export default async function DashboardHome({
 		return (
 			<DonorDashboard
 				data={{
-					firstName: session.user.name.trim().split(" ")[0] || "there",
 					totalCents: stats.totalCents,
 					casesBacked: stats.casesBacked,
 					savedCount,

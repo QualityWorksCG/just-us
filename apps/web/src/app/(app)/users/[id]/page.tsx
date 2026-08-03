@@ -1,7 +1,7 @@
 import { isBlocked, isLocked } from "@just-us/auth/user-status";
 import { getUserWithCases } from "@just-us/db/users";
 import { cn } from "@just-us/ui/lib/utils";
-import { ArrowRight, FolderOpen, HeartHandshake } from "lucide-react";
+import { ArrowRight, FolderOpen, HandCoins } from "lucide-react";
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -130,9 +130,9 @@ export default async function UserDetailPage({
 					className="mb-3"
 				/>
 				<div className="flex flex-wrap items-center gap-3">
-					<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
+					<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
 						{u.name}
-					</h1>
+					</h2>
 					{statusPills(u).map((p) => (
 						<span key={p.text} className={cn(PILL, p.cls)}>
 							<span className={cn("size-1.5 rounded-full", p.dot)} />
@@ -278,10 +278,7 @@ export default async function UserDetailPage({
 			{/* Donations */}
 			<div className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
 				<h2 className="flex items-center gap-2 font-bold text-[15px] text-ink">
-					<HeartHandshake
-						className="size-4 text-brass-deep"
-						aria-hidden="true"
-					/>
+					<HandCoins className="size-4 text-brass-deep" aria-hidden="true" />
 					Donations
 				</h2>
 				<p className="mt-1 text-[13.5px] text-muted-foreground">

@@ -9,7 +9,7 @@ import {
 	Eye,
 	FileText,
 	Gavel,
-	Heart,
+	HandCoins,
 	HeartHandshake,
 	Lock,
 	Pencil,
@@ -73,7 +73,7 @@ const promises = [
 		stat: "100%",
 		title: "Donations are gifts",
 		body: "No return, no strings.",
-		icon: Heart,
+		icon: HandCoins,
 		accent: "brass" as const,
 	},
 	{
@@ -129,7 +129,7 @@ const roles = [
 		href: "/login?mode=create",
 	},
 	{
-		icon: Heart,
+		icon: HandCoins,
 		eyebrow: "For supporters",
 		title: "Donor",
 		body: "Give any amount to a case you believe in, and follow every update to the outcome.",
@@ -157,7 +157,7 @@ const startPaths = [
 		badge: "Most start here",
 	},
 	{
-		icon: Heart,
+		icon: HandCoins,
 		title: "Fund someone's day in court",
 		body: "Give any amount to a case you believe in. One transparent 5% fee, and every update until the outcome.",
 		meta: "Any amount · one flat 5% fee",
@@ -245,7 +245,10 @@ function HeroVisual() {
 						className="object-cover"
 					/>
 					<span className="absolute top-3 right-3 inline-flex animate-[ju-fade_1s_var(--ease-rise)_0.7s_both] items-center gap-1.5 rounded-[var(--radius-pill)] bg-card/95 px-3 py-1.5 font-semibold text-[12px] text-ink shadow-[var(--shadow-float)] backdrop-blur">
-						<Heart className="size-3.5 text-brass-deep" aria-hidden="true" />
+						<HandCoins
+							className="size-3.5 text-brass-deep"
+							aria-hidden="true"
+						/>
 						Anita just gave $50
 					</span>
 				</div>

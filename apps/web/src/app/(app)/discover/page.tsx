@@ -36,14 +36,9 @@ export default async function DiscoverPage({
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Discover cases
-				</h1>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					Find a case that matters to you — save it, share it, or back it today.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				Find a case that matters to you — save it, share it, or back it today.
+			</p>
 
 			<BrowseControls />
 

@@ -148,7 +148,10 @@ export async function resendInvitation(
 
 export type AcceptInvitationResult =
 	| { ok: true; userId: string; email: string }
-	| { ok: false; code: "invalid" | "expired" | "revoked" | "used" | "email_taken" };
+	| {
+			ok: false;
+			code: "invalid" | "expired" | "revoked" | "used" | "email_taken";
+	  };
 
 /**
  * Creates the administrator account from a pending invitation. The invitee's
