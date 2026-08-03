@@ -42,7 +42,7 @@ export default async function CaseRequestsPage({
 	const activeStep = hasInterest ? 2 : 1;
 
 	return (
-		<div className="mx-auto flex max-w-[760px] flex-col gap-6">
+		<div className="flex w-full flex-col gap-6">
 			<div>
 				<BackLink
 					href={"/my-cases" as Route}

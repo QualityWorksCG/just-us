@@ -192,7 +192,6 @@ await prisma.user.createMany({
 			emailVerified: true,
 			onboarded: true,
 			role: "plaintiff",
-			jurisdiction: "Georgia",
 		},
 		{
 			id: OTHER_PLAINTIFF,
@@ -201,7 +200,6 @@ await prisma.user.createMany({
 			emailVerified: true,
 			onboarded: true,
 			role: "plaintiff",
-			jurisdiction: "Texas",
 		},
 	],
 });

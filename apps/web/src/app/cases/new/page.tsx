@@ -12,9 +12,6 @@ export default async function NewCasePage({
 }) {
 	await requireRole("plaintiff");
 	const session = await requireOnboarded();
-	// Prefill the case's state from the jurisdiction captured at onboarding (JUS-12).
-	const jurisdiction =
-		(session.user as { jurisdiction?: string | null }).jurisdiction ?? "";
 
 	const draftId = (await searchParams)?.draft;
 	const source = draftId ? await getOwnedCase(draftId, session.user.id) : null;
@@ -50,11 +47,5 @@ export default async function NewCasePage({
 			}
 		: null;
 
-	return (
-		<CaseWizard
-			name={session.user.name}
-			jurisdiction={jurisdiction}
-			initial={initial}
-		/>
-	);
+	return <CaseWizard name={session.user.name} initial={initial} />;
 }

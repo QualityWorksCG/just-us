@@ -141,9 +141,10 @@ for (const seed of SEEDS) {
 			emailVerified: true,
 			onboarded: true,
 			role: "plaintiff",
-			jurisdiction: seed.state,
 		},
-		update: { jurisdiction: seed.state },
+		// Nothing to update: a plaintiff carries no jurisdiction of their own —
+		// the case's own `location` below is the jurisdiction that matters.
+		update: {},
 	});
 
 	const published = daysAgo(seed.publishedDaysAgo);
