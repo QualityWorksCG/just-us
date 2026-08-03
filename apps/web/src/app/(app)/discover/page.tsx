@@ -1,6 +1,10 @@
 import { browseLiveCases } from "@just-us/db/cases";
 import { listSavedCaseIds } from "@just-us/db/saves";
+import { buttonVariants } from "@just-us/ui/components/button";
+import { cn } from "@just-us/ui/lib/utils";
 import { SearchX } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
 
 import { BrowseControls } from "@/components/browse-controls";
 import { toDonorCase } from "@/components/dashboard/donor-case";
@@ -55,6 +59,14 @@ export default async function DiscoverPage({
 							? "Try clearing a filter or searching for something else."
 							: "As soon as a case goes live and starts raising, it'll show up here."}
 					</p>
+					{filtered && (
+						<Link
+							href={"/discover" as Route}
+							className={cn(buttonVariants({ variant: "outline" }), "mt-1")}
+						>
+							Clear filters
+						</Link>
+					)}
 				</div>
 			) : (
 				<div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

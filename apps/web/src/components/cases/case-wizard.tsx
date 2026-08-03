@@ -55,6 +55,7 @@ import {
 } from "@/app/cases/actions";
 import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
+import { CASE_CATEGORIES } from "@/lib/case-categories";
 
 /** A piece of evidence: an uploaded file (has `size`) or a link (has `url`). */
 export type EvidenceItem = { name: string; size?: number; url?: string };
@@ -101,16 +102,7 @@ const STEPS = [
 
 const LAST_STEP = 5;
 
-const CATEGORIES = [
-	"Employment",
-	"Wage & hours",
-	"Housing",
-	"Consumer fraud",
-	"Elder care",
-	"Civil rights",
-	"Personal injury",
-	"Other",
-];
+const CATEGORIES = CASE_CATEGORIES;
 
 const PAYOUT_TYPES = [
 	"Bank transfer (ACH)",
