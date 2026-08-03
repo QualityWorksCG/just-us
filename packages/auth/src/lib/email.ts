@@ -2,6 +2,7 @@ import AdminInviteEmail, {
 	adminInviteSubject,
 } from "@just-us/email/admin-invite";
 import MagicLinkEmail, { magicLinkSubject } from "@just-us/email/magic-link";
+import NewMessageEmail, { newMessageSubject } from "@just-us/email/new-message";
 import ResetPasswordEmail, {
 	resetPasswordSubject,
 } from "@just-us/email/reset-password";
@@ -91,6 +92,25 @@ export function sendAdminInviteEmail(params: {
 		react: AdminInviteEmail({
 			url: params.url,
 			inviterName: params.inviterName,
+		}),
+	});
+}
+
+/** Transactional JUS-66 message notification. The message body is intentionally
+ * omitted so email previews do not expose private conversation content. */
+export function sendNewMessageEmail(params: {
+	to: string;
+	url: string;
+	recipientName?: string;
+	senderName: string;
+}) {
+	return send({
+		to: params.to,
+		subject: newMessageSubject,
+		react: NewMessageEmail({
+			url: params.url,
+			recipientName: params.recipientName,
+			senderName: params.senderName,
 		}),
 	});
 }

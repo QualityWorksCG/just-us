@@ -55,6 +55,17 @@ model User {
   sentAdminInvitations AdminInvitation[] @relation("AdminInvitationInviter")
   auditEntries         AuditLog[]        @relation("AuditLogActor")
 
+  // JUS-66 private messaging. Conversations are always one plaintiff and one
+  // attorney; these named relations keep that invariant explicit in the schema.
+  plaintiffConversations Conversation[] @relation("ConversationPlaintiff")
+  attorneyConversations  Conversation[] @relation("ConversationAttorney")
+  sentMessages           Message[]      @relation("MessageAuthor")
+  messageEmailDeliveries MessageEmailDelivery[]
+  messagePreference      MessageNotificationPreference?
+  conversationSettings   ConversationNotificationSetting[]
+  reportedConversations  ConversationReport[] @relation("ConversationReportReporter")
+  resolvedConversationReports ConversationReport[] @relation("ConversationReportResolver")
+
   @@unique([email])
   @@map("user")
 }
