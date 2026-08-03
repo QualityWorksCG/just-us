@@ -15,7 +15,6 @@ import {
 	Hourglass,
 	type LucideIcon,
 	Megaphone,
-	MessageCircle,
 	Scale,
 	Search,
 	Share2,
@@ -28,6 +27,8 @@ import {
 import type { Route } from "next";
 import Link from "next/link";
 import { toast } from "sonner";
+
+import { MessageAttorneyButton } from "@/components/messages/message-attorney-button";
 
 export type CaseSummary = {
 	id: string;
@@ -45,6 +46,9 @@ export type CaseSummary = {
 	attorneyFirm: string | null;
 	attorneyArea: string | null;
 	attorneyLocation: string | null;
+	/** Present only when the case is matched to a JustUs attorney account. */
+	attorneyId: string | null;
+	attorneyConversationId: string | null;
 	createdAt: string;
 	/** Attorneys who have expressed interest in representing this case and are
 	 *  still awaiting a decision (JUS-25). */
@@ -459,14 +463,20 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 										</p>
 									</div>
 								</div>
-								<button
-									type="button"
-									onClick={() => toast.success("Messaging isn't wired up yet.")}
-									className={cn(buttonVariants(), "mt-4 w-full")}
-								>
-									<MessageCircle data-icon="inline-start" aria-hidden="true" />
-									Message {c.attorneyName?.split(" ")[0]}
-								</button>
+								{c.attorneyId ? (
+									<MessageAttorneyButton
+										attorneyId={c.attorneyId}
+										attorneyName={c.attorneyName ?? "your attorney"}
+										caseId={c.id}
+										existingConversationId={c.attorneyConversationId}
+										className="mt-4 w-full"
+									/>
+								) : (
+									<p className="mt-4 text-[12.5px] text-muted-foreground">
+										Messaging is available when your attorney has a JustUs
+										account.
+									</p>
+								)}
 							</>
 						) : isSeeking ? (
 							/* Out to attorneys: what matters here is who has put themselves
@@ -809,15 +819,18 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 				{initials(attorneyName)}
 			</span>
 		);
-		action = (
-			<button
-				type="button"
-				onClick={() => toast.success("Messaging isn't wired up yet.")}
-				className={cn(buttonVariants({ size: "sm" }), "h-9 shrink-0")}
-			>
-				<MessageCircle data-icon="inline-start" aria-hidden="true" />
-				Message
-			</button>
+		action = c.attorneyId ? (
+			<MessageAttorneyButton
+				attorneyId={c.attorneyId}
+				attorneyName={attorneyName}
+				caseId={c.id}
+				existingConversationId={c.attorneyConversationId}
+				className="shrink-0"
+			/>
+		) : (
+			<span className="max-w-32 text-right text-[12px] text-muted-foreground leading-snug">
+				Not on JustUs messaging
+			</span>
 		);
 	} else if (isSeeking) {
 		const interested = c.interestCount;

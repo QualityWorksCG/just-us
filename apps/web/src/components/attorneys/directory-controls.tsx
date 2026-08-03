@@ -34,20 +34,31 @@ const SORTS = [
 	{ value: "availability", label: "Availability" },
 ] as const;
 
+const ALL_PRACTICE_AREAS = "All practice areas";
+const ALL_LICENSED_STATES = "All licensed states";
+
 export function DirectoryControls({
 	practiceAreas,
 	states,
+	defaultState,
 }: {
 	/** Only areas and states that actually have a listed attorney. */
 	practiceAreas: string[];
 	states: string[];
+	defaultState?: string;
 }) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const params = useSearchParams();
 
-	const area = params.get("area") ?? "";
-	const state = params.get("state") ?? "";
+	const areaParam = params.get("area");
+	const stateParam = params.get("state");
+	const area =
+		areaParam && areaParam !== "all" ? areaParam : ALL_PRACTICE_AREAS;
+	const state =
+		stateParam === "all"
+			? ALL_LICENSED_STATES
+			: (stateParam ?? defaultState ?? ALL_LICENSED_STATES);
 	const q = params.get("q") ?? "";
 	const sort = params.get("sort") ?? "name";
 
@@ -69,7 +80,11 @@ export function DirectoryControls({
 		router.push((qs ? `${pathname}?${qs}` : pathname) as Route);
 	}
 
-	const hasFilters = !!(area || state || q);
+	const hasFilters = !!(
+		(areaParam && areaParam !== "all") ||
+		(stateParam && stateParam !== "all") ||
+		q
+	);
 
 	/** Back to the unfiltered list. The keyword input holds its own state, so it
 	 *  has to be cleared directly — otherwise the debounce effect sees text that
@@ -94,9 +109,11 @@ export function DirectoryControls({
 					<Dropdown
 						id={ids.area}
 						value={area}
-						anyLabel="All practice areas"
+						allLabel={ALL_PRACTICE_AREAS}
 						className={CONTROL_CLASS}
-						onChange={(v) => apply({ area: v })}
+						onChange={(value) =>
+							apply({ area: value === ALL_PRACTICE_AREAS ? "all" : value })
+						}
 						options={practiceAreas}
 					/>
 				</Field>
@@ -105,9 +122,11 @@ export function DirectoryControls({
 					<Dropdown
 						id={ids.state}
 						value={state}
-						anyLabel="All states"
+						allLabel={ALL_LICENSED_STATES}
 						className={CONTROL_CLASS}
-						onChange={(v) => apply({ state: v })}
+						onChange={(value) =>
+							apply({ state: value === ALL_LICENSED_STATES ? "all" : value })
+						}
 						options={states}
 					/>
 				</Field>
@@ -200,34 +219,35 @@ function Field({
  * A searchable single-select.
  *
  * Fifty states is too many to scroll past, so the field is typed into rather than
- * hunted through. Clearing the text clears the filter — the empty field *is* the
- * "all" state, which is why there's no separate "All states" option to pick.
+ * hunted through. Each filter has an explicit all option, so a plaintiff can
+ * deliberately widen the default jurisdiction scope without mistaking a blank
+ * field for a selected state.
  */
 function Dropdown({
 	id,
 	value,
 	options,
-	anyLabel,
+	allLabel,
 	onChange,
 	className,
 }: {
 	id: string;
-	/** Empty string means no filter. */
+	/** The selected label, including the explicit all option. */
 	value: string;
 	options: string[];
-	/** Placeholder, and what an empty field means, e.g. "All states". */
-	anyLabel: string;
+	/** Visible all option, e.g. "All licensed states". */
+	allLabel: string;
 	/** Called with the chosen option, or null when the field is cleared. */
 	onChange: (value: string | null) => void;
 	className?: string;
 }) {
 	return (
 		<Combobox
-			items={options}
+			items={[allLabel, ...options]}
 			value={value}
 			onValueChange={(next: string | null) => onChange(next || null)}
 		>
-			<ComboboxInput id={id} placeholder={anyLabel} className={className} />
+			<ComboboxInput id={id} className={className} />
 			<ComboboxContent>
 				<ComboboxEmpty>No matches</ComboboxEmpty>
 				<ComboboxList>

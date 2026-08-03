@@ -21,6 +21,8 @@ export function AttorneyDirectory({
 	practiceAreas,
 	states,
 	filtered,
+	showMessageAction = false,
+	defaultState,
 }: {
 	attorneys: DirectoryAttorney[];
 	/** Passed to each card — see `AttorneyCard.profileBasePath`. */
@@ -29,11 +31,18 @@ export function AttorneyDirectory({
 	states: string[];
 	/** Whether any filter is active, which changes the empty-state wording. */
 	filtered: boolean;
+	showMessageAction?: boolean;
+	/** Plaintiff jurisdiction used until they deliberately choose a state. */
+	defaultState?: string;
 }) {
 	return (
 		<div className="flex flex-col gap-6">
 			<section className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)] sm:p-6">
-				<DirectoryControls practiceAreas={practiceAreas} states={states} />
+				<DirectoryControls
+					practiceAreas={practiceAreas}
+					states={states}
+					defaultState={defaultState}
+				/>
 
 				<div className="mt-5 flex items-center justify-between border-border border-t pt-4">
 					<span className="font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
@@ -68,6 +77,7 @@ export function AttorneyDirectory({
 								key={attorney.id}
 								attorney={attorney}
 								profileBasePath={profileBasePath}
+								showMessageAction={showMessageAction}
 							/>
 						))}
 					</div>
@@ -103,11 +113,17 @@ export function readDirectoryParams(
 	const area = one("area");
 	const state = one("state");
 	const keyword = one("q");
+	const allStates = state === "all";
 	return {
-		area,
-		state,
+		area: area === "all" ? undefined : area,
+		state: allStates ? undefined : state,
+		allStates,
 		keyword,
 		sort: one("sort"),
-		filtered: !!(area || state || keyword),
+		filtered: !!(
+			(area && area !== "all") ||
+			(state && state !== "all") ||
+			keyword
+		),
 	};
 }

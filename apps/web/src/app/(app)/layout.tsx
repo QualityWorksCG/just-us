@@ -2,6 +2,7 @@ import type { Role } from "@just-us/auth";
 import { cookies } from "next/headers";
 
 import { AppShell } from "@/components/dashboard/app-shell";
+import { unreadMessageCount } from "@just-us/db/messages";
 import { requireOnboarded } from "@/lib/auth-server";
 import { getFlags } from "@/lib/flags-server";
 
@@ -21,7 +22,12 @@ export default async function DashboardLayout({
 
 	// Flag state is read here and handed down, so the client sidebar stays a pure
 	// render of what the server decided rather than fetching flags itself. (JUS-13)
-	const flags = await getFlags();
+	const [flags, messageUnreadCount] = await Promise.all([
+		getFlags(),
+		role === "plaintiff" || role === "attorney"
+			? unreadMessageCount(session.user.id)
+			: Promise.resolve(0),
+	]);
 
 	return (
 		<AppShell
@@ -31,6 +37,7 @@ export default async function DashboardLayout({
 			avatarUrl={session.user.image ?? null}
 			defaultOpen={sidebarState !== "false"}
 			flags={flags}
+			messageUnreadCount={messageUnreadCount}
 		>
 			{children}
 		</AppShell>
