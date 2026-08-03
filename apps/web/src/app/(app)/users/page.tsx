@@ -130,7 +130,7 @@ function pageHref(base: URLSearchParams, page: number) {
 	return (qs ? `/users?${qs}` : "/users") as Route;
 }
 
-const COLUMNS = "lg:grid-cols-[2fr_100px_120px_1.4fr_100px_100px]";
+const COLUMNS = "lg:grid-cols-[2.2fr_100px_1.5fr_100px_100px]";
 const INVITE_COLUMNS = "sm:grid-cols-[1.6fr_1fr_1fr_auto]";
 const HEAD =
 	"font-mono font-semibold text-[10.5px] text-muted-foreground uppercase tracking-[0.06em]";
@@ -314,7 +314,6 @@ export default async function UsersPage({
 							<div className={cn("hidden gap-x-4 px-5 py-3 lg:grid", COLUMNS)}>
 								<span className={HEAD}>Account</span>
 								<span className={HEAD}>Role</span>
-								<span className={HEAD}>Jurisdiction</span>
 								<span className={HEAD}>Status</span>
 								<span className={HEAD}>Joined</span>
 								<span className={HEAD}>Last sign-in</span>
@@ -353,12 +352,6 @@ export default async function UsersPage({
 									<Cell label="Role">
 										<p className="text-[13px] text-ink-soft capitalize">
 											{u.role}
-										</p>
-									</Cell>
-
-									<Cell label="Jurisdiction">
-										<p className="truncate text-[13px] text-ink-soft">
-											{u.jurisdiction || "—"}
 										</p>
 									</Cell>
 

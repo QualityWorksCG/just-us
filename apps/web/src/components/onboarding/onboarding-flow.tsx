@@ -26,7 +26,6 @@ import {
 	LogOut,
 	type LucideIcon,
 	Scale,
-	ShieldCheck,
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
@@ -104,7 +103,7 @@ export function OnboardingFlow({ name }: { name: string }) {
 	const [step, setStep] = useState<1 | 2>(1);
 	const [role, setRole] = useState<Role | null>(null);
 
-	// Jurisdiction (US state) — captured for plaintiffs and attorneys only (JUS-12).
+	// Licensing jurisdiction (US state) — attorneys only (JUS-12).
 	const [jurisdiction, setJurisdiction] = useState<Jurisdiction | "">("");
 
 	// Attorney — practice details.
@@ -115,7 +114,10 @@ export function OnboardingFlow({ name }: { name: string }) {
 	const [pending, setPending] = useState(false);
 
 	const isAttorney = role === "attorney";
-	// Plaintiffs and attorneys are asked for a jurisdiction; donors are not. (JUS-12)
+	const isPlaintiff = role === "plaintiff";
+	// Attorneys only: a licensing state is a fact about the person. A plaintiff's
+	// jurisdiction is a fact about each case, so the case wizard asks for it and
+	// this flow never does. (JUS-12)
 	const needsJurisdiction = !!role && requiresJurisdiction(role);
 	const inputClass =
 		"h-11 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]";
@@ -311,24 +313,20 @@ export function OnboardingFlow({ name }: { name: string }) {
 					) : (
 						<form id={STEP2_FORM_ID} onSubmit={handleSubmit}>
 							<p className="mb-2.5 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.1em]">
-								{isAttorney
-									? "Your practice"
-									: needsJurisdiction
-										? "Your jurisdiction"
-										: "Almost there"}
+								{isAttorney ? "Your practice" : "Almost there"}
 							</p>
 							<h1 className="font-extrabold text-[clamp(1.875rem,3.4vw,2.75rem)] text-ink tracking-[-0.03em]">
 								{isAttorney
 									? "Tell us about your practice"
-									: needsJurisdiction
-										? "Where is your case based?"
+									: isPlaintiff
+										? "You're ready to start your case."
 										: "You're ready to fund cases."}
 							</h1>
 							<p className="mt-2.5 max-w-[560px] text-[15px] text-ink-soft leading-relaxed">
 								{isAttorney
 									? "We verify your bar standing before your profile goes live, so cases only reach attorneys who can take them."
-									: needsJurisdiction
-										? "This is the state your case falls under — we use it to match you with attorneys licensed there."
+									: isPlaintiff
+										? "Nothing more to set up here. You'll choose the state your case falls under while you build it, so each case you run can be in a different one."
 										: "No extra details needed. Browse live cases and give what moves you, then follow every case you back to its outcome."}
 							</p>
 
@@ -420,27 +418,20 @@ export function OnboardingFlow({ name }: { name: string }) {
 												</div>
 											</>
 										)}
-
-										{!isAttorney && (
-											<p className="flex gap-2.5 rounded-[var(--radius-card-sm)] bg-green-soft px-4 py-3 text-[13px] text-green-deep leading-relaxed">
-												<ShieldCheck
-													className="mt-0.5 size-4 shrink-0 text-success"
-													aria-hidden="true"
-												/>
-												We use your state only to match your case with attorneys
-												licensed there. You can change it later in settings.
-											</p>
-										)}
 									</div>
 								) : (
 									<div className="flex items-start gap-3">
 										<span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
-											<HandCoins className="size-5" aria-hidden="true" />
+											{isPlaintiff ? (
+												<FileText className="size-5" aria-hidden="true" />
+											) : (
+												<HandCoins className="size-5" aria-hidden="true" />
+											)}
 										</span>
 										<p className="text-[14px] text-ink-soft leading-relaxed">
-											You're all set to fund cases. Give any amount to a case
-											you believe in and follow it to the outcome — no extra
-											details needed.
+											{isPlaintiff
+												? "You're all set. When you submit a case you'll pick the state it falls under and choose the attorney to represent you — we use that state to find attorneys licensed there."
+												: "You're all set to fund cases. Give any amount to a case you believe in and follow it to the outcome — no extra details needed."}
 										</p>
 									</div>
 								)}
@@ -456,9 +447,20 @@ export function OnboardingFlow({ name }: { name: string }) {
 					{step === 1 ? (
 						<>
 							<p className="text-[13px] text-muted-foreground">
-								You can change your home base anytime in settings.
+								You can change how you use JustUs anytime in settings.
 							</p>
+							{/*
+								`key` is load-bearing, not cosmetic. Both branches render a
+								<Button> in this slot, so without distinct keys React reuses
+								the same DOM node and only patches its attributes — flipping
+								type="button" to type="submit" while the click that advanced
+								the step is still propagating. The browser then applies the
+								default action to the mutated node and submits step 2 on the
+								same click, so the step is never seen. Separate keys force a
+								remount instead.
+							*/}
 							<Button
+								key="step-1-continue"
 								type="button"
 								size="lg"
 								className="px-6"
@@ -486,6 +488,7 @@ export function OnboardingFlow({ name }: { name: string }) {
 								Back
 							</Button>
 							<Button
+								key="step-2-submit"
 								type="submit"
 								form={STEP2_FORM_ID}
 								size="lg"

@@ -46,16 +46,9 @@ import {
 	updateCaseDetailsAction,
 } from "@/app/cases/actions";
 
-const CATEGORIES = [
-	"Employment",
-	"Wage & hours",
-	"Housing",
-	"Consumer fraud",
-	"Elder care",
-	"Civil rights",
-	"Personal injury",
-	"Other",
-];
+import { CASE_CATEGORIES } from "@/lib/case-categories";
+
+const CATEGORIES = CASE_CATEGORIES;
 
 export type ManageCaseData = {
 	id: string;

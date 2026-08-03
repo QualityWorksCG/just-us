@@ -34,6 +34,7 @@ export default async function DashboardLayout({
 			role={role}
 			name={session.user.name}
 			email={session.user.email}
+			avatarUrl={session.user.image ?? null}
 			defaultOpen={sidebarState !== "false"}
 			flags={flags}
 			messageUnreadCount={messageUnreadCount}

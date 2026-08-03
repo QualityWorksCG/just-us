@@ -65,6 +65,7 @@ export function AppShell({
 	role,
 	name,
 	email,
+	avatarUrl,
 	defaultOpen,
 	flags,
 	messageUnreadCount = 0,
@@ -73,6 +74,9 @@ export function AppShell({
 	role: Role;
 	name: string;
 	email: string;
+	/** The private object URL never leaves the server; this only enables its route. */
+	/** Public Blob URL of the profile photo, or null to fall back to initials. */
+	avatarUrl: string | null;
 	/** Restored from the `sidebar_state` cookie so SSR matches the last choice. */
 	defaultOpen: boolean;
 	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
@@ -174,8 +178,17 @@ export function AppShell({
 				<SidebarFooter className="border-sidebar-border border-t p-3 group-data-[collapsible=icon]:p-2">
 					<div className="flex items-center gap-2.5 px-2.5 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
 						{/* size-9 overflows the 2rem rail slot, so drop to size-8 there. */}
-						<span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[12.5px] text-brass-ink group-data-[collapsible=icon]:size-8">
-							{initials(name)}
+						<span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brass font-bold text-[12.5px] text-brass-ink group-data-[collapsible=icon]:size-8">
+							{avatarUrl ? (
+								// biome-ignore lint/performance/noImgElement: user-uploaded Blob URL, not a static asset
+								<img
+									src={avatarUrl}
+									alt=""
+									className="size-full object-cover"
+								/>
+							) : (
+								initials(name)
+							)}
 						</span>
 						<span className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
 							<span className="block truncate font-bold text-[13px] text-paper/92">

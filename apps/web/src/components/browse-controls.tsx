@@ -17,19 +17,14 @@ import {
 	SelectValue,
 } from "@just-us/ui/components/select";
 import { cn } from "@just-us/ui/lib/utils";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-const CATEGORIES = [
-	"Employment",
-	"Housing",
-	"Elder care",
-	"Consumer fraud",
-	"Medical",
-	"Civil rights",
-];
+import { CASE_CATEGORIES } from "@/lib/case-categories";
+
+const CATEGORIES = CASE_CATEGORIES;
 
 const SORTS = [
 	{ value: "trending", label: "Trending" },
@@ -48,6 +43,7 @@ export function BrowseControls() {
 	const sort = params.get("sort") ?? "trending";
 
 	const [search, setSearch] = useState(q);
+	const hasFilters = !!(q || state || category);
 
 	// Keep the input in sync if the URL changes elsewhere (e.g. back button).
 	useEffect(() => {
@@ -62,6 +58,14 @@ export function BrowseControls() {
 		}
 		const qs = sp.toString();
 		router.push((qs ? `${pathname}?${qs}` : pathname) as Route);
+	}
+
+	/** Back to the unfiltered list. The search input holds its own state, so it
+	 *  has to be cleared directly — otherwise the debounce effect sees text that
+	 *  the URL no longer has and immediately re-applies it. */
+	function clearFilters() {
+		setSearch("");
+		apply({ q: null, state: null, category: null });
 	}
 
 	// Debounce the free-text search so we don't push on every keystroke.
@@ -107,7 +111,7 @@ export function BrowseControls() {
 			</div>
 
 			{/* Category pills */}
-			<div className="flex flex-wrap gap-2">
+			<div className="flex flex-wrap items-center gap-2">
 				<Pill active={!category} onClick={() => apply({ category: null })}>
 					All
 				</Pill>
@@ -120,6 +124,19 @@ export function BrowseControls() {
 						{cat}
 					</Pill>
 				))}
+
+				{/* Only shown when there's something to clear — a permanently-visible
+				    reset invites a click that does nothing. */}
+				{hasFilters && (
+					<button
+						type="button"
+						onClick={clearFilters}
+						className="ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5 font-semibold text-[13px] text-ink-soft transition-colors hover:bg-brass-wash hover:text-brass-deep"
+					>
+						<X className="size-3.5" aria-hidden="true" />
+						Clear filters
+					</button>
+				)}
 			</div>
 		</div>
 	);

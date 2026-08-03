@@ -15,10 +15,15 @@ model User {
   // (welcome + role selection). Gates access to the app until done.
   onboarded Boolean @default(false)
 
-  // Home jurisdiction (US state), captured at sign-up for plaintiffs and
-  // attorneys only (JUS-12) — see JURISDICTION_ROLES in the auth package. Drives
-  // attorney-availability checks downstream. Null for donors and administrators,
-  // and for accounts created before JUS-12.
+  // Licensing jurisdiction (US state) — where an attorney is admitted to
+  // practice. Captured at sign-up for attorneys only (JUS-12) — see
+  // JURISDICTION_ROLES in the auth package. Gates bar verification and the
+  // directory.
+  //
+  // Not a plaintiff field: a plaintiff's jurisdiction belongs to the case, not
+  // the person, and lives on `Case.location`. Null for every non-attorney role —
+  // including plaintiff rows created before this became per-case, which may
+  // still carry a stale value.
   jurisdiction String?
 
   // Attorney profile fields — only populated when role = attorney (captured at sign-up).
