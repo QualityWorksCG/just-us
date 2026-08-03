@@ -2,6 +2,7 @@ import type { Role } from "@just-us/auth";
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import { listOwnedCases } from "@just-us/db/cases";
 import { donorStats } from "@just-us/db/donations";
+import { listMessageConversations } from "@just-us/db/messages";
 import {
 	interestCounts,
 	listMyInterests,
@@ -36,11 +37,18 @@ export default async function DashboardHome({
 	const role = ((session.user as { role?: Role }).role ?? "donor") as Role;
 
 	if (role === "plaintiff") {
-		const [owned, interests] = await Promise.all([
+		const [owned, interests, conversations] = await Promise.all([
 			listOwnedCases(session.user.id),
 			// Expressions of interest surface here, per case (JUS-25).
 			interestCountsByCase(session.user.id),
+			listMessageConversations(session.user.id),
 		]);
+		const conversationByAttorney = new Map(
+			conversations.map((conversation) => [
+				conversation.otherUser.id,
+				conversation.conversationId,
+			]),
+		);
 		const cases: CaseSummary[] = owned.map((c) => ({
 			id: c.id,
 			title: c.title,
@@ -57,6 +65,10 @@ export default async function DashboardHome({
 			attorneyFirm: c.attorneyFirm,
 			attorneyArea: c.attorneyArea,
 			attorneyLocation: c.attorneyLocation,
+			attorneyId: c.match?.attorneyId ?? null,
+			attorneyConversationId: c.match
+				? (conversationByAttorney.get(c.match.attorneyId) ?? null)
+				: null,
 			createdAt: c.createdAt.toISOString(),
 			interestCount: interests[c.id]?.open ?? 0,
 			newInterestCount: interests[c.id]?.unseen ?? 0,

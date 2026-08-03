@@ -67,7 +67,7 @@ const listSelect = {
 	virtualConsultation: true,
 	feeApproach: true,
 	bio: true,
-	user: { select: { jurisdiction: true } },
+	user: { select: { id: true, jurisdiction: true } },
 	reviews: {
 		where: { published: true },
 		select: { rating: true, quote: true, byline: true },
@@ -88,6 +88,9 @@ export function averageRating(reviews: { rating: number }[]): number | null {
 }
 
 export type DirectoryAttorney = {
+	/** Account id used for actions such as opening a one-to-one conversation. */
+	userId: string;
+	/** Directory profile id, used only in the public profile route. */
 	id: string;
 	legalName: string;
 	firmName: string | null;
@@ -128,6 +131,7 @@ export async function listDirectoryAttorneys(
 
 	const attorneys: DirectoryAttorney[] = rows.map((row) => ({
 		id: row.id,
+		userId: row.user.id,
 		// Non-null by the `legalName: { not: null }` filter above.
 		legalName: row.legalName ?? "",
 		firmName: row.firmName,
@@ -176,7 +180,7 @@ export async function getDirectoryAttorney(id: string) {
 	const profile = await prisma.attorneyProfile.findFirst({
 		where: { id, verificationStatus: "verified", legalName: { not: null } },
 		include: {
-			user: { select: { jurisdiction: true, barNumber: true } },
+			user: { select: { id: true, jurisdiction: true, barNumber: true } },
 			reviews: {
 				where: { published: true },
 				orderBy: { createdAt: "desc" },

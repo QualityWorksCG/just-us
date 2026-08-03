@@ -223,6 +223,7 @@ export async function listOwnedCases(
 	return prisma.case.findMany({
 		where: whereForFilter(ownerId, opts?.filter ?? "all"),
 		orderBy: { createdAt: "desc" },
+		include: { match: { select: { attorneyId: true } } },
 		skip: opts?.skip,
 		take: opts?.take,
 	});

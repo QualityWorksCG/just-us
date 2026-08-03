@@ -1,16 +1,7 @@
 import type { DirectoryProfile } from "@just-us/db/attorney-directory";
 import { cn } from "@just-us/ui/lib/utils";
-import {
-	ChevronLeft,
-	FileText,
-	Globe,
-	Lock,
-	Mail,
-	Phone,
-	ShieldCheck,
-} from "lucide-react";
+import { FileText, Globe, Lock, Mail, Phone, ShieldCheck } from "lucide-react";
 import type { Route } from "next";
-import Link from "next/link";
 
 import {
 	AvailabilityBadge,
@@ -19,6 +10,8 @@ import {
 	yearsLicensed,
 } from "@/components/attorneys/attorney-card";
 import { ContactAttorneyButton } from "@/components/attorneys/contact-attorney-button";
+import { DetailBackLink } from "@/components/detail-back-link";
+import { MessageAttorneyButton } from "@/components/messages/message-attorney-button";
 import { FEE_APPROACHES } from "@/lib/attorney-profile";
 
 /**
@@ -122,6 +115,7 @@ export function AttorneyProfileView({
 	backHref,
 	backLabel,
 	headingLevel = "h1",
+	messagingEnabled = false,
 }: {
 	attorney: DirectoryProfile;
 	/** Where "back" goes — the directory this profile was opened from. */
@@ -129,6 +123,7 @@ export function AttorneyProfileView({
 	backLabel: string;
 	/** "h2" inside the app shell, whose header bar is already the page's h1. */
 	headingLevel?: "h1" | "h2";
+	messagingEnabled?: boolean;
 }) {
 	const Heading = headingLevel;
 
@@ -175,15 +170,9 @@ export function AttorneyProfileView({
 
 	return (
 		<div>
-			<Link
-				href={backHref}
-				className="inline-flex items-center gap-1.5 font-semibold text-[13.5px] text-ink-soft transition-colors hover:text-ink"
-			>
-				<ChevronLeft className="size-4" aria-hidden="true" />
-				{backLabel}
-			</Link>
+			<DetailBackLink href={backHref} label={backLabel} />
 
-			<div className="mt-5 grid gap-6 lg:grid-cols-[1fr_320px]">
+			<div className="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
 				{/* Main column */}
 				<div className="flex min-w-0 flex-col gap-6">
 					<Card>
@@ -416,11 +405,19 @@ export function AttorneyProfileView({
 							whether to take it. If they accept, you agree a fee together and
 							it becomes your funding goal.
 						</p>
-						<ContactAttorneyButton
-							attorneyName={attorney.legalName ?? ""}
-							size="lg"
-							className="mt-4 w-full justify-center"
-						/>
+						{messagingEnabled ? (
+							<MessageAttorneyButton
+								attorneyId={attorney.user.id}
+								attorneyName={attorney.legalName ?? ""}
+								className="mt-4 w-full justify-center"
+							/>
+						) : (
+							<ContactAttorneyButton
+								attorneyName={attorney.legalName ?? ""}
+								size="lg"
+								className="mt-4 w-full justify-center"
+							/>
+						)}
 					</Card>
 
 					<Card>

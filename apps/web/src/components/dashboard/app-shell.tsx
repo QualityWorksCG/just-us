@@ -67,6 +67,7 @@ export function AppShell({
 	email,
 	defaultOpen,
 	flags,
+	messageUnreadCount = 0,
 	children,
 }: {
 	role: Role;
@@ -76,6 +77,7 @@ export function AppShell({
 	defaultOpen: boolean;
 	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
 	flags: FlagState;
+	messageUnreadCount?: number;
 	children: React.ReactNode;
 }) {
 	const pathname = usePathname();
@@ -156,6 +158,11 @@ export function AppShell({
 										>
 											<item.icon className="size-[17px] shrink-0" />
 											<span>{item.label}</span>
+											{item.slug === "messages" && messageUnreadCount > 0 && (
+												<span className="ml-auto rounded-full bg-brass px-1.5 py-0.5 font-bold text-[11px] text-brass-ink">
+													{messageUnreadCount}
+												</span>
+											)}
 										</SidebarMenuButton>
 									</SidebarMenuItem>
 								);
