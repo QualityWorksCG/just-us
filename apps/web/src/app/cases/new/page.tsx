@@ -39,7 +39,11 @@ export default async function NewCasePage({
 						}
 					: null,
 				evidence: Array.isArray(source.evidence)
-					? (source.evidence as { name: string; size: number }[])
+					? (source.evidence as {
+							name: string;
+							size?: number;
+							url?: string;
+						}[])
 					: [],
 				coverImageUrl: source.coverImageUrl,
 				images: source.images ?? [],

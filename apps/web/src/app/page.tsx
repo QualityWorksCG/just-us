@@ -126,7 +126,7 @@ const roles = [
 		title: "Plaintiff",
 		body: "Submit your case, choose your attorney, and raise the agreed fee together.",
 		cta: "Start your case",
-		href: "/login",
+		href: "/login?mode=create",
 	},
 	{
 		icon: Heart,
@@ -153,7 +153,7 @@ const startPaths = [
 		body: "Submit your case free, choose your attorney, and the public funds the agreed fee you set.",
 		meta: "Free to submit · you choose your attorney",
 		cta: "Start your case",
-		href: "/login",
+		href: "/login?mode=create",
 		badge: "Most start here",
 	},
 	{
@@ -328,7 +328,7 @@ export default async function Home() {
 						</p>
 						<div className="mt-7 flex animate-[ju-rise_0.8s_var(--ease-rise)_0.34s_both] flex-col gap-3 sm:flex-row">
 							<Link
-								href="/login"
+								href="/login?mode=create"
 								className={cn(
 									buttonVariants({ size: "lg" }),
 									"w-full sm:w-auto",

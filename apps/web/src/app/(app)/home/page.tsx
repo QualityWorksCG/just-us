@@ -1,6 +1,7 @@
 import type { Role } from "@just-us/auth";
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import { listOwnedCases } from "@just-us/db/cases";
+import { donorStats } from "@just-us/db/donations";
 import {
 	interestCounts,
 	listMyInterests,
@@ -9,7 +10,10 @@ import {
 	queueStates,
 } from "@just-us/db/representation";
 import { interestCountsByCase } from "@just-us/db/requests";
+import { countSavedCases, listSavedCases } from "@just-us/db/saves";
 
+import { toDonorCase } from "@/components/dashboard/donor-case";
+import { DonorDashboard } from "@/components/dashboard/donor-dashboard";
 import {
 	type CaseSummary,
 	PlaintiffDashboard,
@@ -58,6 +62,26 @@ export default async function DashboardHome({
 			newInterestCount: interests[c.id]?.unseen ?? 0,
 		}));
 		return <PlaintiffDashboard name={session.user.name} cases={cases} />;
+	}
+
+	if (role === "donor") {
+		const [stats, savedCount, saved] = await Promise.all([
+			donorStats(session.user.id, new Date().getFullYear()),
+			countSavedCases(session.user.id),
+			listSavedCases(session.user.id, 3),
+		]);
+		return (
+			<DonorDashboard
+				data={{
+					firstName: session.user.name.trim().split(" ")[0] || "there",
+					totalCents: stats.totalCents,
+					casesBacked: stats.casesBacked,
+					savedCount,
+					helpedFund: 0,
+					saved: saved.map(toDonorCase),
+				}}
+			/>
+		);
 	}
 
 	const home = getRoleNav(role).items[0];

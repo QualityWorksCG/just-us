@@ -29,7 +29,13 @@ const attorneySchema = z
 	.nullish();
 
 const evidenceSchema = z
-	.array(z.object({ name: z.string(), size: z.number() }))
+	.array(
+		z.object({
+			name: z.string(),
+			size: z.number().optional(),
+			url: z.string().url().optional(),
+		}),
+	)
 	.optional();
 
 const imageFields = {
