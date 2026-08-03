@@ -96,6 +96,9 @@ export function AppShell({
 	// the render right after its flag is switched off.
 	const current = findScreenByPath(role, pathname ?? "") ?? items[0];
 	const activeSlug = current?.slug;
+	// Messages fills the content pane edge-to-edge (list + thread), so drop the
+	// usual page gutters and pin the main column to the viewport height.
+	const isMessages = (pathname ?? "").startsWith("/messages");
 
 	async function signOut() {
 		await authClient.signOut();
@@ -217,14 +220,24 @@ export function AppShell({
 				<SidebarRail />
 			</Sidebar>
 
-			<div className="flex min-w-0 flex-1 flex-col bg-paper">
+			<div
+				className={cn(
+					"flex min-w-0 flex-1 flex-col bg-paper",
+					isMessages && "h-svh overflow-hidden",
+				)}
+			>
 				{/*
 					The header bar spans full width (border + background reach the edges) but
 					its contents share the same column as <main> below, so the sidebar
 					toggle sits on the same left edge as the page heading beneath it.
 					Keep CONTENT_COLUMN identical in both places.
 				*/}
-				<header className="sticky top-0 z-30 border-border border-b bg-surface">
+				<header
+					className={cn(
+						"z-30 border-border border-b bg-surface",
+						isMessages ? "shrink-0" : "sticky top-0",
+					)}
+				>
 					<div
 						className={cn(
 							CONTENT_COLUMN,
@@ -259,7 +272,15 @@ export function AppShell({
 					</div>
 				</header>
 
-				<main className={cn(CONTENT_COLUMN, "pt-5 pb-10")}>{children}</main>
+				<main
+					className={
+						isMessages
+							? "flex min-h-0 flex-1 flex-col overflow-hidden"
+							: cn(CONTENT_COLUMN, "pt-5 pb-10")
+					}
+				>
+					{children}
+				</main>
 			</div>
 		</SidebarProvider>
 	);

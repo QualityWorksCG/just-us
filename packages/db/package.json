@@ -11,7 +11,7 @@
 	},
 	"scripts": {
 		"db:generate": "prisma generate",
-		"postinstall": "prisma generate",
+		"postinstall": "node scripts/postinstall.mjs",
 		"db:migrate": "prisma migrate dev",
 		"db:migrate:create": "prisma migrate dev --create-only",
 		"db:migrate:sql": "prisma migrate diff --from-config-datasource --to-schema prisma/schema --script",

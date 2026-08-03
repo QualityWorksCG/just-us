@@ -1,6 +1,13 @@
 "use client";
 
 import { Button } from "@just-us/ui/components/button";
+import {
+	Card,
+	CardContent,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@just-us/ui/components/card";
 import { AlertCircle, Flag, Send, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -12,6 +19,7 @@ import {
 	sendMessageAction,
 	setConversationEmailPreferenceAction,
 } from "@/app/(app)/message-actions";
+import { DetailBackLink } from "@/components/detail-back-link";
 
 type ThreadMessage = {
 	id: string;
@@ -131,110 +139,117 @@ export function ConversationThread({
 		});
 	}
 	return (
-		<div className="flex min-h-[640px] flex-col rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
-			<header className="flex flex-wrap items-center justify-between gap-3 border-border border-b px-6 py-5">
-				<div>
-					<h2 className="font-bold text-[18px] text-ink">{otherName}</h2>
-					<p className="mt-1 text-[13px] text-muted-foreground">
-						Private conversation
-					</p>
-				</div>
-				<div className="flex gap-2">
-					<Button
-						variant="outline"
-						size="lg"
-						onClick={() => setEmail(!conversationEmailEnabled)}
-						disabled={pending}
-					>
-						{conversationEmailEnabled ? "Mute email" : "Turn on email"}
-					</Button>
-					<Button
-						variant="outline"
-						size="lg"
-						onClick={() => setReportOpen(true)}
-						disabled={pending}
-					>
-						<Flag data-icon="inline-start" />
-						Report
-					</Button>
-				</div>
-			</header>
-			<div className="flex flex-1 flex-col gap-5 px-6 py-6">
-				{messages.map((message) => {
-					const own = message.authorId === currentUserId;
-					return (
-						<article
-							key={message.id}
-							className={own ? "ml-auto max-w-[75%]" : "mr-auto max-w-[75%]"}
-						>
-							<div
-								className={
-									own
-										? "rounded-[var(--radius-card)] bg-brass-wash px-4 py-3"
-										: "rounded-[var(--radius-card)] bg-paper-alt px-4 py-3"
-								}
-							>
-								{message.deletedAt ? (
-									<p className="text-[14px] text-muted-foreground italic">
-										Message removed
-									</p>
-								) : (
-									<p className="whitespace-pre-wrap text-[14px] text-ink leading-relaxed">
-										{message.body}
-									</p>
-								)}
-							</div>
-							<div
-								className={
-									own
-										? "mt-1 flex justify-end gap-2 text-[12px] text-muted-foreground"
-										: "mt-1 flex gap-2 text-[12px] text-muted-foreground"
-								}
-							>
-								<span>
-									{message.authorName} ·{" "}
-									{new Date(message.createdAt).toLocaleString()}
-								</span>
-								{own && !message.deletedAt && (
-									<Button
-										type="button"
-										onClick={() => remove(message.id)}
-										variant="ghost"
-										size="lg"
-										className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-									>
-										<Trash2 data-icon="inline-start" aria-hidden="true" />
-										Remove
-									</Button>
-								)}
-							</div>
-						</article>
-					);
-				})}
+		<div className="flex min-h-0 flex-1 flex-col bg-paper px-6 py-5 sm:px-10 lg:px-12">
+			<div className="shrink-0 pb-4">
+				<DetailBackLink href="/messages" label="Back to messages" />
 			</div>
-			<footer className="border-border border-t p-6">
-				<label htmlFor="reply" className="font-semibold text-[14px] text-ink">
-					Reply
-				</label>
-				<textarea
-					id="reply"
-					value={body}
-					onChange={(event) => setBody(event.target.value)}
-					maxLength={4000}
-					placeholder="Write a message…"
-					className="mt-2 min-h-24 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface p-3 text-[14px] outline-none focus:border-brass-deep"
-				/>
-				<div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-					<p className="text-[12px] text-muted-foreground">
-						Do not share account numbers, documents, or sensitive personal
-						information here.
-					</p>
-					<Button size="lg" onClick={reply} disabled={!body.trim() || pending}>
-						<Send data-icon="inline-start" />
-						{pending ? "Sending…" : "Send message"}
-					</Button>
-				</div>
-			</footer>
+			<Card className="flex min-h-0 flex-1 flex-col rounded-[var(--radius-card-lg)] border border-border bg-surface py-0 shadow-[var(--shadow-rest)] ring-0">
+				<CardHeader className="flex shrink-0 flex-row flex-wrap items-center justify-between gap-3 border-border border-b px-5 pt-5 pb-4">
+					<div className="min-w-0">
+						<CardTitle className="font-bold text-[18px] text-ink">
+							{otherName}
+						</CardTitle>
+						<p className="mt-1 text-[13px] text-muted-foreground">
+							Private conversation
+						</p>
+					</div>
+					<div className="flex gap-2">
+						<Button
+							variant="outline"
+							size="lg"
+							onClick={() => setEmail(!conversationEmailEnabled)}
+							disabled={pending}
+						>
+							{conversationEmailEnabled ? "Mute email" : "Turn on email"}
+						</Button>
+						<Button
+							variant="outline"
+							size="lg"
+							onClick={() => setReportOpen(true)}
+							disabled={pending}
+						>
+							<Flag data-icon="inline-start" />
+							Report
+						</Button>
+					</div>
+				</CardHeader>
+				<CardContent className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+					{messages.map((message) => {
+						const own = message.authorId === currentUserId;
+						return (
+							<article
+								key={message.id}
+								className={own ? "ml-auto max-w-[75%]" : "mr-auto max-w-[75%]"}
+							>
+								<div
+									className={
+										own
+											? "rounded-[var(--radius-card)] bg-brass-wash px-4 py-3"
+											: "rounded-[var(--radius-card)] bg-paper-alt px-4 py-3"
+									}
+								>
+									{message.deletedAt ? (
+										<p className="text-[14px] text-muted-foreground italic">
+											Message removed
+										</p>
+									) : (
+										<p className="whitespace-pre-wrap text-[14px] text-ink leading-relaxed">
+											{message.body}
+										</p>
+									)}
+								</div>
+								<div
+									className={
+										own
+											? "mt-1 flex justify-end gap-2 text-[12px] text-muted-foreground"
+											: "mt-1 flex gap-2 text-[12px] text-muted-foreground"
+									}
+								>
+									<span>
+										{message.authorName} ·{" "}
+										{new Date(message.createdAt).toLocaleString()}
+									</span>
+									{own && !message.deletedAt && (
+										<Button
+											type="button"
+											onClick={() => remove(message.id)}
+											variant="ghost"
+											size="lg"
+											className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+										>
+											<Trash2 data-icon="inline-start" aria-hidden="true" />
+											Remove
+										</Button>
+									)}
+								</div>
+							</article>
+						);
+					})}
+				</CardContent>
+				<CardFooter className="shrink-0 flex-col items-stretch border-border px-5 py-5">
+					<label htmlFor="reply" className="font-semibold text-[14px] text-ink">
+						Reply
+					</label>
+					<textarea
+						id="reply"
+						value={body}
+						onChange={(event) => setBody(event.target.value)}
+						maxLength={4000}
+						placeholder="Write a message…"
+						className="mt-2 min-h-24 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface p-3 text-[14px] outline-none focus:border-brass-deep"
+					/>
+					<div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+						<p className="text-[12px] text-muted-foreground">
+							Do not share account numbers, documents, or sensitive personal
+							information here.
+						</p>
+						<Button size="lg" onClick={reply} disabled={!body.trim() || pending}>
+							<Send data-icon="inline-start" />
+							{pending ? "Sending…" : "Send message"}
+						</Button>
+					</div>
+				</CardFooter>
+			</Card>
 			{reportOpen && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
 					<button

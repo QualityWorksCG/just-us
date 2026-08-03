@@ -4,7 +4,6 @@ import {
 } from "@just-us/db/messages";
 import { notFound } from "next/navigation";
 
-import { DetailBackLink } from "@/components/detail-back-link";
 import { ConversationThread } from "@/components/messages/conversation-thread";
 import { requireRole } from "@/lib/auth-server";
 
@@ -23,24 +22,21 @@ export default async function ConversationPage({
 			: conversation.plaintiff;
 	const preferences = await messageEmailPreferences(session.user.id, id);
 	return (
-		<div className="mx-auto max-w-[1180px]">
-			<DetailBackLink href="/messages" label="Back to messages" />
-			<div className="mt-4">
-				<ConversationThread
-					conversationId={id}
-					currentUserId={session.user.id}
-					otherName={other.name}
-					emailEnabled={preferences.conversationEmailEnabled}
-					messages={conversation.messages.map((message) => ({
-						id: message.id,
-						body: message.body,
-						createdAt: message.createdAt.toISOString(),
-						deletedAt: message.deletedAt?.toISOString() ?? null,
-						authorId: message.authorId,
-						authorName: message.author.name,
-					}))}
-				/>
-			</div>
+		<div className="flex min-h-0 flex-1 flex-col">
+			<ConversationThread
+				conversationId={id}
+				currentUserId={session.user.id}
+				otherName={other.name}
+				emailEnabled={preferences.conversationEmailEnabled}
+				messages={conversation.messages.map((message) => ({
+					id: message.id,
+					body: message.body,
+					createdAt: message.createdAt.toISOString(),
+					deletedAt: message.deletedAt?.toISOString() ?? null,
+					authorId: message.authorId,
+					authorName: message.author.name,
+				}))}
+			/>
 		</div>
 	);
 }
