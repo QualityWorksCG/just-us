@@ -4,12 +4,7 @@ import { ProfileAccessError, updateOwnProfile } from "@just-us/db/profile";
 import { revalidatePath } from "next/cache";
 
 import { requireOnboarded } from "@/lib/auth-server";
-import { isManagedPrivateAvatarUrl } from "@/lib/avatar-policy";
-import {
-	AvatarValidationError,
-	deletePrivateAvatar,
-	storePrivateAvatar,
-} from "@/lib/private-avatar";
+import { AvatarValidationError, deleteAvatar, storeAvatar } from "@/lib/avatar";
 import { useLogger, withEvlog } from "@/lib/evlog";
 import { validateProfileFields } from "@/lib/profile-validation";
 
@@ -18,7 +13,7 @@ export type SaveProfileResult =
 			ok: true;
 			profile: {
 				name: string;
-				hasAvatar: boolean;
+				avatarUrl: string | null;
 				jurisdiction: string | null;
 			};
 	  }
@@ -64,17 +59,18 @@ export const saveProfileAction = withEvlog(async function saveProfileAction(
 
 	try {
 		if (avatar) {
-			newAvatarUrl = (await storePrivateAvatar(session.user.id, avatar)).url;
+			newAvatarUrl = (await storeAvatar(session.user.id, avatar)).url;
 		}
 	} catch (error) {
 		const uploadError =
-			error instanceof Error ? error : new Error("Unknown avatar upload failure");
+			error instanceof Error
+				? error
+				: new Error("Unknown avatar upload failure");
 		// Keep provider diagnostics on the server. Deliberately exclude image content,
 		// filename, Blob URL, and all credentials from the event.
 		log.error(uploadError, {
 			action: "profile.avatar.upload",
 			user: { id: session.user.id },
-			avatar: { access: "private" },
 		});
 
 		return {
@@ -100,11 +96,11 @@ export const saveProfileAction = withEvlog(async function saveProfileAction(
 		});
 
 		// The database now points at the replacement (or null), so remove the old
-		// private object afterwards. A cleanup failure never undoes a successful
-		// profile save; it only leaves a harmless orphan for lifecycle cleanup.
+		// object afterwards. A cleanup failure never undoes a successful profile
+		// save; it only leaves a harmless orphan for lifecycle cleanup.
 		if (newAvatarUrl || removeAvatar) {
 			try {
-				await deletePrivateAvatar(updated.previousImage);
+				await deleteAvatar(updated.previousImage);
 			} catch {
 				// Best-effort object cleanup; keep the user-facing save successful.
 			}
@@ -116,14 +112,14 @@ export const saveProfileAction = withEvlog(async function saveProfileAction(
 			ok: true,
 			profile: {
 				name: updated.profile.name,
-				hasAvatar: isManagedPrivateAvatarUrl(updated.profile.image),
+				avatarUrl: updated.profile.image,
 				jurisdiction: updated.profile.jurisdiction,
 			},
 		};
 	} catch (error) {
 		if (newAvatarUrl) {
 			try {
-				await deletePrivateAvatar(newAvatarUrl);
+				await deleteAvatar(newAvatarUrl);
 			} catch {
 				// The original failure is more useful than a compensating-delete error.
 			}

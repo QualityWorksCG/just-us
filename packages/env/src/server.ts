@@ -44,13 +44,10 @@ export const env = createEnv({
 		// OpenAI key powering the case-wizard AI helpers (story polish, title
 		// suggestions). Optional so the app still boots without it.
 		OPENAI_API_KEY: z.string().min(1).optional(),
-		// Vercel Blob read/write token for case image uploads. Optional so the
-		// app boots without it (uploads simply fail with a clear error).
+		// Vercel Blob read/write token. One public store holds both case images
+		// and profile photos. Optional so the app boots without it (uploads
+		// simply fail with a clear error).
 		BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
-		// Dedicated private Blob store for profile photos. The public case-image
-		// store deliberately remains on BLOB_READ_WRITE_TOKEN.
-		PRIVATE_AVATAR_STORE_ID: z.string().min(1).optional(),
-		PRIVATE_AVATAR_READ_WRITE_TOKEN: z.string().min(1).optional(),
 		EMAIL_SOURCE: z.string().min(1).default("just-us <onboarding@resend.dev>"),
 		NODE_ENV: z
 			.enum(["development", "production", "test"])

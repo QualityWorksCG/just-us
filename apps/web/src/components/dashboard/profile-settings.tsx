@@ -43,7 +43,7 @@ type SettingsProfile = {
 	name: string;
 	email: string;
 	emailVerified: boolean;
-	hasAvatar: boolean;
+	avatarUrl: string | null;
 	role: string;
 	jurisdiction: string | null;
 	createdAt: string;
@@ -136,9 +136,8 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 	const [jurisdiction, setJurisdiction] = useState(profile.jurisdiction ?? "");
 	const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null);
 	const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-	const [hasAvatar, setHasAvatar] = useState(profile.hasAvatar);
+	const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
 	const [removeAvatar, setRemoveAvatar] = useState(false);
-	const [avatarVersion, setAvatarVersion] = useState(0);
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [formError, setFormError] = useState<string | null>(null);
 	const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -252,10 +251,9 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 
 			setDisplayName(result.profile.name);
 			setJurisdiction(result.profile.jurisdiction ?? "");
-			setHasAvatar(result.profile.hasAvatar);
+			setAvatarUrl(result.profile.avatarUrl);
 			setRemoveAvatar(false);
 			clearAvatarSelection();
-			setAvatarVersion((version) => version + 1);
 			setFieldErrors({});
 			setSuccessMessage("Changes saved");
 			// Refreshes the server component tree rather than reloading the document;
@@ -264,11 +262,7 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 		});
 	}
 
-	const avatarSrc =
-		avatarPreview ??
-		(hasAvatar && !removeAvatar
-			? `/api/avatars/${profile.id}?v=${avatarVersion}`
-			: null);
+	const avatarSrc = avatarPreview ?? (removeAvatar ? null : avatarUrl);
 
 	return (
 		<div>
@@ -284,7 +278,7 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 					<div className="flex flex-col gap-1">
 						<h2 className="font-bold text-[16px] text-ink">Personal details</h2>
 						<p className="text-[13px] text-ink-soft leading-relaxed">
-							Update the details shown on your private account.
+							Update the details shown on your account.
 						</p>
 					</div>
 
@@ -313,7 +307,7 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 								</span>
 								<div className="flex min-w-0 flex-1 flex-col gap-2">
 									<p className="text-[13px] text-ink-soft leading-relaxed">
-										Private to your account and people you message.
+										Shown on your profile and anywhere your name appears.
 									</p>
 									<div className="flex flex-wrap gap-2">
 										<Button
@@ -326,7 +320,7 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 											<Camera data-icon="inline-start" aria-hidden="true" />
 											Change photo
 										</Button>
-										{hasAvatar ? (
+										{avatarUrl ? (
 											removeAvatar ? (
 												<Button
 													type="button"
@@ -350,7 +344,7 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 												</Button>
 											)
 										) : null}
-										{selectedAvatar && !hasAvatar ? (
+										{selectedAvatar && !avatarUrl ? (
 											<Button
 												type="button"
 												variant="ghost"

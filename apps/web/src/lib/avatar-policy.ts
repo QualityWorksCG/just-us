@@ -1,11 +1,14 @@
 const AVATAR_PATH_PREFIX = "avatars/";
 
 /**
- * Restricts profile rendering to avatars managed by this application. Existing
- * third-party OAuth image URLs are intentionally not rendered in the dashboard
- * because profile photos are a private account detail.
+ * Whether this URL is an avatar blob this application uploaded.
+ *
+ * Used to scope deletes: a user's `image` may be a third-party OAuth URL we
+ * never created and must not try to remove from our own Blob store. Rendering is
+ * no longer gated on it — profile photos are public, so any stored image URL is
+ * fine to display.
  */
-export function isManagedPrivateAvatarUrl(
+export function isManagedAvatarUrl(
 	imageUrl: string | null | undefined,
 ): imageUrl is string {
 	if (!imageUrl) return false;

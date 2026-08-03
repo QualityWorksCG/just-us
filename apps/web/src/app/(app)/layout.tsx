@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 
 import { AppShell } from "@/components/dashboard/app-shell";
 import { requireOnboarded } from "@/lib/auth-server";
-import { isManagedPrivateAvatarUrl } from "@/lib/avatar-policy";
 import { getFlags } from "@/lib/flags-server";
 
 export default async function DashboardLayout({
@@ -27,10 +26,9 @@ export default async function DashboardLayout({
 	return (
 		<AppShell
 			role={role}
-			userId={session.user.id}
 			name={session.user.name}
 			email={session.user.email}
-			hasAvatar={isManagedPrivateAvatarUrl(session.user.image)}
+			avatarUrl={session.user.image ?? null}
 			defaultOpen={sidebarState !== "false"}
 			flags={flags}
 		>
