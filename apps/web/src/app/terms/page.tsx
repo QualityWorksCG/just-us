@@ -82,9 +82,25 @@ export default function TermsPage() {
 					</li>
 					<li>
 						<strong>JustUs never takes custody of donated funds.</strong> Funds
-						route directly into a case-specific account held by the retained
-						attorney through our third-party payment processor. JustUs's own
+						route directly, through our third-party payment processor, into an
+						account held by the case's designated recipient. JustUs's own
 						balance never receives a donated dollar.
+					</li>
+					<li>
+						<strong>Each case names who receives its funds.</strong> Depending
+						on how the case is set up, the recipient is either the{" "}
+						<strong>plaintiff</strong> or their{" "}
+						<strong>retained attorney</strong>. Whichever it is, that recipient
+						opens and controls the receiving account themselves, and it is
+						stated on the case page before you give. JustUs does not choose the
+						recipient and does not direct how funds are used once received.
+					</li>
+					<li>
+						Where the plaintiff is the recipient, funds are received by them
+						directly and are <strong>not</strong> held in an attorney trust
+						account or subject to the professional obligations that attach to
+						one. Where the attorney is the recipient, their handling of client
+						funds is governed by their own professional rules, not by JustUs.
 					</li>
 					<li>
 						We do not take any share of legal fees or settlements. Fees and

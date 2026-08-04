@@ -11,7 +11,7 @@ model Conversation {
 
   /// A conversation can exist before a matter is chosen; when supplied, the
   /// case must belong to the plaintiff and is checked in the data layer.
-  case   Case?  @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  case   Case?   @relation(fields: [caseId], references: [id], onDelete: SetNull)
   caseId String?
 
   /// Heartbeats are written only while the recipient has this exact thread
@@ -46,11 +46,11 @@ model Message {
   authorId       String
 
   body      String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   deletedAt DateTime?
   /// This is set only for an incoming message when its recipient opens the
   /// thread. The author never needs a read marker for their own message.
-  readAt DateTime?
+  readAt    DateTime?
 
   emailDelivery MessageEmailDelivery?
 
@@ -64,11 +64,11 @@ model Message {
 /// as enabled so existing accounts retain transactional-message email by
 /// default; a row is created once the user changes the preference.
 model MessageNotificationPreference {
-  id String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String @unique
-  emailEnabled Boolean @default(true)
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String   @unique
+  emailEnabled Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
 
   @@map("message_notification_preference")
 }
@@ -76,13 +76,13 @@ model MessageNotificationPreference {
 /// Per-thread email mute. A false value means the user opted out for this one
 /// conversation while leaving their global preference unchanged.
 model ConversationNotificationSetting {
-  id String @id @default(cuid())
+  id             String       @id @default(cuid())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  emailEnabled Boolean @default(true)
-  updatedAt DateTime @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  emailEnabled   Boolean      @default(true)
+  updatedAt      DateTime     @updatedAt
 
   @@unique([conversationId, userId])
   @@index([userId])
@@ -98,15 +98,15 @@ enum MessageEmailDeliveryStatus {
 /// One row per message reserves email delivery before calling the provider,
 /// preventing retries or concurrent requests from sending a duplicate email.
 model MessageEmailDelivery {
-  id String @id @default(cuid())
-  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  messageId String @unique
-  recipient   User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  id          String                     @id @default(cuid())
+  message     Message                    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId   String                     @unique
+  recipient   User                       @relation(fields: [recipientId], references: [id], onDelete: Cascade)
   recipientId String
-  status MessageEmailDeliveryStatus
-  reason String?
-  createdAt DateTime @default(now())
-  sentAt DateTime?
+  status      MessageEmailDeliveryStatus
+  reason      String?
+  createdAt   DateTime                   @default(now())
+  sentAt      DateTime?
 
   @@index([recipientId, createdAt])
   @@map("message_email_delivery")
@@ -120,17 +120,17 @@ enum ConversationReportStatus {
 /// The minimal JUS-66 moderation foundation: a participant can report the
 /// conversation, and administrators can review it without participating.
 model ConversationReport {
-  id String @id @default(cuid())
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id             String                   @id @default(cuid())
+  conversation   Conversation             @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
-  reporter   User @relation("ConversationReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  reporterId String
-  reason String
-  status ConversationReportStatus @default(open)
-  resolvedAt DateTime?
-  resolver   User? @relation("ConversationReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
-  resolvedById String?
-  createdAt DateTime @default(now())
+  reporter       User                     @relation("ConversationReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporterId     String
+  reason         String
+  status         ConversationReportStatus @default(open)
+  resolvedAt     DateTime?
+  resolver       User?                    @relation("ConversationReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedById   String?
+  createdAt      DateTime                 @default(now())
 
   @@index([status, createdAt])
   @@index([conversationId])

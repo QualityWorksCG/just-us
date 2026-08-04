@@ -1,9 +1,11 @@
 import { getOwnedCase } from "@just-us/db/cases";
+import { getCasePayoutOptions } from "@just-us/db/payouts";
 import { cn } from "@just-us/ui/lib/utils";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 
 import { BackLink } from "@/components/dashboard/back-link";
+import { CasePayout } from "@/components/dashboard/case-payout";
 import {
 	ManageCase,
 	type ManageCaseData,
@@ -19,6 +21,10 @@ export default async function ManageCasePage({
 	const { id } = await params;
 	const c = await getOwnedCase(id, session.user.id);
 	if (!c || c.deletedAt) notFound();
+
+	// Who this case pays out to. Both candidates' onboarding state is read, because
+	// a recipient the plaintiff can pick but not use has to explain itself.
+	const payout = await getCasePayoutOptions(id, session.user.id);
 
 	const data: ManageCaseData = {
 		id: c.id,
@@ -88,6 +94,19 @@ export default async function ManageCasePage({
 			</div>
 
 			<ManageCase data={data} />
+
+			{payout && (
+				<CasePayout
+					data={{
+						caseId: c.id,
+						status: payout.status,
+						recipient: payout.recipient,
+						bound: payout.bound,
+						plaintiff: payout.plaintiff,
+						attorney: payout.attorney,
+					}}
+				/>
+			)}
 		</div>
 	);
 }

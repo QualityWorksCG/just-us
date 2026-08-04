@@ -1,5 +1,11 @@
 // biome-ignore-all lint/performance/noImgElement: case images are user-uploaded Blob URLs, not static assets
 import { getPublicCase } from "@just-us/db/cases";
+import { resolvePayoutDestination } from "@just-us/db/payouts";
+import {
+	donationPresets,
+	minDonationCents,
+	platformFeeBps,
+} from "@just-us/payments";
 import { Eye, Lock, Megaphone, Scale, ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -57,6 +63,30 @@ export default async function PublicCasePage({
 		[c.attorneyFirm, c.attorneyArea, c.attorneyLocation]
 			.filter(Boolean)
 			.join(" · ") || "—";
+
+	// Can this case actually take money right now? Resolved server-side from the
+	// case's *bound* payout account, so the button state and the charge path agree
+	// rather than each deciding for itself.
+	const destination = await resolvePayoutDestination(c.id);
+	const BLOCKED: Record<string, string> = {
+		not_live: "This case isn't raising right now.",
+		unbound:
+			"This case is still setting up where donations go, so it can't accept them yet.",
+		transfers_disabled:
+			"The recipient's payout setup is still being verified. Donations open as soon as it clears.",
+	};
+
+	// Who this case's donations are paid to. A donor decides partly on this, and
+	// terms §4 commits to stating it per case, so it is read from the case's own
+	// `payoutRecipient` rather than asserted globally — the recipient is either
+	// side depending on how the case was set up. Null means no payout account has
+	// been designated yet, and the note must claim neither rather than guess.
+	const fundsNote =
+		c.payoutRecipient === "plaintiff"
+			? `Funds go to ${ownerFirst}'s account — ${ownerFirst} pays the attorney directly.`
+			: c.payoutRecipient === "attorney"
+				? `Funds go straight to ${c.attorneyName ?? "the attorney"}'s account — never through ${ownerFirst}.`
+				: "Funds go to the recipient this case designates — never to JustUs.";
 	const paragraphs = c.story
 		.split(/\n{2,}|\n/)
 		.map((p) => p.trim())
@@ -194,7 +224,19 @@ export default async function PublicCasePage({
 								{c.donorsCount} {c.donorsCount === 1 ? "donor" : "donors"}
 							</p>
 							<div className="mt-5">
-								<PublicCaseActions sharePath={`/cases/${c.id}`} />
+								<PublicCaseActions
+									sharePath={`/cases/${c.id}`}
+									caseId={c.id}
+									config={{
+										presetsCents: donationPresets(),
+										minCents: minDonationCents(),
+										feeBps: platformFeeBps(),
+										canDonate: destination.ok,
+										blockedReason: destination.ok
+											? null
+											: (BLOCKED[destination.reason] ?? null),
+									}}
+								/>
 							</div>
 						</div>
 
@@ -222,8 +264,7 @@ export default async function PublicCasePage({
 									className="mt-0.5 size-4 shrink-0 text-brass-deep"
 									aria-hidden="true"
 								/>
-								Funds go to {ownerFirst}'s account — {ownerFirst} pays the
-								attorney directly.
+								{fundsNote}
 							</span>
 							<span className="flex items-start gap-2">
 								<Eye

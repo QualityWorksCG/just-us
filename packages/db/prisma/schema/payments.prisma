@@ -1,0 +1,108 @@
+// Where donated money goes.
+//
+// JustUs never takes custody: a donation is a Stripe Connect *destination
+// charge*, so the full amount transfers to the recipient's connected account and
+// only the platform fee comes back to us. That part of the promise (terms §4) is
+// true regardless of who the recipient is. This file holds the account money
+// lands in; the donation ledger itself is `Donation` in case.prisma, next to the
+// case it funds.
+//
+// Who receives is deliberately **not** fixed here. Either the plaintiff or the
+// retained attorney may be the payout recipient, decided per case — see
+// `Case.payoutRecipient`. Everything below is recipient-agnostic on purpose: to
+// Stripe, and to this schema, a recipient is just an onboarded account that can
+// accept a charge.
+
+/// A user's Stripe Connect (Express) account — a destination donations can be
+/// sent to. Held by whoever is receiving: a plaintiff or an attorney.
+///
+/// One per **person**, not per case and not per role. Stripe KYCs a human once,
+/// and an attorney representing nine cases cannot be re-verified nine times. A
+/// case points at one of these (`Case.payoutAccountId`) rather than owning one.
+///
+/// Every column except `stripeAccountId` is a **cache of Stripe's own view**,
+/// written only by the `account.updated` webhook and the initial create call.
+/// Nothing here is form-editable, because anyone who could set `chargesEnabled`
+/// themselves could open donations against an account that cannot receive them.
+model PayoutAccount {
+  id String @id @default(cuid())
+
+  /// The person this account belongs to — any role. Unique: one Stripe account
+  /// per human, so a case's destination is unambiguous once bound.
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  /// Stripe's `acct_…` id. The only column not derived from Stripe.
+  stripeAccountId String @unique
+
+  /// Nothing is outstanding on Stripe's side — derived from there being no
+  /// requirement entry awaiting the holder. Deliberately separate from
+  /// `transfersEnabled`: someone can complete the hosted flow and still be held
+  /// for review, so this answers "should we keep nagging them" while
+  /// `transfersEnabled` answers "can a case take money". Conflating the two opens
+  /// donations against an account that cannot receive them.
+  detailsSubmitted Boolean @default(false)
+  /// **The donation gate.** Nothing may be charged toward a case whose bound
+  /// account does not have this true.
+  ///
+  /// Mirrors the Accounts v2 `recipient` capability
+  /// `stripe_balance.stripe_transfers` — the one that lets an account *receive* a
+  /// destination transfer. Deliberately not "charges enabled": these accounts
+  /// never charge anyone. JustUs is the merchant of record and the recipient only
+  /// receives, which is why the `recipient` configuration is requested and
+  /// `merchant` is not.
+  transfersEnabled Boolean @default(false)
+  /// Whether Stripe will pay the balance out to their bank
+  /// (`stripe_balance.payouts`). False here means money can still arrive and
+  /// simply sits in the Stripe balance — worth surfacing to the holder, but it
+  /// does not block donations. Read-only: unlike transfers, it cannot be
+  /// requested at creation, only observed.
+  payoutsEnabled   Boolean @default(false)
+
+  /// When Stripe last told us about this account. A stale timestamp next to a
+  /// half-onboarded account is how a stuck recipient becomes visible instead of
+  /// silently never receiving money.
+  syncedAt DateTime?
+
+  /// Cases routing donations here. Many, because one attorney's account serves
+  /// every case they represent.
+  cases Case[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("payout_account")
+}
+
+/// Who a given case pays out to.
+///
+/// Recorded per case rather than decided platform-wide, because the two sides
+/// settle it between themselves: some plaintiffs bring their own attorney and
+/// receive funds directly, some retain through an attorney who holds them.
+///
+///   plaintiff — the case owner receives; they pay the attorney themselves.
+///   attorney  — the retained attorney receives directly.
+///
+/// This is the value the **donor-facing disclosure reads from**. A donor is told
+/// which of the two applies before they confirm, so it must be set and stated,
+/// never inferred at render time.
+enum PayoutRecipient {
+  plaintiff
+  attorney
+}
+
+/// Lifecycle of a donation.
+///
+///   pending   — Checkout Session created, donor has not finished paying. The row
+///               exists from this moment so a completed payment always has a row
+///               to land on, rather than the webhook inventing one.
+///   succeeded — payment captured; the only state that counts toward
+///               `Case.raisedCents`.
+///   failed    — the donor's payment did not go through, or they abandoned it.
+///   refunded  — captured then returned, in full or in part.
+enum DonationStatus {
+  pending
+  succeeded
+  failed
+  refunded
+}
