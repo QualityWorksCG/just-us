@@ -5,7 +5,6 @@
 import { breakdownAtBps, checkDonationAmount } from "@just-us/payments/fees";
 import { cn } from "@just-us/ui/lib/utils";
 import { HandCoins, Lock, Share2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -60,7 +59,6 @@ export function PublicCaseActions({
 	);
 	const [customInput, setCustomInput] = useState("");
 	const [pending, startTransition] = useTransition();
-	const router = useRouter();
 
 	// A custom entry wins over a preset whenever it parses; typing clears the
 	// preset selection so two amounts are never highlighted at once.
@@ -88,7 +86,6 @@ export function PublicCaseActions({
 			const result = await startDonation({ caseId, amountCents });
 			if (!result.ok) {
 				toast.error(result.error);
-				if (result.needsSignIn) router.push("/login");
 				return;
 			}
 			// Full navigation — this leaves the app for Stripe's hosted Checkout.
@@ -201,8 +198,8 @@ export function PublicCaseActions({
 
 					<p className="flex items-start gap-1.5 text-[11.5px] text-muted-foreground leading-relaxed">
 						<Lock className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-						Paid securely through Stripe. A donation is a gift — no financial
-						return and no share of any settlement.
+						No account needed. Paid securely through Stripe — a donation is a
+						gift, with no financial return and no share of any settlement.
 					</p>
 				</div>
 			) : (

@@ -110,6 +110,8 @@ export async function markDonationSucceeded(input: {
 	stripeCheckoutSessionId: string;
 	stripePaymentIntentId: string | null;
 	donorEmail: string | null;
+	/** Collected by Checkout. For a guest, the only name we will ever have. */
+	donorName?: string | null;
 }): Promise<{ applied: boolean }> {
 	return prisma.$transaction(async (tx) => {
 		const donation = await tx.donation.findUnique({
@@ -132,6 +134,7 @@ export async function markDonationSucceeded(input: {
 				succeededAt: new Date(),
 				stripePaymentIntentId: input.stripePaymentIntentId,
 				...(input.donorEmail ? { donorEmail: input.donorEmail } : {}),
+				...(input.donorName ? { donorName: input.donorName } : {}),
 			},
 		});
 		// Already applied by an earlier delivery of the same event.

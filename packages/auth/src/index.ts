@@ -1,4 +1,5 @@
 import { createPrismaClient } from "@just-us/db";
+import { claimGuestDonations } from "@just-us/db/donations";
 import { env } from "@just-us/env/server";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -232,6 +233,17 @@ export function createAuth() {
 							failedLoginAttempts: 0,
 							lockedUntil: null,
 						});
+						// Attach any donations this person made as a guest, now that an
+						// account exists to attach them to. Donating requires no account, so
+						// this is how "create an account to track your giving" actually
+						// delivers — matched on a *verified* email only, see
+						// claimGuestDonations. Failure must never block a sign-in: the
+						// donations are already recorded and a later sign-in will retry.
+						try {
+							await claimGuestDonations(session.userId);
+						} catch (error) {
+							console.error("[auth] claimGuestDonations failed", error);
+						}
 					},
 				},
 			},
