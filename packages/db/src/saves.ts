@@ -28,6 +28,15 @@ export async function countSavedCases(userId: string) {
 	return prisma.savedCase.count({ where: { userId } });
 }
 
+/** Whether a donor has saved a specific case. */
+export async function isCaseSaved(userId: string, caseId: string) {
+	const row = await prisma.savedCase.findUnique({
+		where: { userId_caseId: { userId, caseId } },
+		select: { id: true },
+	});
+	return !!row;
+}
+
 /** A donor's saved cases (newest first), with the live case data + owner name.
  *  Deleted or non-existent cases are filtered out. */
 export async function listSavedCases(userId: string, take?: number) {
