@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -84,11 +85,21 @@ export function DonorCaseCard({
 }) {
 	const [saved, setSaved] = useState(initialSaved);
 	const [, startSave] = useTransition();
+	const pathname = usePathname();
 	const pct =
 		c.goal > 0 ? Math.min(100, Math.round((c.raised / c.goal) * 100)) : 0;
 	const style = CAT_STYLES[c.category] ?? DEFAULT_CAT;
 	const Icon = style.icon;
-	const href = `/cases/${c.id}` as Route;
+	// The in-app case screen, not the public `/cases/[id]` page: a signed-in donor
+	// sent to the public page lost the sidebar and the marketing header at once,
+	// leaving the case with no way back. `from` tells that screen which list to
+	// return to, since these cards appear on three of them.
+	const from = pathname?.startsWith("/saved")
+		? "saved"
+		: pathname?.startsWith("/home")
+			? "home"
+			: "discover";
+	const href = `/discover/${c.id}?from=${from}` as Route;
 	const compact = variant === "compact";
 	const status = STATUS_BADGE[c.status] ?? STATUS_BADGE.live;
 
