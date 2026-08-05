@@ -61,6 +61,14 @@ export default async function BrowseCasesPage({
 					<BrowseControls />
 				</div>
 
+				{cases.length > 0 && (
+					<p className="mt-6 text-[13.5px] text-muted-foreground">
+						<span className="font-semibold text-ink">{cases.length}</span>{" "}
+						{cases.length === 1 ? "case" : "cases"}
+						{filtered ? " match your filters" : ""}
+					</p>
+				)}
+
 				{cases.length === 0 ? (
 					<div className="mt-10 flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-6 py-16 text-center">
 						<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
@@ -84,7 +92,7 @@ export default async function BrowseCasesPage({
 						)}
 					</div>
 				) : (
-					<div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+					<div className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
 						{cases.map((c) => {
 							const goal = c.goalCents / 100;
 							const raised = c.raisedCents / 100;
