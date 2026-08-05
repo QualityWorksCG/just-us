@@ -8,8 +8,10 @@
  *   compile error rather than a silently-false read.
  * - Deleting a flag from this registry removes it from the admin screen and from
  *   every code path at once; a leftover database row can't resurrect it.
- * - Every flag is off until an administrator turns it on, so declaring a flag is
- *   always safe to ship.
+ * - A flag with no `defaultEnabled` is off until an administrator turns it on, so
+ *   declaring one is safe to ship. `defaultEnabled: true` inverts that — the
+ *   feature is live on deploy and the stored row only ever turns it off — so it
+ *   belongs to features that are meant to launch, not to work in progress.
  *
  * This module is framework-agnostic and safe to import from client components —
  * it holds no state and touches no database. **Client code must import from
@@ -23,6 +25,12 @@ export type FlagDefinition = {
 	label: string;
 	/** What turning this on actually does, for the admin who has to decide. */
 	description: string;
+	/**
+	 * State before anyone has touched the switch. Omit for work in progress;
+	 * set true for a shipped feature that should be live on deploy, where the
+	 * switch exists to turn it *off* without one.
+	 */
+	defaultEnabled?: boolean;
 };
 
 export const FLAGS = {
@@ -30,6 +38,7 @@ export const FLAGS = {
 		label: "AI assistant",
 		description:
 			"Gates the in-app role-aware AI assistant — both its entry point in the app shell and the endpoint behind it. Off means no user can reach it and no model spend is possible.",
+		defaultEnabled: true,
 	},
 	investorTrack: {
 		label: "Investor track",
@@ -49,10 +58,17 @@ export function isFlagKey(value: string): value is FlagKey {
 	return Object.hasOwn(FLAGS, value);
 }
 
-/** Every flag, off — the shape a caller gets before any database read. */
-export function allFlagsDisabled(): Record<FlagKey, boolean> {
-	return Object.fromEntries(FLAG_KEYS.map((k) => [k, false])) as Record<
-		FlagKey,
-		boolean
-	>;
+/** Whether a flag is on before any administrator has touched it. */
+export function flagDefault(key: FlagKey): boolean {
+	// Read through the interface: `as const` narrows each entry to its own literal
+	// type, and the property is simply absent on flags that omit it.
+	const definition: FlagDefinition = FLAGS[key];
+	return definition.defaultEnabled ?? false;
+}
+
+/** Every flag at its declared default — the shape before any database read. */
+export function defaultFlagState(): FlagState {
+	return Object.fromEntries(
+		FLAG_KEYS.map((k) => [k, flagDefault(k)]),
+	) as FlagState;
 }
