@@ -1,10 +1,12 @@
 import prisma from "./index";
 
-/** A donor's donations, newest first, with the case + owner name for display. */
-export async function listDonations(donorId: string) {
+/** A donor's donations, newest first, with the case + owner name for display.
+ *  Pass `take` to cap the list. */
+export async function listDonations(donorId: string, take?: number) {
 	return prisma.donation.findMany({
 		where: { donorId, case: { deletedAt: null } },
 		orderBy: { createdAt: "desc" },
+		take,
 		include: { case: { include: { owner: { select: { name: true } } } } },
 	});
 }

@@ -55,6 +55,10 @@ model User {
   sentAdminInvitations AdminInvitation[] @relation("AdminInvitationInviter")
   auditEntries         AuditLog[]        @relation("AuditLogActor")
 
+  // Assistant conversations. Model spend has no back-relation here on purpose —
+  // see AiUsage.
+  chats Chat[]
+
   @@unique([email])
   @@map("user")
 }

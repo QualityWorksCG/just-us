@@ -341,6 +341,54 @@ export async function listMyInterests(attorneyId: string) {
 	}));
 }
 
+/**
+ * The cases an attorney is representing, newest match first.
+ *
+ * Scoped to the asking attorney, and unlike the queue it carries the funding
+ * figures: `queueWhere` withholds them from an attorney who is only browsing,
+ * while an attorney matched to a case is entitled to know how its fee is coming
+ * along. Contact details stay withheld either way — `cardSelect` has none.
+ */
+export async function listAttorneyMatches(attorneyId: string, take?: number) {
+	const rows = await prisma.match.findMany({
+		where: { attorneyId, case: { deletedAt: null } },
+		orderBy: { createdAt: "desc" },
+		take,
+		select: {
+			id: true,
+			origin: true,
+			createdAt: true,
+			case: {
+				select: {
+					...cardSelect,
+					status: true,
+					goalCents: true,
+					raisedCents: true,
+					donorsCount: true,
+				},
+			},
+		},
+	});
+
+	return rows.map((row) => ({
+		matchId: row.id,
+		origin: row.origin,
+		matchedAt: row.createdAt,
+		case: {
+			id: row.case.id,
+			title: row.case.title,
+			category: row.case.category,
+			state: row.case.location,
+			summary: row.case.summary,
+			status: row.case.status,
+			plaintiffName: row.case.owner.name,
+			goalCents: row.case.goalCents,
+			raisedCents: row.case.raisedCents,
+			donorsCount: row.case.donorsCount,
+		},
+	}));
+}
+
 /** An attorney's interest tally by status, for the queue's summary row. */
 export async function interestCounts(attorneyId: string) {
 	const grouped = await prisma.attorneyRequest.groupBy({
