@@ -26,6 +26,11 @@ export type FlagDefinition = {
 };
 
 export const FLAGS = {
+	aiAssistant: {
+		label: "AI assistant",
+		description:
+			"Gates the in-app role-aware AI assistant — both its entry point in the app shell and the endpoint behind it. Off means no user can reach it and no model spend is possible.",
+	},
 	investorTrack: {
 		label: "Investor track",
 		description:

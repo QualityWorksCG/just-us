@@ -12,6 +12,9 @@
 				"BETTER_AUTH_URL",
 				"RESEND_API_KEY",
 				"EMAIL_SOURCE",
+				"OPENAI_API_KEY",
+				"AI_GATEWAY_API_KEY",
+				"AI_CHAT_MODEL",
 				"SKIP_ENV_VALIDATION",
 				"NODE_ENV"
 			],

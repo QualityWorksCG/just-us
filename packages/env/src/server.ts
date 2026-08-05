@@ -44,6 +44,11 @@ export const env = createEnv({
 		// OpenAI key powering the case-wizard AI helpers (story polish, title
 		// suggestions). Optional so the app still boots without it.
 		OPENAI_API_KEY: z.string().min(1).optional(),
+		// Vercel AI Gateway key for the in-app assistant. When set, model calls
+		// route through the gateway; without it we fall back to direct OpenAI.
+		AI_GATEWAY_API_KEY: z.string().min(1).optional(),
+		// Overrides the assistant's default chat model. See @just-us/ai/provider.
+		AI_CHAT_MODEL: z.string().min(1).optional(),
 		// Vercel Blob read/write token for case image uploads. Optional so the
 		// app boots without it (uploads simply fail with a clear error).
 		BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
