@@ -1,4 +1,5 @@
 import { getPublicCase } from "@just-us/db/cases";
+import { isCaseSaved } from "@just-us/db/saves";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 
@@ -36,7 +37,7 @@ export default async function InAppCasePage({
 	params: Promise<{ id: string }>;
 	searchParams: Promise<{ from?: string }>;
 }) {
-	await requireRole("donor");
+	const { session } = await requireRole("donor");
 	const [{ id }, { from }] = await Promise.all([params, searchParams]);
 
 	// The same predicate the public page uses: a case that isn't live 404s here
@@ -44,6 +45,7 @@ export default async function InAppCasePage({
 	const c = await getPublicCase(id);
 	if (!c) notFound();
 
+	const initialSaved = await isCaseSaved(session.user.id, id);
 	const back = BACK_TO[from ?? ""] ?? BACK_TO.discover;
 
 	return (
@@ -56,6 +58,8 @@ export default async function InAppCasePage({
 				backLabel={back.label}
 				// The shell's header bar is this page's h1.
 				headingLevel="h2"
+				canSave
+				initialSaved={initialSaved}
 			/>
 		</div>
 	);
