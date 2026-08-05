@@ -78,17 +78,23 @@ export function AppShell({
 	role,
 	name,
 	email,
+	avatarUrl,
 	defaultOpen,
 	flags,
+	messageUnreadCount = 0,
 	children,
 }: {
 	role: Role;
 	name: string;
 	email: string;
+	/** The private object URL never leaves the server; this only enables its route. */
+	/** Public Blob URL of the profile photo, or null to fall back to initials. */
+	avatarUrl: string | null;
 	/** Restored from the `sidebar_state` cookie so SSR matches the last choice. */
 	defaultOpen: boolean;
 	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
 	flags: FlagState;
+	messageUnreadCount?: number;
 	children: React.ReactNode;
 }) {
 	const pathname = usePathname();
@@ -129,6 +135,9 @@ export function AppShell({
 	// the render right after its flag is switched off.
 	const current = findScreenByPath(role, pathname ?? "") ?? items[0];
 	const activeSlug = current?.slug;
+	// Messages fills the content pane edge-to-edge (list + thread), so drop the
+	// usual page gutters and pin the main column to the viewport height.
+	const isMessages = (pathname ?? "").startsWith("/messages");
 
 	async function signOut() {
 		await authClient.signOut();
@@ -203,6 +212,11 @@ export function AppShell({
 										>
 											<item.icon className="size-[17px] shrink-0" />
 											<span>{item.label}</span>
+											{item.slug === "messages" && messageUnreadCount > 0 && (
+												<span className="ml-auto rounded-full bg-brass px-1.5 py-0.5 font-bold text-[11px] text-brass-ink">
+													{messageUnreadCount}
+												</span>
+											)}
 										</SidebarMenuButton>
 									</SidebarMenuItem>
 								);
@@ -214,8 +228,17 @@ export function AppShell({
 				<SidebarFooter className="border-sidebar-border border-t p-3 group-data-[collapsible=icon]:p-2">
 					<div className="flex items-center gap-2.5 px-2.5 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
 						{/* size-9 overflows the 2rem rail slot, so drop to size-8 there. */}
-						<span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[12.5px] text-brass-ink group-data-[collapsible=icon]:size-8">
-							{initials(name)}
+						<span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brass font-bold text-[12.5px] text-brass-ink group-data-[collapsible=icon]:size-8">
+							{avatarUrl ? (
+								// biome-ignore lint/performance/noImgElement: user-uploaded Blob URL, not a static asset
+								<img
+									src={avatarUrl}
+									alt=""
+									className="size-full object-cover"
+								/>
+							) : (
+								initials(name)
+							)}
 						</span>
 						<span className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
 							<span className="block truncate font-bold text-[13px] text-paper/92">
@@ -244,14 +267,24 @@ export function AppShell({
 				<SidebarRail />
 			</Sidebar>
 
-			<div className="flex min-w-0 flex-1 flex-col bg-paper">
+			<div
+				className={cn(
+					"flex min-w-0 flex-1 flex-col bg-paper",
+					isMessages && "h-svh overflow-hidden",
+				)}
+			>
 				{/*
 					The header bar spans full width (border + background reach the edges) but
 					its contents share the same column as <main> below, so the sidebar
 					toggle sits on the same left edge as the page heading beneath it.
 					Keep CONTENT_COLUMN identical in both places.
 				*/}
-				<header className="sticky top-0 z-30 border-border border-b bg-surface">
+				<header
+					className={cn(
+						"z-30 border-border border-b bg-surface",
+						isMessages ? "shrink-0" : "sticky top-0",
+					)}
+				>
 					<div
 						className={cn(
 							CONTENT_COLUMN,
@@ -303,7 +336,15 @@ export function AppShell({
 					</div>
 				</header>
 
-				<main className={cn(CONTENT_COLUMN, "pt-5 pb-10")}>{children}</main>
+				<main
+					className={
+						isMessages
+							? "flex min-h-0 flex-1 flex-col overflow-hidden"
+							: cn(CONTENT_COLUMN, "pt-5 pb-10")
+					}
+				>
+					{children}
+				</main>
 			</div>
 
 			{/*

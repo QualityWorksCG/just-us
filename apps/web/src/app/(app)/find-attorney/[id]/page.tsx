@@ -37,6 +37,7 @@ export default async function InAppAttorneyProfilePage({
 			backLabel="Back to attorneys"
 			// The shell's header bar is this page's h1.
 			headingLevel="h2"
+			messagingEnabled
 		/>
 	);
 }

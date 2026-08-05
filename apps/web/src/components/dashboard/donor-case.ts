@@ -6,6 +6,7 @@ export type DonorCase = {
 	title: string;
 	category: string;
 	location: string;
+	status: string;
 	cover: string | null;
 	owner: string;
 	attorney: string | null;
@@ -19,6 +20,7 @@ type CaseRow = {
 	title: string;
 	category: string;
 	location: string;
+	status: string;
 	coverImageUrl: string | null;
 	attorneyName: string | null;
 	raisedCents: number;
@@ -33,6 +35,7 @@ export function toDonorCase(c: CaseRow): DonorCase {
 		title: c.title || "Untitled case",
 		category: c.category,
 		location: c.location,
+		status: c.status,
 		cover: c.coverImageUrl,
 		owner: c.owner?.name ?? "A plaintiff",
 		attorney: c.attorneyName,

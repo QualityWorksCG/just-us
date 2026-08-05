@@ -618,6 +618,87 @@ const SEEDS: Seed[] = [
 		],
 	},
 	{
+		name: "Nia Caldwell",
+		firm: "Caldwell Civil Rights Law",
+		state: "Alabama",
+		city: "Birmingham",
+		barNumber: "AL #24581",
+		admittedYear: 2012,
+		practiceAreas: ["Civil rights", "Employment"],
+		languages: ["English"],
+		accepting: true,
+		virtual: true,
+		feeApproach: "contingency",
+		education: "J.D., University of Alabama School of Law · 2012",
+		background:
+			"Former civil-rights investigator who now represents workers and families in discrimination and constitutional-rights matters.",
+		bio: "Plaintiff-side civil-rights and workplace-discrimination representation across Alabama.",
+		phone: "(205) 555-0176",
+		website: "https://caldwellcivilrights.example",
+		reviews: [
+			{
+				rating: 5,
+				quote:
+					"Nia listened carefully, then made a hard process feel manageable.",
+				byline: "former client, workplace discrimination",
+			},
+			{
+				rating: 4,
+				quote: "Clear advice from day one and relentless in negotiations.",
+				byline: "former client, retaliation claim",
+			},
+		],
+		cases: [
+			{
+				year: 2025,
+				title: "Retaliation after reporting workplace harassment",
+				amount: "$185,000 settlement",
+				outcome: "settled",
+			},
+			{
+				year: 2023,
+				title: "Discriminatory termination at a manufacturing plant",
+				amount: "$92,000 verdict",
+				outcome: "won",
+			},
+		],
+	},
+	{
+		name: "Caleb Monroe",
+		firm: "Monroe Injury Group",
+		state: "Alabama",
+		city: "Montgomery",
+		barNumber: "AL #31742",
+		admittedYear: 2018,
+		practiceAreas: ["Personal injury", "Medical malpractice"],
+		languages: ["English", "Spanish"],
+		accepting: false,
+		virtual: false,
+		feeApproach: "contingency",
+		education: "J.D., Cumberland School of Law · 2018",
+		background:
+			"Trial lawyer focused on serious-injury and medical-negligence claims, with a practice across central Alabama.",
+		bio: "Serious injury and medical-negligence claims; currently accepting a limited number of new matters.",
+		phone: "(334) 555-0128",
+		website: "https://monroeinjury.example",
+		reviews: [
+			{
+				rating: 5,
+				quote:
+					"Caleb never made me feel rushed and was prepared for every question.",
+				byline: "former client, vehicle collision",
+			},
+		],
+		cases: [
+			{
+				year: 2024,
+				title: "Delayed diagnosis after emergency-room discharge",
+				amount: "$410,000 settlement",
+				outcome: "settled",
+			},
+		],
+	},
+	{
 		// Deliberately bare: verified and listable, but with no reviews and no case
 		// record. Shows whether the profile hides those sections rather than
 		// rendering empty cards, and whether "Highest rated" sorts an unrated

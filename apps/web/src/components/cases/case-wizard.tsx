@@ -55,6 +55,7 @@ import {
 } from "@/app/cases/actions";
 import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
+import { CASE_CATEGORIES } from "@/lib/case-categories";
 
 /** A piece of evidence: an uploaded file (has `size`) or a link (has `url`). */
 export type EvidenceItem = { name: string; size?: number; url?: string };
@@ -101,16 +102,7 @@ const STEPS = [
 
 const LAST_STEP = 5;
 
-const CATEGORIES = [
-	"Employment",
-	"Wage & hours",
-	"Housing",
-	"Consumer fraud",
-	"Elder care",
-	"Civil rights",
-	"Personal injury",
-	"Other",
-];
+const CATEGORIES = CASE_CATEGORIES;
 
 const PAYOUT_TYPES = [
 	"Bank transfer (ACH)",
@@ -144,11 +136,9 @@ function ThinBar({ pct = 0 }: { pct?: number }) {
 
 export function CaseWizard({
 	name,
-	jurisdiction = "",
 	initial = null,
 }: {
 	name: string;
-	jurisdiction?: string;
 	initial?: WizardInitial | null;
 }) {
 	const ids = {
@@ -165,12 +155,12 @@ export function CaseWizard({
 
 	const knownState = (s: string | undefined | null): s is string =>
 		!!s && (US_STATES as readonly string[]).includes(s);
+	// Only a saved draft seeds the state. It is deliberately not prefilled from
+	// the plaintiff's profile: the state belongs to this case, and a plaintiff
+	// running cases in more than one state would get a wrong answer prefilled as
+	// if it were confirmed.
 	const draftState = initial?.location;
-	const seedState = knownState(draftState)
-		? draftState
-		: knownState(jurisdiction)
-			? jurisdiction
-			: "";
+	const seedState = knownState(draftState) ? draftState : "";
 
 	// Resume the furthest step the saved draft supports.
 	const seedStep = (() => {
@@ -195,7 +185,11 @@ export function CaseWizard({
 
 	// Step 1 — the story
 	const [story, setStory] = useState(initial?.story ?? "");
-	const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+	const [aiRefine, setAiRefine] = useState<
+		| { kind: "refined"; text: string }
+		| { kind: "need_more"; message: string }
+		| null
+	>(null);
 	const [refining, setRefining] = useState(false);
 	const [evidence, setEvidence] = useState<EvidenceItem[]>(
 		initial?.evidence ?? [],
@@ -431,8 +425,15 @@ export function CaseWizard({
 		setRefining(true);
 		const result = await refineStoryAction(story);
 		setRefining(false);
-		if (result.ok) setAiSuggestion(result.text);
-		else toast.error(result.error);
+		if (!result.ok) {
+			toast.error(result.error);
+			return;
+		}
+		if (result.kind === "need_more") {
+			setAiRefine({ kind: "need_more", message: result.message });
+			return;
+		}
+		setAiRefine({ kind: "refined", text: result.text });
 	}
 
 	// Ask OpenAI for a few title options drawn from the story.
@@ -1328,7 +1329,48 @@ export function CaseWizard({
 										</div>
 									</div>
 
-									{aiSuggestion && (
+									{aiRefine?.kind === "need_more" && (
+										<div className="rounded-[var(--radius-card-lg)] border border-line-strong bg-surface p-5">
+											<div className="mb-3 flex items-center gap-2.5">
+												<span className="flex size-8 items-center justify-center rounded-lg bg-brass text-white">
+													<Sparkles className="size-4" aria-hidden="true" />
+												</span>
+												<span className="font-bold text-[14px] text-ink">
+													Need a bit more detail
+												</span>
+											</div>
+											<p className="text-[14px] text-ink leading-relaxed">
+												{aiRefine.message}
+											</p>
+											<div className="mt-4 flex flex-wrap gap-2.5">
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													className="h-9"
+													onClick={() => setAiRefine(null)}
+												>
+													Got it
+												</Button>
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													className="h-9"
+													onClick={refineWithAI}
+													disabled={refining}
+												>
+													Try again
+												</Button>
+											</div>
+											<p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
+												Add more of what happened in your own words, then refine
+												again. AI won&apos;t invent details for you.
+											</p>
+										</div>
+									)}
+
+									{aiRefine?.kind === "refined" && (
 										<div className="rounded-[var(--radius-card-lg)] border border-brass bg-brass-wash/40 p-5">
 											<div className="mb-3 flex items-center gap-2.5">
 												<span className="flex size-8 items-center justify-center rounded-lg bg-brass text-white">
@@ -1342,7 +1384,7 @@ export function CaseWizard({
 												</span>
 											</div>
 											<p className="text-[14px] text-ink leading-relaxed">
-												“{aiSuggestion}”
+												“{aiRefine.text}”
 											</p>
 											<div className="mt-4 flex flex-wrap gap-2.5">
 												<Button
@@ -1350,8 +1392,8 @@ export function CaseWizard({
 													size="sm"
 													className="h-9"
 													onClick={() => {
-														setStory(aiSuggestion);
-														setAiSuggestion(null);
+														setStory(aiRefine.text);
+														setAiRefine(null);
 														toast.success("Applied the refined version.");
 													}}
 												>
@@ -1363,7 +1405,7 @@ export function CaseWizard({
 													variant="outline"
 													size="sm"
 													className="h-9"
-													onClick={() => setAiSuggestion(null)}
+													onClick={() => setAiRefine(null)}
 												>
 													Keep mine
 												</Button>

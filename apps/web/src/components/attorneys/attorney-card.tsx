@@ -6,6 +6,7 @@ import { Eye } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { ContactAttorneyButton } from "@/components/attorneys/contact-attorney-button";
+import { MessageAttorneyButton } from "@/components/messages/message-attorney-button";
 import { FEE_APPROACHES } from "@/lib/attorney-profile";
 
 /** Years licensed, derived so it can't go stale. Null when we don't know. */
@@ -99,6 +100,7 @@ export function HeadshotFrame({
 export function AttorneyCard({
 	attorney,
 	profileBasePath = "/attorneys",
+	showMessageAction = false,
 }: {
 	attorney: DirectoryAttorney;
 	/**
@@ -110,6 +112,7 @@ export function AttorneyCard({
 	 * page dropped them out of the app with no sidebar and no way back.
 	 */
 	profileBasePath?: string;
+	showMessageAction?: boolean;
 }) {
 	const years = yearsLicensed(attorney.admittedYear);
 
@@ -212,11 +215,11 @@ export function AttorneyCard({
 					)}
 				</div>
 
-				<div className="flex shrink-0 flex-col gap-1.5 sm:w-[118px]">
+				<div className="flex shrink-0 flex-col gap-2 sm:w-56">
 					<Link
 						href={`${profileBasePath}/${attorney.id}` as Route}
 						className={cn(
-							buttonVariants({ variant: "outline", size: "sm" }),
+							buttonVariants({ variant: "outline", size: "lg" }),
 							"w-full justify-center",
 						)}
 					>
@@ -227,10 +230,19 @@ export function AttorneyCard({
 					    to decide, so there is nothing to send them without one. The button
 					    explains that before moving them, rather than dropping them into the
 					    wizard unannounced. */}
-					<ContactAttorneyButton
-						attorneyName={attorney.legalName}
-						className="w-full justify-center"
-					/>
+					{showMessageAction ? (
+						<MessageAttorneyButton
+							attorneyId={attorney.userId}
+							attorneyName={attorney.legalName}
+							className="w-full justify-center"
+						/>
+					) : (
+						<ContactAttorneyButton
+							attorneyName={attorney.legalName}
+							size="lg"
+							className="w-full justify-center"
+						/>
+					)}
 				</div>
 			</div>
 		</article>

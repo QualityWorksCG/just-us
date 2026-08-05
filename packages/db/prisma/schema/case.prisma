@@ -70,6 +70,7 @@ model Case {
   // The attorney representing this case, once one is matched. Its absence is
   // what puts a `seeking` case in the attorney queue — see listSeekingQueue.
   match Match?
+  conversations Conversation[]
 
   @@index([ownerId])
   @@index([status])

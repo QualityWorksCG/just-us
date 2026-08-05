@@ -49,8 +49,9 @@ export const env = createEnv({
 		AI_GATEWAY_API_KEY: z.string().min(1).optional(),
 		// Overrides the assistant's default chat model. See @just-us/ai/provider.
 		AI_CHAT_MODEL: z.string().min(1).optional(),
-		// Vercel Blob read/write token for case image uploads. Optional so the
-		// app boots without it (uploads simply fail with a clear error).
+		// Vercel Blob read/write token. One public store holds both case images
+		// and profile photos. Optional so the app boots without it (uploads
+		// simply fail with a clear error).
 		BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
 		EMAIL_SOURCE: z.string().min(1).default("just-us <onboarding@resend.dev>"),
 		NODE_ENV: z

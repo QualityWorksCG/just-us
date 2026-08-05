@@ -162,42 +162,59 @@ export async function getPublicCase(id: string) {
 	});
 }
 
-/** Filtered/sorted live cases for the public "Browse cases" directory. */
-export async function browseLiveCases(opts?: {
+export type BrowseFilters = {
 	q?: string;
 	state?: string;
 	category?: string;
 	sort?: "trending" | "funded" | "newest";
-}) {
+};
+
+/** Prisma `where` for the public "Browse cases" directory — live, non-deleted,
+ *  matching the optional state/category/search filters. */
+function browseWhere(opts?: BrowseFilters) {
 	const q = opts?.q?.trim();
+	return {
+		status: "live" as const,
+		deletedAt: null,
+		...(opts?.state ? { location: opts.state } : {}),
+		...(opts?.category ? { category: opts.category } : {}),
+		...(q
+			? {
+					OR: [
+						{ title: { contains: q, mode: "insensitive" as const } },
+						{ summary: { contains: q, mode: "insensitive" as const } },
+						{ story: { contains: q, mode: "insensitive" as const } },
+						{ location: { contains: q, mode: "insensitive" as const } },
+						{ category: { contains: q, mode: "insensitive" as const } },
+						{ attorneyName: { contains: q, mode: "insensitive" as const } },
+					],
+				}
+			: {}),
+	};
+}
+
+/** Filtered/sorted live cases for the "Browse"/"Discover" directory. Pass
+ *  skip/take to paginate (defaults to the first 60). */
+export async function browseLiveCases(
+	opts?: BrowseFilters & { skip?: number; take?: number },
+) {
 	return prisma.case.findMany({
-		where: {
-			status: "live",
-			deletedAt: null,
-			...(opts?.state ? { location: opts.state } : {}),
-			...(opts?.category ? { category: opts.category } : {}),
-			...(q
-				? {
-						OR: [
-							{ title: { contains: q, mode: "insensitive" } },
-							{ summary: { contains: q, mode: "insensitive" } },
-							{ story: { contains: q, mode: "insensitive" } },
-							{ location: { contains: q, mode: "insensitive" } },
-							{ category: { contains: q, mode: "insensitive" } },
-							{ attorneyName: { contains: q, mode: "insensitive" } },
-						],
-					}
-				: {}),
-		},
+		where: browseWhere(opts),
 		orderBy:
 			opts?.sort === "funded"
 				? { raisedCents: "desc" as const }
 				: opts?.sort === "newest"
 					? { publishedAt: "desc" as const }
 					: { donorsCount: "desc" as const },
-		take: 60,
+		skip: opts?.skip,
+		take: opts?.take ?? 60,
 		include: { owner: { select: { name: true } } },
 	});
+}
+
+/** Total live cases matching the filters — for the Discover result count + pagination. */
+export async function countLiveCases(opts?: BrowseFilters) {
+	return prisma.case.count({ where: browseWhere(opts) });
 }
 
 /** The tabs on the My cases page. */
@@ -223,6 +240,7 @@ export async function listOwnedCases(
 	return prisma.case.findMany({
 		where: whereForFilter(ownerId, opts?.filter ?? "all"),
 		orderBy: { createdAt: "desc" },
+		include: { match: { select: { attorneyId: true } } },
 		skip: opts?.skip,
 		take: opts?.take,
 	});

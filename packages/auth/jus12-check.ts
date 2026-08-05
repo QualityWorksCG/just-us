@@ -1,7 +1,9 @@
 /**
- * JUS-12 verification: jurisdiction is captured for plaintiffs and attorneys and
- * NOT stored for anyone else. Creates throwaway users, runs the real onboarding
- * persistence path for each self-signup role, asserts what landed, then cleans up.
+ * JUS-12 verification: a licensing jurisdiction is captured for attorneys and
+ * NOT stored for anyone else — including plaintiffs, whose jurisdiction belongs
+ * to each case (`Case.location`) rather than to them. Creates throwaway users,
+ * runs the real onboarding persistence path for each self-signup role, asserts
+ * what landed, then cleans up.
  *
  * Run from packages/auth:  bun jus12-check.ts
  */
@@ -24,18 +26,20 @@ function check(label: string, pass: boolean, detail = "") {
 }
 
 console.log("--- role policy ---");
-check("plaintiff requires jurisdiction", requiresJurisdiction("plaintiff"));
 check("attorney requires jurisdiction", requiresJurisdiction("attorney"));
+// The plaintiff is the point of this policy: theirs is per-case, so the profile
+// must not ask for one.
+check("plaintiff does not", !requiresJurisdiction("plaintiff"));
 check("donor does not", !requiresJurisdiction("donor"));
 check("administrator does not", !requiresJurisdiction("administrator"));
 check(
-	"exactly two roles collect it",
-	JURISDICTION_ROLES.length === 2,
+	"only one role collects it",
+	JURISDICTION_ROLES.length === 1,
 	`got ${JURISDICTION_ROLES.length}`,
 );
 
 console.log(
-	"\n--- persistence: stored for plaintiff/attorney, dropped for donor ---",
+	"\n--- persistence: stored for attorney, dropped for plaintiff and donor ---",
 );
 
 for (const role of ROLES) {
@@ -60,8 +64,8 @@ for (const role of ROLES) {
 		select: { role: true, jurisdiction: true, firmName: true, onboarded: true },
 	});
 
-	// "Georgia" is submitted for every role above, so donor proves the server
-	// drops it rather than merely that the UI never asked.
+	// "Georgia" is submitted for every role above, so plaintiff and donor prove
+	// the server drops it rather than merely that the UI never asked.
 	const expected = requiresJurisdiction(role) ? "Georgia" : null;
 	check(
 		`${role}: jurisdiction ${expected === null ? "dropped" : "persisted"}`,
@@ -110,6 +114,64 @@ check(
 	`got ${JSON.stringify(escalated.jurisdiction)}`,
 );
 
+console.log("\n--- a case carries its own jurisdiction ---");
+
+// Two cases in different states under one plaintiff whose own jurisdiction is
+// null. This is what the profile field could not express, and the reason it
+// moved: the state has to be per case.
+const owner = await prisma.user.create({
+	data: {
+		id: `${TAG}-multi`,
+		name: "Check multi-state",
+		email: `${TAG}+multi@example.com`,
+		emailVerified: true,
+		onboarded: true,
+		role: "plaintiff",
+	},
+});
+for (const [suffix, state] of [
+	["ga", "Georgia"],
+	["tx", "Texas"],
+] as const) {
+	await prisma.case.create({
+		data: {
+			id: `${TAG}-case-${suffix}`,
+			ownerId: owner.id,
+			title: `Check case ${state}`,
+			category: "Employment",
+			location: state,
+			summary: "Fixture case.",
+			story: "Fixture story.",
+			goalCents: 0,
+		},
+	});
+}
+const cases = await prisma.case.findMany({
+	where: { ownerId: owner.id },
+	select: { location: true },
+	orderBy: { id: "asc" },
+});
+const ownerRow = await prisma.user.findUniqueOrThrow({
+	where: { id: owner.id },
+	select: { jurisdiction: true },
+});
+check(
+	"owner holds no jurisdiction",
+	ownerRow.jurisdiction === null,
+	`got ${JSON.stringify(ownerRow.jurisdiction)}`,
+);
+check(
+	"one plaintiff can hold cases in two states",
+	cases.map((c) => c.location).join(",") === "Georgia,Texas",
+	`got ${JSON.stringify(cases.map((c) => c.location))}`,
+);
+check(
+	"every case state is on the allowlist",
+	cases.every((c) => isValidJurisdiction(c.location)),
+	`got ${JSON.stringify(cases.map((c) => c.location))}`,
+);
+
+await prisma.case.deleteMany({ where: { id: { startsWith: `${TAG}-case-` } } });
 await prisma.user.deleteMany({ where: { id: { startsWith: `${TAG}-` } } });
 
 console.log("\n--- allowlist: server rejects anything off the state list ---");

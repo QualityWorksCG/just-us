@@ -26,15 +26,16 @@ export default async function DashboardAttorneysPage({
 }: {
 	searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-	await requireRole("plaintiff");
+	const { session } = await requireRole("plaintiff");
 
 	const screen = findScreen("plaintiff", "attorneys");
 	const filters = readDirectoryParams(await searchParams);
+	const defaultState = (session.user as { jurisdiction?: string }).jurisdiction;
 
 	const [attorneys, practiceAreas, states] = await Promise.all([
 		listDirectoryAttorneys({
 			practiceArea: filters.area,
-			state: filters.state,
+			state: filters.allStates ? undefined : (filters.state ?? defaultState),
 			keyword: filters.keyword,
 			sort: toDirectorySort(filters.sort),
 		}),
@@ -54,8 +55,10 @@ export default async function DashboardAttorneysPage({
 					practiceAreas={practiceAreas}
 					states={states}
 					filtered={filters.filtered}
+					defaultState={defaultState}
 					// Keep profile links inside the shell (see AttorneyCard).
 					profileBasePath="/find-attorney"
+					showMessageAction
 				/>
 			</div>
 		</div>
