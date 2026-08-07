@@ -57,33 +57,42 @@ loadEnv({
 const isDeployBuild = !!(process.env.VERCEL || process.env.CI);
 
 /**
- * Branches with a DATABASE_URL of their own in Vercel, and so the only ones
- * entitled to migrate on a preview build.
+ * Only a deployment whose database is its own may migrate.
  *
- * Every other branch — every feature branch, every PR — has no branch-specific
- * override and falls back to the environment-wide preview DATABASE_URL, which
- * points at a database these branches share. Migrating there applies a branch's
- * *unmerged* migrations to a database other deployments depend on, and a single
- * failure is not confined to the branch that caused it: the failed attempt is
- * recorded in `_prisma_migrations`, and from that moment `migrate deploy`
- * refuses to run against that database at all (P3009). One PR takes down every
- * other PR and the shared environment with it — which is exactly what happened
- * when the stripe branch's `add_stripe_donations` failed against the dev
- * database and blocked every deployment behind it.
+ * A branch that shares a database with other deployments must not: migrating
+ * applies that branch's *unmerged* migrations to a database others depend on,
+ * and a single failure is not confined to the branch that caused it. The failed
+ * attempt is recorded in `_prisma_migrations`, and from that moment
+ * `migrate deploy` refuses to run against that database at all (P3009) — so one
+ * PR takes down every other PR and the shared environment with it. That is
+ * exactly what happened when the stripe branch's `add_stripe_donations` failed
+ * against the dev database and blocked every deployment behind it.
  *
- * Keep this list in step with the branch-scoped DATABASE_URL entries in Vercel.
+ * Two ways a deployment qualifies:
+ *
+ *   - Its branch has a DATABASE_URL of its own in Vercel. Listed here rather
+ *     than inferred, and kept as a floor: these branches must migrate, because
+ *     shipping code ahead of its schema is the bug this whole script exists to
+ *     prevent. If DB_DEDICATED were ever removed, they keep working.
+ *
+ *   - DB_DEDICATED is set, asserting that this deployment's DATABASE_URL is not
+ *     the database any environment branch runs on. Set it once, on the Preview
+ *     environment, *after* repointing the environment-wide preview DATABASE_URL
+ *     at a database reserved for previews. Setting it while that URL still
+ *     points at dev reintroduces the incident above, which is why the target
+ *     host is logged below.
  */
 const DATABASE_OWNING_BRANCHES = ["dev", "qa", "demo"];
 
 // Scoped to preview builds specifically: production has its own DATABASE_URL,
 // and CI has no VERCEL_GIT_COMMIT_REF at all, so neither should be judged by the
-// branch list. An unknown ref on a preview build is treated as not owning a
-// database — the safe direction, since guessing wrong here is what poisons a
-// shared database.
+// branch list. An unknown ref with no DB_DEDICATED is treated as sharing — the
+// safe direction, since guessing wrong here is what poisons a shared database.
 const branch = process.env.VERCEL_GIT_COMMIT_REF;
+const ownsItsDatabase =
+	DATABASE_OWNING_BRANCHES.includes(branch) || !!process.env.DB_DEDICATED;
 const sharesPreviewDatabase =
-	process.env.VERCEL_ENV === "preview" &&
-	!DATABASE_OWNING_BRANCHES.includes(branch);
+	process.env.VERCEL_ENV === "preview" && !ownsItsDatabase;
 
 const skipReason = process.env.SKIP_DB_MIGRATE
 	? "SKIP_DB_MIGRATE is set"
@@ -106,6 +115,23 @@ if (skipReason) {
 	);
 	process.exit(0);
 }
+
+/** Host and database name only — never the credentials the URL also carries. */
+function describeDatabase(url) {
+	try {
+		const { hostname, pathname } = new URL(url);
+		return `${hostname}${pathname}`;
+	} catch {
+		return "(unparseable DATABASE_URL)";
+	}
+}
+
+// Name the database about to be migrated. A preview build that prints the dev
+// host is the DB_DEDICATED misconfiguration described above, and reading it here
+// is far cheaper than discovering it from a poisoned `_prisma_migrations`.
+console.log(
+	`[db] migrate deploy → ${describeDatabase(process.env.DATABASE_URL)}`,
+);
 
 try {
 	prisma("migrate", "deploy");
