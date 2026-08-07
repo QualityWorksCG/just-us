@@ -14,7 +14,10 @@ import type { Route } from "next";
 import { CaseGallery } from "@/components/cases/case-gallery";
 import { CaseUpdates } from "@/components/cases/case-updates";
 import { DetailBackLink } from "@/components/detail-back-link";
-import { PublicCaseActions } from "@/components/public-case-actions";
+import {
+	type DonateConfig,
+	PublicCaseActions,
+} from "@/components/public-case-actions";
 
 /**
  * One live case, as a donor reads it.
@@ -58,6 +61,8 @@ export function PublicCaseView({
 	backHref,
 	backLabel,
 	headingLevel = "h1",
+	donate,
+	fundsNote,
 	canSave = false,
 	initialSaved = false,
 	canFollow = false,
@@ -66,6 +71,21 @@ export function PublicCaseView({
 	updatesHighlightSince,
 }: {
 	c: PublicCase;
+	/** Whether and how this case can take money, resolved server-side from its
+	 *  bound payout account. Required rather than optional: every route that shows
+	 *  a case has to answer the donate question the same way, and a default here
+	 *  would let a route quietly render a donate card it never checked. */
+	donate: DonateConfig;
+	/**
+	 * Who this case's donations are paid to, in the words the donor reads.
+	 *
+	 * Passed in rather than written here, because it is derived per case from
+	 * `Case.payoutRecipient` — terms §4 commits to stating the recipient for *this*
+	 * case, and cases bound before payouts moved to firm accounts still pay the
+	 * plaintiff. A single sentence hardcoded in this component was wrong for every
+	 * attorney-recipient case, telling those donors the money went to the plaintiff.
+	 */
+	fundsNote: string;
 	/** Where "back" goes — the list this case was opened from. */
 	backHref: Route;
 	backLabel: string;
@@ -237,6 +257,7 @@ export function PublicCaseView({
 							<PublicCaseActions
 								caseId={c.id}
 								sharePath={`/cases/${c.id}`}
+								config={donate}
 								canSave={canSave}
 								initialSaved={initialSaved}
 								canFollow={canFollow}
@@ -286,8 +307,7 @@ export function PublicCaseView({
 								className="mt-0.5 size-4 shrink-0 text-brass-deep"
 								aria-hidden="true"
 							/>
-							Funds go to {ownerFirst}'s account — {ownerFirst} pays the
-							attorney directly.
+							{fundsNote}
 						</span>
 						<span className="flex items-start gap-2">
 							<Eye

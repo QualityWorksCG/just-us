@@ -244,7 +244,10 @@ export function AuthScreen({
 				},
 				onError: (ctx) => {
 					const code = ctx.error.code;
-					if (code === "USER_NOT_FOUND" || code === "new_user_signup_disabled") {
+					if (
+						code === "USER_NOT_FOUND" ||
+						code === "new_user_signup_disabled"
+					) {
 						promptCreateAccount(target);
 						return;
 					}

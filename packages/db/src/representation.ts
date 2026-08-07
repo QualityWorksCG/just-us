@@ -1,9 +1,14 @@
-import type { RequestStatus } from "../prisma/generated/enums";
+import type {
+	CaseStatus,
+	MatchOrigin,
+	RequestStatus,
+} from "../prisma/generated/enums";
+import { type CaseEvidence, caseEvidence } from "./cases";
 import prisma from "./index";
 
 /**
- * The attorney-facing "Seeking Representation" queue and the expression of
- * interest it produces (JUS-25).
+ * The attorney-facing "Seeking Representation" queue, the expression of interest
+ * it produces (JUS-25), and the cases an attorney ends up representing.
  *
  * Three rules live here rather than in the UI, because each of them is a promise
  * the product makes and a screen is not where a promise can be kept:
@@ -162,8 +167,17 @@ export async function listSeekingQueue(
 export type QueueCaseDetail = QueueCase & {
 	/** The plaintiff's full account of what happened. */
 	story: string;
-	/** Attached evidence as `[{ name, size }]` — metadata only; the files
-	 *  themselves aren't stored yet (see `Case.evidence`). */
+	/**
+	 * What the plaintiff filed — **names and sizes only, deliberately**.
+	 *
+	 * An attorney browsing the queue is deciding whether to put themselves
+	 * forward, not yet acting on the matter, and the screen tells them the
+	 * documents are shared once they are representing it. So neither the storage
+	 * URL nor the app's own evidence route reaches this view: the promise is kept
+	 * by there being nothing here to open, rather than by a component choosing not
+	 * to render a link. The representing attorney gets the files — see
+	 * `getAttorneyCase`.
+	 */
 	evidence: { name: string; size: number }[];
 	coverImageUrl: string | null;
 	images: string[];
@@ -199,10 +213,12 @@ export async function getQueueCase(
 		...rest,
 		state: location,
 		plaintiffName: owner.name,
-		// Stored as Json, so its shape is asserted here rather than trusted.
-		evidence: Array.isArray(evidence)
-			? (evidence as { name: string; size: number }[])
-			: [],
+		// Normalised, then stripped back to name and size: whatever the stored row
+		// carries, a browsing attorney is handed no way to reach a document.
+		evidence: caseEvidence(evidence, row.id).map((file) => ({
+			name: file.name,
+			size: file.size ?? 0,
+		})),
 		myInterest: requests[0] ?? null,
 	};
 }
@@ -339,6 +355,231 @@ export async function listMyInterests(attorneyId: string) {
 			plaintiffName: row.case.owner.name,
 		},
 	}));
+}
+
+/**
+ * The cases an attorney is actually acting on — their "My cases" screen.
+ *
+ * Two routes attach an attorney to a case, and both count, because both can fund:
+ * an accepted expression of interest writes a `Match`, and the bring-your-own path
+ * (JUS-23) writes only the plaintiff's chosen `attorneyEmail`. The same pair is
+ * what the payout layer binds money on, so a case that can pay this attorney is a
+ * case that appears here.
+ *
+ * Drafts are excluded. A draft is private to the plaintiff — it is not published
+ * to anyone, including an attorney named in it — and there is nothing an attorney
+ * can do about a case that has not been sent out.
+ *
+ * What is withheld is the same line the queue draws, moved: the plaintiff's *name*
+ * and account id come back, because this is their client and messaging needs the
+ * id, but their email and phone never do. An attorney still cannot open the
+ * conversation — `startConversationAction` is plaintiff-only — so what the id buys
+ * is the ability to open a thread the client already started.
+ */
+function myCasesWhere(userId: string, email: string) {
+	return {
+		deletedAt: null,
+		status: { in: ["seeking", "live", "closed"] as CaseStatus[] },
+		OR: [
+			{ match: { attorneyId: userId } },
+			{ attorneyEmail: { equals: email, mode: "insensitive" as const } },
+		],
+	};
+}
+
+const myCaseSelect = {
+	id: true,
+	title: true,
+	category: true,
+	location: true,
+	summary: true,
+	status: true,
+	goalCents: true,
+	raisedCents: true,
+	donorsCount: true,
+	coverImageUrl: true,
+	publishedAt: true,
+	createdAt: true,
+	// Whether the plaintiff has opened donations against the account — their step,
+	// not the attorney's, and worth telling them apart.
+	payoutAccountId: true,
+	payoutAccountForCase: {
+		select: {
+			userId: true,
+			detailsSubmitted: true,
+			transfersEnabled: true,
+			payoutsEnabled: true,
+		},
+	},
+	owner: { select: { id: true, name: true } },
+	match: { select: { attorneyId: true, origin: true, createdAt: true } },
+	// How many progress updates the attorney has posted on this case (JUS-33).
+	// Counted rather than fetched: the list only reports the number, and the posts
+	// themselves belong to the case's own updates screen.
+	_count: { select: { updates: true } },
+} as const;
+
+/** How far this case's own Stripe account has got. Every flag is a cache of
+ *  Stripe's view — see `syncPayoutAccount`. */
+export type AttorneyCasePayout = {
+	/** The plaintiff has opened donations against this account. */
+	bound: boolean;
+	hasAccount: boolean;
+	detailsSubmitted: boolean;
+	/** The donation gate: whether this case can accept money at all. */
+	transfersEnabled: boolean;
+	payoutsEnabled: boolean;
+};
+
+export type AttorneyCase = {
+	id: string;
+	title: string;
+	category: string;
+	/** The state the case is in — `Case.location`. */
+	state: string;
+	summary: string;
+	status: CaseStatus;
+	/** The agreed fee in cents — the funding goal. 0 until a fee is agreed. */
+	goalCents: number;
+	raisedCents: number;
+	donorsCount: number;
+	coverImageUrl: string | null;
+	publishedAt: Date | null;
+	createdAt: Date;
+	/** The client. Their name and account id — never a way to contact them
+	 *  directly. */
+	plaintiffName: string;
+	plaintiffId: string;
+	/** How this attorney came to be on the case. Null when the plaintiff named
+	 *  them by email rather than matching through JustUs. */
+	origin: MatchOrigin | null;
+	matchedAt: Date | null;
+	payout: AttorneyCasePayout;
+	/** Progress updates posted on this case so far (JUS-33). */
+	updatesCount: number;
+};
+
+function toAttorneyCase(
+	row: {
+		id: string;
+		title: string;
+		category: string;
+		location: string;
+		summary: string;
+		status: CaseStatus;
+		goalCents: number;
+		raisedCents: number;
+		donorsCount: number;
+		coverImageUrl: string | null;
+		publishedAt: Date | null;
+		createdAt: Date;
+		payoutAccountId: string | null;
+		payoutAccountForCase: {
+			userId: string;
+			detailsSubmitted: boolean;
+			transfersEnabled: boolean;
+			payoutsEnabled: boolean;
+		} | null;
+		owner: { id: string; name: string };
+		match: { attorneyId: string; origin: MatchOrigin; createdAt: Date } | null;
+		_count: { updates: number };
+	},
+	userId: string,
+): AttorneyCase {
+	// Only *this* attorney's account is theirs to finish. A case that changed
+	// counsel keeps the previous firm's account row, and reporting it here would
+	// show the new attorney a setup they cannot reach and tell them they were done.
+	const account =
+		row.payoutAccountForCase?.userId === userId
+			? row.payoutAccountForCase
+			: null;
+	return {
+		id: row.id,
+		title: row.title,
+		category: row.category,
+		state: row.location,
+		summary: row.summary,
+		status: row.status,
+		goalCents: row.goalCents,
+		raisedCents: row.raisedCents,
+		donorsCount: row.donorsCount,
+		coverImageUrl: row.coverImageUrl,
+		publishedAt: row.publishedAt,
+		createdAt: row.createdAt,
+		plaintiffName: row.owner.name,
+		plaintiffId: row.owner.id,
+		origin: row.match?.origin ?? null,
+		matchedAt: row.match?.createdAt ?? null,
+		updatesCount: row._count.updates,
+		payout: {
+			bound: !!row.payoutAccountId,
+			hasAccount: !!account,
+			detailsSubmitted: account?.detailsSubmitted ?? false,
+			transfersEnabled: account?.transfersEnabled ?? false,
+			payoutsEnabled: account?.payoutsEnabled ?? false,
+		},
+	};
+}
+
+/** Every case this attorney represents, newest publication first. */
+export async function listAttorneyCases(input: {
+	userId: string;
+	email: string;
+}): Promise<AttorneyCase[]> {
+	const rows = await prisma.case.findMany({
+		where: myCasesWhere(input.userId, input.email),
+		orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+		select: myCaseSelect,
+	});
+	return rows.map((row) => toAttorneyCase(row, input.userId));
+}
+
+export type AttorneyCaseDetail = AttorneyCase & {
+	/** The plaintiff's full account of what happened. */
+	story: string;
+	/**
+	 * What the plaintiff filed, openable. This is the attorney acting on the case,
+	 * which is the point at which the queue's promise says the documents are
+	 * shared — so `href` is present here where the queue view has none.
+	 *
+	 * For a stored document that href is the app's own authorized route, never the
+	 * blob URL: see `caseEvidence`.
+	 */
+	evidence: CaseEvidence[];
+	images: string[];
+};
+
+/**
+ * One represented case in full.
+ *
+ * Gated on the same predicate as the list rather than on the id alone, so an
+ * attorney who is taken off a case — or was never on it — gets nothing, including
+ * one holding the link. Returns null in that case, which the route turns into a
+ * 404.
+ */
+export async function getAttorneyCase(input: {
+	userId: string;
+	email: string;
+	caseId: string;
+}): Promise<AttorneyCaseDetail | null> {
+	const row = await prisma.case.findFirst({
+		where: { ...myCasesWhere(input.userId, input.email), id: input.caseId },
+		select: {
+			...myCaseSelect,
+			story: true,
+			evidence: true,
+			images: true,
+		},
+	});
+	if (!row) return null;
+
+	const { story, evidence, images, ...rest } = row;
+	return {
+		...toAttorneyCase(rest, input.userId),
+		story,
+		evidence: caseEvidence(evidence, row.id),
+		images,
+	};
 }
 
 /**

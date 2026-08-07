@@ -243,7 +243,11 @@ export function ConversationThread({
 							Do not share account numbers, documents, or sensitive personal
 							information here.
 						</p>
-						<Button size="lg" onClick={reply} disabled={!body.trim() || pending}>
+						<Button
+							size="lg"
+							onClick={reply}
+							disabled={!body.trim() || pending}
+						>
 							<Send data-icon="inline-start" />
 							{pending ? "Sending…" : "Send message"}
 						</Button>

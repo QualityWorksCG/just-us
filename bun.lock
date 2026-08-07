@@ -29,6 +29,7 @@
         "@just-us/db": "workspace:*",
         "@just-us/env": "workspace:*",
         "@just-us/flags": "workspace:*",
+        "@just-us/payments": "workspace:*",
         "@just-us/ui": "workspace:*",
         "@prisma/client": "catalog:",
         "@swc/helpers": "^0.5.23",
@@ -149,6 +150,17 @@
       "version": "0.0.0",
       "dependencies": {
         "@just-us/db": "workspace:*",
+      },
+      "devDependencies": {
+        "@just-us/config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/payments": {
+      "name": "@just-us/payments",
+      "dependencies": {
+        "@just-us/env": "workspace:*",
+        "stripe": "^22.4.0",
       },
       "devDependencies": {
         "@just-us/config": "workspace:*",
@@ -498,6 +510,8 @@
     "@just-us/env": ["@just-us/env@workspace:packages/env"],
 
     "@just-us/flags": ["@just-us/flags@workspace:packages/flags"],
+
+    "@just-us/payments": ["@just-us/payments@workspace:packages/payments"],
 
     "@just-us/ui": ["@just-us/ui@workspace:packages/ui"],
 
@@ -2140,6 +2154,8 @@
     "strip-bom": ["strip-bom@3.0.0", "", {}, "sha512-vavAMRXOgBVNF6nyEEmL3DBK19iRpDcoIwW+swQ+CbGiu7lju6t+JklA1MHweoWtadgt4ISVUsXLyDq34ddcwA=="],
 
     "strip-final-newline": ["strip-final-newline@4.0.0", "", {}, "sha512-aulFJcD6YK8V1G7iRB5tigAP4TsHBZZrOV8pjV++zdUwmeV8uzbY7yn6h9MswN62adStNZFuCIx4haBnRuMDaw=="],
+
+    "stripe": ["stripe@22.4.0", "", { "peerDependencies": { "@types/node": ">=18" }, "optionalPeers": ["@types/node"] }, "sha512-LVJ+tcSYeqOSnXr3i+Kz2tZ7y0crLLdP2uwD/4wccrmEVyn0g/Heo0pF7as7rxS/sOjJzrb1lxgZY0Y0Dx1pSA=="],
 
     "stubborn-fs": ["stubborn-fs@2.0.0", "", { "dependencies": { "stubborn-utils": "^1.0.1" } }, "sha512-Y0AvSwDw8y+nlSNFXMm2g6L51rBGdAQT20J3YSOqxC53Lo3bjWRtr2BKcfYoAf352WYpsZSTURrA0tqhfgudPA=="],
 

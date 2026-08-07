@@ -1,4 +1,6 @@
 import type {
+	CaseStatus,
+	MatchOrigin,
 	RequestStatus,
 	VerificationStatus,
 } from "../prisma/generated/enums";
@@ -7,7 +9,8 @@ import prisma from "./index";
 
 /**
  * The plaintiff's side of representation: the inbox of attorneys who have
- * expressed interest in a seeking case, and taking one of them forward (JUS-25).
+ * expressed interest in a seeking case, taking one of them forward (JUS-25), and
+ * the standing view of who is acting on each of their cases afterwards.
  *
  * "Open" here means pending or viewed — an expression of interest still awaiting
  * the plaintiff's decision. `pending` and `viewed` differ only in whether the
@@ -355,4 +358,284 @@ export async function declineInterest(interestId: string, ownerId: string) {
 		data: { status: "declined" },
 	});
 	return res.count;
+}
+
+/**
+ * Who is representing the plaintiff, per case — the "My representation" screen.
+ *
+ * Two routes put an attorney on a case, and both are answers to "who is acting
+ * for me", so both are read here:
+ *
+ *  - **Matched** — a `Match` naming a JustUs account. Their profile is read live,
+ *    for the same reason the interest inbox reads it live: bar standing lapses,
+ *    firms change, and this is the screen where a plaintiff checks who is acting
+ *    for them. A snapshot taken at match time could show a badge that is no
+ *    longer true.
+ *  - **Named on the case** — the bring-your-own path (JUS-23) writes the
+ *    attorney's details onto the case and no `Match` at all. The address on the
+ *    case is looked up against registered attorney accounts, exactly as the
+ *    payout layer does before binding a case's money: if it resolves, that
+ *    account is the one that will receive, so it is the one to show and the one
+ *    the plaintiff can message. If it resolves to nobody, what the plaintiff
+ *    typed is what comes back — dropping them for want of a JustUs account would
+ *    leave a represented plaintiff looking unrepresented on their own
+ *    representation screen.
+ *
+ * Cases with neither are returned too, carrying their open-interest counts: a
+ * case still looking for an attorney is part of where representation stands, and
+ * it is the one that needs the plaintiff to act.
+ */
+export type RepresentationAttorney = {
+	/** Their JustUs account. Null only for an attorney with no account here, which
+	 *  is also what decides whether they can be messaged. */
+	userId: string | null;
+	/** AttorneyProfile id — what `/find-attorney/[id]` takes. Null when there is no
+	 *  directory profile to open. */
+	profileId: string | null;
+	name: string;
+	firm: string | null;
+	practiceAreas: string[];
+	location: string | null;
+	headshotUrl: string | null;
+	admittedYear: number | null;
+	/** Bar standing right now. Null when they have no profile to check — an
+	 *  attorney off-platform is unverified rather than failing verification, and
+	 *  the two must not render the same. */
+	verificationStatus: VerificationStatus | null;
+	rating: number | null;
+	reviewCount: number;
+	/** The contact address on the case — what the plaintiff typed when they named
+	 *  their own attorney. Not read from a matched attorney's account: a matched
+	 *  attorney is reached through messaging, not by email. */
+	email: string | null;
+	/**
+	 * How this attorney is attached to the case.
+	 *
+	 * `named_email` is the one the screen has to be careful about: the link rests
+	 * on an address the plaintiff typed, so a mistyped one resolves to a real
+	 * attorney who is not theirs. The card says so, for the same reason the bind
+	 * step names the firm before the plaintiff confirms.
+	 */
+	linkedBy: "match" | "named_email";
+};
+
+export type RepresentationCase = {
+	id: string;
+	title: string;
+	category: string;
+	location: string;
+	status: CaseStatus;
+	/** The agreed fee in cents — the funding goal. 0 until a fee is agreed. */
+	goalCents: number;
+	raisedCents: number;
+	donorsCount: number;
+	createdAt: Date;
+	publishedAt: Date | null;
+	attorney: RepresentationAttorney | null;
+	/** How the attorney came to represent this case. Null when the plaintiff named
+	 *  them on the case rather than being matched through JustUs. */
+	origin: MatchOrigin | null;
+	matchedAt: Date | null;
+	/** Attorneys awaiting the plaintiff's decision, and how many they haven't seen.
+	 *  Only meaningful while the case has no attorney — once one is taken forward
+	 *  the rest are moot, so they are reported as zero rather than as a decision
+	 *  still owed. */
+	openInterest: number;
+	newInterest: number;
+};
+
+export async function listRepresentation(
+	ownerId: string,
+): Promise<RepresentationCase[]> {
+	const [cases, interests] = await Promise.all([
+		prisma.case.findMany({
+			where: { ownerId, deletedAt: null },
+			orderBy: { createdAt: "desc" },
+			select: {
+				id: true,
+				title: true,
+				category: true,
+				location: true,
+				status: true,
+				goalCents: true,
+				raisedCents: true,
+				donorsCount: true,
+				createdAt: true,
+				publishedAt: true,
+				// What the plaintiff typed — the fallback for the bring-your-own path,
+				// and the only attorney detail an unmatched case has.
+				attorneyName: true,
+				attorneyFirm: true,
+				attorneyArea: true,
+				attorneyLocation: true,
+				attorneyEmail: true,
+				match: {
+					select: {
+						origin: true,
+						createdAt: true,
+						attorney: { select: { id: true, ...attorneySelect } },
+					},
+				},
+			},
+		}),
+		interestCountsByCase(ownerId),
+	]);
+
+	// The addresses on cases nobody was matched to. Resolved in one query rather
+	// than per case, and only for cases that need it.
+	const designated = await designatedAttorneys(
+		cases.filter((k) => !k.match).map((k) => k.attorneyEmail),
+	);
+
+	return cases.map((k) => {
+		const attorney = toRepresentationAttorney(
+			k,
+			designated.get(k.attorneyEmail?.trim().toLowerCase() ?? "") ?? null,
+		);
+		const counts = interests[k.id];
+		return {
+			id: k.id,
+			title: k.title,
+			category: k.category,
+			location: k.location,
+			status: k.status,
+			goalCents: k.goalCents,
+			raisedCents: k.raisedCents,
+			donorsCount: k.donorsCount,
+			createdAt: k.createdAt,
+			publishedAt: k.publishedAt,
+			attorney,
+			origin: k.match?.origin ?? null,
+			matchedAt: k.match?.createdAt ?? null,
+			openInterest: attorney ? 0 : (counts?.open ?? 0),
+			newInterest: attorney ? 0 : (counts?.unseen ?? 0),
+		};
+	});
+}
+
+/** An attorney account with the profile fields this screen reads. */
+type AttorneyAccount = {
+	id: string;
+	name: string;
+	jurisdiction: string | null;
+	attorneyProfile: {
+		id: string;
+		legalName: string | null;
+		firmName: string | null;
+		officeCity: string | null;
+		officeState: string | null;
+		headshotUrl: string | null;
+		practiceAreas: string[];
+		admittedYear: number | null;
+		verificationStatus: VerificationStatus;
+		reviews: { rating: number }[];
+	} | null;
+};
+
+/**
+ * Registered attorneys behind the addresses plaintiffs typed on their cases,
+ * keyed by lowercased email.
+ *
+ * Role-gated for the same reason `representingAttorney` gates the payout lookup:
+ * only an attorney account can hold the firm's payout account, and resolving any
+ * other role would put a stranger — a donor who happens to own that address — on
+ * the plaintiff's representation screen as their counsel.
+ */
+async function designatedAttorneys(
+	emails: (string | null)[],
+): Promise<Map<string, AttorneyAccount>> {
+	const wanted = [
+		...new Set(
+			emails
+				.map((email) => email?.trim().toLowerCase())
+				.filter((email): email is string => !!email),
+		),
+	];
+	if (wanted.length === 0) return new Map();
+
+	const users = await prisma.user.findMany({
+		where: {
+			role: "attorney",
+			// Per-address rather than `in`, because addresses are compared without
+			// case and `in` has no insensitive mode.
+			OR: wanted.map((email) => ({
+				email: { equals: email, mode: "insensitive" as const },
+			})),
+		},
+		select: { id: true, email: true, ...attorneySelect },
+	});
+	return new Map(users.map((user) => [user.email.toLowerCase(), user]));
+}
+
+function toRepresentationAttorney(
+	k: {
+		attorneyName: string | null;
+		attorneyFirm: string | null;
+		attorneyArea: string | null;
+		attorneyLocation: string | null;
+		attorneyEmail: string | null;
+		match: { attorney: AttorneyAccount } | null;
+	},
+	/** The account behind the address on the case, when one exists. Only consulted
+	 *  where there is no match — a matched attorney is already an account. */
+	designated: AttorneyAccount | null,
+): RepresentationAttorney | null {
+	const email = k.attorneyEmail?.trim() || null;
+	const matched = k.match?.attorney;
+	if (matched) return fromAccount(matched, k, email, "match");
+	// Named on the case, and the address belongs to a registered attorney: that
+	// account is the one the payout layer will bind this case's money to, so it is
+	// the one to show — and the one the plaintiff can reach through messaging.
+	if (designated) return fromAccount(designated, k, email, "named_email");
+	if (!k.attorneyName) return null;
+	// Named on the case, resolving to nobody: everything here is the plaintiff's
+	// own entry, so there is no profile, no badge and no rating to claim.
+	return {
+		userId: null,
+		profileId: null,
+		name: k.attorneyName,
+		firm: k.attorneyFirm,
+		practiceAreas: k.attorneyArea ? [k.attorneyArea] : [],
+		location: k.attorneyLocation,
+		headshotUrl: null,
+		admittedYear: null,
+		verificationStatus: null,
+		rating: null,
+		reviewCount: 0,
+		email,
+		linkedBy: "named_email",
+	};
+}
+
+function fromAccount(
+	account: AttorneyAccount,
+	k: {
+		attorneyFirm: string | null;
+		attorneyLocation: string | null;
+	},
+	email: string | null,
+	linkedBy: "match" | "named_email",
+): RepresentationAttorney {
+	const profile = account.attorneyProfile;
+	return {
+		userId: account.id,
+		profileId: profile?.id ?? null,
+		// The bar-record name, as everywhere else — it is what verification ran
+		// against. The account name is only a fallback.
+		name: profile?.legalName ?? account.name,
+		firm: profile?.firmName ?? k.attorneyFirm,
+		practiceAreas: profile?.practiceAreas ?? [],
+		location:
+			account.jurisdiction ??
+			profile?.officeState ??
+			profile?.officeCity ??
+			k.attorneyLocation,
+		headshotUrl: profile?.headshotUrl ?? null,
+		admittedYear: profile?.admittedYear ?? null,
+		verificationStatus: profile?.verificationStatus ?? null,
+		rating: averageRating(profile?.reviews ?? []),
+		reviewCount: profile?.reviews.length ?? 0,
+		email,
+		linkedBy,
+	};
 }

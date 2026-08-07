@@ -5,6 +5,7 @@ import {
 	countOwnedCases,
 	listOwnedCases,
 } from "@just-us/db/cases";
+import { listAttorneyCases } from "@just-us/db/representation";
 import { interestCountsByCase } from "@just-us/db/requests";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
@@ -87,12 +88,21 @@ export default async function MyCasesPage({
 	searchParams: Promise<{ page?: string; filter?: string }>;
 }) {
 	// Both roles have a "My cases" nav entry pointing here, and they mean different
-	// things: the plaintiff's own cases below, the attorney's matched cases (not
-	// built yet) as their screen's placeholder. Before this route was flattened the
-	// attorney's link hit a plaintiff-only page and bounced them to their home.
+	// things: the plaintiff's own cases below, and the cases an attorney is acting
+	// on. Before this route was flattened the attorney's link hit a plaintiff-only
+	// page and bounced them to their home.
 	const { session, role } = await requireRole("plaintiff", "attorney");
 	if (role === "attorney") {
-		return <AttorneyCases attorneyId={session.user.id} />;
+		return (
+			<AttorneyCases
+				cases={
+					await listAttorneyCases({
+						userId: session.user.id,
+						email: session.user.email,
+					})
+				}
+			/>
+		);
 	}
 
 	const sp = await searchParams;

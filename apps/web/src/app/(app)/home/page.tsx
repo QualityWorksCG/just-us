@@ -3,6 +3,7 @@ import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import { listOwnedCases } from "@just-us/db/cases";
 import { donorStats } from "@just-us/db/donations";
 import { listMessageConversations } from "@just-us/db/messages";
+import { attorneyPayoutReadiness } from "@just-us/db/payouts";
 import {
 	interestCounts,
 	listMyInterests,
@@ -15,6 +16,7 @@ import { countSavedCases, listSavedCases } from "@just-us/db/saves";
 
 import { toDonorCase } from "@/components/dashboard/donor-case";
 import { DonorDashboard } from "@/components/dashboard/donor-dashboard";
+import { PayoutNudge } from "@/components/dashboard/payout-nudge";
 import {
 	type CaseSummary,
 	PlaintiffDashboard,
@@ -100,7 +102,7 @@ export default async function DashboardHome({
 	// The attorney's home is the Seeking Representation queue (JUS-25).
 	if (role === "attorney") {
 		const filters = readQueueParams(await searchParams);
-		const [cases, categories, states, tally, interests, profile] =
+		const [cases, categories, states, tally, interests, profile, payout] =
 			await Promise.all([
 				listSeekingQueue(session.user.id, {
 					category: filters.category,
@@ -112,10 +114,21 @@ export default async function DashboardHome({
 				interestCounts(session.user.id),
 				listMyInterests(session.user.id),
 				getAttorneyProfile(session.user.id),
+				// Donations pay the firm, so an unfinished payout account here blocks
+				// someone else's published case. This is the only screen that tells them.
+				attorneyPayoutReadiness({
+					userId: session.user.id,
+					email: session.user.email,
+				}),
 			]);
 
 		return (
 			<div>
+				<PayoutNudge
+					waitingCases={payout.waitingCases}
+					unstartedCases={payout.unstartedCases}
+					inReviewCases={payout.inReviewCases}
+				/>
 				<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 					{home.sub}
 				</p>

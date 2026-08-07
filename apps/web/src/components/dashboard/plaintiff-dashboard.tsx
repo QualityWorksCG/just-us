@@ -588,9 +588,9 @@ function TrustFooter() {
 				className="mt-0.5 size-4 shrink-0 text-brass-deep"
 				aria-hidden="true"
 			/>
-			Donations fund the agreed fee and land in your account — you pay the
-			attorney you chose. One transparent 5% fee, shown to each donor before
-			they give.
+			Donations fund the agreed fee and are paid to your attorney's firm, which
+			applies them to that fee — you never have to handle the money. One
+			transparent 5% fee, shown to each donor before they give.
 		</div>
 	);
 }

@@ -1,10 +1,17 @@
 import { getPublicCase } from "@just-us/db/cases";
+import { donorSupportForCase } from "@just-us/db/donations";
 import {
 	getFollowUpdatesSeenAt,
 	isCaseFollowing,
 	markCaseUpdatesSeenByFollower,
 } from "@just-us/db/follows";
+import { resolvePayoutDestination } from "@just-us/db/payouts";
 import { isCaseSaved } from "@just-us/db/saves";
+import {
+	donationPresets,
+	minDonationCents,
+	platformFeeBps,
+} from "@just-us/payments";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 
@@ -62,12 +69,58 @@ export default async function InAppCasePage({
 	const canFollow = session.user.id !== c.ownerId;
 	const back = BACK_TO[from ?? ""] ?? BACK_TO.discover;
 
+	// Donating from inside the app resolves exactly as it does on the public page:
+	// from this case's *bound* payout account, server-side. A donor browsing here
+	// must not be offered a donate button the public page would refuse, or refused
+	// one it would offer — same case, same answer.
+	const owner = c.owner?.name ?? "A plaintiff";
+	const ownerFirst = owner.split(" ")[0];
+	const [destination, mySupport] = await Promise.all([
+		resolvePayoutDestination(c.id),
+		donorSupportForCase({
+			caseId: c.id,
+			donorId: session.user.id,
+			donorEmail: session.user.emailVerified ? session.user.email : null,
+		}),
+	]);
+	const BLOCKED: Record<string, string> = {
+		not_live: "This case isn't raising right now.",
+		unbound:
+			"This case is still setting up where donations go, so it can't accept them yet.",
+		transfers_disabled:
+			"The receiving law firm's payout setup is still being verified. Donations open as soon as it clears.",
+	};
+	// Same per-case disclosure the public page makes — see the note there.
+	const firmLabel =
+		destination.ok && (destination.holderFirm ?? destination.holderName)
+			? (destination.holderFirm ?? destination.holderName)
+			: (c.attorneyFirm ?? c.attorneyName ?? null);
+	const fundsNote =
+		c.payoutRecipient === "attorney"
+			? firmLabel
+				? `Funds go to ${firmLabel} — the law firm representing ${ownerFirst}, not to ${ownerFirst} and never to JustUs.`
+				: `Funds go to the law firm representing ${ownerFirst} — never to JustUs.`
+			: c.payoutRecipient === "plaintiff"
+				? `Funds go to ${ownerFirst}'s account — ${ownerFirst} pays the attorney directly.`
+				: "Funds go to the recipient this case designates — never to JustUs.";
+
 	return (
 		// Full-bleed, like the other app screens: the shell's content column already
 		// supplies the gutters.
 		<div className="w-full">
 			<PublicCaseView
 				c={c}
+				donate={{
+					presetsCents: donationPresets(),
+					minCents: minDonationCents(),
+					feeBps: platformFeeBps(),
+					alreadyBacked: mySupport.count > 0,
+					canDonate: destination.ok,
+					blockedReason: destination.ok
+						? null
+						: (BLOCKED[destination.reason] ?? null),
+				}}
+				fundsNote={fundsNote}
 				backHref={back.href}
 				backLabel={back.label}
 				// The shell's header bar is this page's h1.

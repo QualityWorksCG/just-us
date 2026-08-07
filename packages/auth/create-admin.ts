@@ -11,8 +11,9 @@
  *
  * Run from packages/auth. Affects whatever DATABASE_URL points at.
  */
-import prisma from "@just-us/db";
+
 import { randomBytes, randomUUID } from "node:crypto";
+import prisma from "@just-us/db";
 
 import { auth } from "./src/index";
 
@@ -39,7 +40,7 @@ const existing = await prisma.user.findUnique({
 if (existing) {
 	console.error(
 		`A user with ${email} already exists (role: ${existing.role}). ` +
-			`Use promote-admin.ts to change its role, or delete it first.`,
+			"Use promote-admin.ts to change its role, or delete it first.",
 	);
 	process.exit(1);
 }
@@ -72,7 +73,9 @@ console.log("\n✅ Administrator created\n");
 console.log(`  email:    ${email}`);
 console.log(`  name:     ${name}`);
 console.log(`  password: ${password}`);
-console.log(`  role:     administrator (verified + onboarded)\n`);
-console.log("Sign in at /login, then change this password from Profile & settings.\n");
+console.log("  role:     administrator (verified + onboarded)\n");
+console.log(
+	"Sign in at /login, then change this password from Profile & settings.\n",
+);
 
 process.exit(0);
