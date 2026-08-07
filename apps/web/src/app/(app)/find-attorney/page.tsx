@@ -3,6 +3,10 @@ import {
 	listedPracticeAreas,
 	listedStates,
 } from "@just-us/db/attorney-directory";
+import { getOwnedCase } from "@just-us/db/cases";
+import { ArrowLeft } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
 
 import {
 	AttorneyDirectory,
@@ -29,8 +33,19 @@ export default async function DashboardAttorneysPage({
 	const { session } = await requireRole("plaintiff");
 
 	const screen = findScreen("plaintiff", "attorneys");
-	const filters = readDirectoryParams(await searchParams);
+	const params = await searchParams;
+	const filters = readDirectoryParams(params);
 	const defaultState = (session.user as { jurisdiction?: string }).jurisdiction;
+
+	// Arrived from the case wizard's "Search and reach out yourself". Their draft
+	// was saved on the way out, so the only thing missing is the road back — and
+	// without it this screen is a one-way door out of a half-written case.
+	//
+	// Ownership is re-checked rather than trusted from the query string: the id is
+	// about to become a link, and `getOwnedCase` is scoped to this plaintiff, so a
+	// stranger's id simply yields no banner.
+	const draftId = Array.isArray(params.draft) ? params.draft[0] : params.draft;
+	const draft = draftId ? await getOwnedCase(draftId, session.user.id) : null;
 
 	const [attorneys, practiceAreas, states] = await Promise.all([
 		listDirectoryAttorneys({
@@ -49,6 +64,26 @@ export default async function DashboardAttorneysPage({
 				{screen?.sub ??
 					"Browse bar-verified attorneys and choose who represents you."}
 			</p>
+
+			{draft && (
+				<div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-brass-deep/30 bg-brass-wash/60 px-5 py-4">
+					<div className="min-w-0">
+						<p className="font-bold text-[14px] text-ink">
+							{draft.title?.trim() || "Your case"} is saved
+						</p>
+						<p className="mt-0.5 text-[13px] text-ink-soft leading-relaxed">
+							Find someone who fits, then head back and add them to your case.
+						</p>
+					</div>
+					<Link
+						href={`/cases/new?draft=${draft.id}` as Route}
+						className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-brass px-4 font-semibold text-[13px] text-white transition-colors hover:bg-brass-deep"
+					>
+						<ArrowLeft className="size-3.5" aria-hidden="true" />
+						Back to your case
+					</Link>
+				</div>
+			)}
 			<div className="mt-8">
 				<AttorneyDirectory
 					attorneys={attorneys}

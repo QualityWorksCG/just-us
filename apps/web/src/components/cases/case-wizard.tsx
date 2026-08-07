@@ -522,10 +522,11 @@ export function CaseWizard({
 		}
 	}
 
-	// Persist whatever's filled in as a draft, then head to the dashboard.
-	async function saveAndExit() {
-		setSaving(true);
-		const res = await saveCaseDraftAction({
+	/** Whatever is filled in so far, in the shape the draft action takes. Shared by
+	 *  every path that leaves the wizard, so none of them can persist less than
+	 *  another. */
+	function draftPayload() {
+		return {
 			id: caseId ?? undefined,
 			title: title.trim() || undefined,
 			category,
@@ -538,7 +539,13 @@ export function CaseWizard({
 			evidence,
 			coverImageUrl: coverUrl,
 			images: moreImages,
-		});
+		};
+	}
+
+	// Persist whatever's filled in as a draft, then head to the dashboard.
+	async function saveAndExit() {
+		setSaving(true);
+		const res = await saveCaseDraftAction(draftPayload());
 		if (res.ok) {
 			toast.success("Progress saved — pick up where you left off anytime.");
 			window.location.assign("/home");
@@ -546,6 +553,27 @@ export function CaseWizard({
 			toast.error(res.error);
 			setSaving(false);
 		}
+	}
+
+	/**
+	 * Step 3, "Search and reach out yourself" — leave the wizard for the attorney
+	 * directory.
+	 *
+	 * Saves first, and that is the whole reason this is not a plain link.
+	 * Everything typed so far lives in component state, so navigating away
+	 * unsaved would lose the story they just wrote — and this is the one branch of
+	 * the wizard that deliberately sends them somewhere else. The draft id rides
+	 * along in the URL so the directory can offer a way back into it.
+	 */
+	async function browseDirectory() {
+		setSaving(true);
+		const res = await saveCaseDraftAction(draftPayload());
+		if (!res.ok) {
+			toast.error(res.error);
+			setSaving(false);
+			return;
+		}
+		window.location.assign(`/find-attorney?draft=${res.caseId}`);
 	}
 
 	// Abandon the wizard without saving. If a draft was already persisted (a fresh
@@ -2046,11 +2074,10 @@ export function CaseWizard({
 													type="button"
 													variant="outline"
 													className="w-full"
-													onClick={() =>
-														toast.success("The directory is coming soon.")
-													}
+													onClick={browseDirectory}
+													disabled={saving}
 												>
-													Search the directory
+													{saving ? "Saving…" : "Search the directory"}
 													<ArrowRight
 														data-icon="inline-end"
 														aria-hidden="true"
