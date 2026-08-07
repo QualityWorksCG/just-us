@@ -1,12 +1,27 @@
 // Litigation case a plaintiff creates and raises the attorney fee for. Created
 // via the case-creation wizard.
-//   draft   — in progress, private to the owner
-//   seeking — published to attorneys (no attorney yet), open to requests
-//   live    — funding publicly, attorney + fee set
-//   closed  — resolved / no longer funding
+//   draft          — in progress, private to the owner
+//   seeking        — published to attorneys (no attorney yet), open to requests
+//   pending_payout — finished and committed, waiting on the firm's Stripe account
+//   live           — funding publicly, attorney + fee set
+//   closed         — resolved / no longer funding
+//
+// `pending_payout` exists because a case must never be public before it can take
+// a donation. Every other ingredient — story, goal, attorney, agreed fee — is the
+// plaintiff's to supply, but the account donations land in is opened by their
+// *attorney*, per case, through Stripe's hosted flow. Without this state the
+// plaintiff's only options were to publish a campaign that visibly cannot accept
+// money (a progress bar and a goal, and a donate panel that refuses), or to sit
+// in `draft` — which the attorney cannot see, and so can never clear.
+//
+// It is the case as the plaintiff finished it, held back from the public and
+// shown to the firm. `publishedAt` is stamped on entry, matching `seeking`: both
+// mean "the plaintiff committed this", not "the public can see it". The
+// transition out is the plaintiff's own act — see `goLiveCase`.
 enum CaseStatus {
   draft
   seeking
+  pending_payout
   live
   closed
 }

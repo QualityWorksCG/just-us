@@ -30,6 +30,13 @@ import prisma from "./index";
  *  - `caseId` — **this** case's public page, when it is live: the story, the goal and
  *    the attorney's own name on it. Since the account exists for one case, that page
  *    is the most direct evidence of what the account is for.
+ *
+ *    Rarely available now, and the `live` condition is load-bearing rather than
+ *    incidental: onboarding usually happens while the case is `pending_payout`,
+ *    precisely so it is not public yet, and handing Stripe's reviewer a URL that
+ *    404s is worse than offering nothing. A case reaches this branch only by the
+ *    routes that reach onboarding after publication — a change of counsel, or an
+ *    account re-opened on a case already raising.
  *  - `profileId` — their public JustUs directory profile, which only resolves for a
  *    bar-verified listed attorney. Linking a reviewer to a page that 404s is worse
  *    than linking the platform, so this is only offered when it will load.
@@ -82,23 +89,34 @@ export async function getPayoutAccountForCase(caseId: string) {
  * is excluded even if the plaintiff has not pressed bind yet, because that step is the
  * plaintiff's and nagging an attorney about it would be noise they cannot clear.
  *
- * `live` only. A draft or seeking case is not waiting on anyone's bank details.
+ * `live` **and** `pending_payout`. The second is now the more urgent of the two and
+ * the reason this count exists at all: a `pending_payout` case is not merely unable to
+ * take donations, it is not public — nobody can see it, share it or give to it until
+ * this attorney finishes. A `live` case at least raises the moment they do.
+ *
+ * `draft` and `seeking` stay out: neither is waiting on anyone's bank details.
  */
 export async function attorneyPayoutReadiness(input: {
 	userId: string;
 	email: string;
 }): Promise<{
-	/** Live cases of theirs with no account started at all. */
+	/** Cases of theirs with no account started at all. */
 	unstartedCases: number;
-	/** Live cases whose account exists but cannot yet receive. */
+	/** Cases whose account exists but cannot yet receive. */
 	unfinishedCases: number;
 	/** Of the unfinished, how many are simply awaiting Stripe rather than them. */
 	inReviewCases: number;
 	waitingCases: number;
+	/**
+	 * Of the waiting, how many are `pending_payout` — held back from the public
+	 * entirely, not merely unable to take money. The sharpest thing the nudge can
+	 * say, because it is the plaintiff's whole campaign that has not started.
+	 */
+	blockedCases: number;
 }> {
 	const cases = await prisma.case.findMany({
 		where: {
-			status: "live",
+			status: { in: ["pending_payout", "live"] },
 			deletedAt: null,
 			// Both routes an attorney can be on a case — see `representingAttorney`.
 			OR: [
@@ -107,6 +125,7 @@ export async function attorneyPayoutReadiness(input: {
 			],
 		},
 		select: {
+			status: true,
 			payoutAccountForCase: {
 				select: {
 					userId: true,
@@ -120,6 +139,7 @@ export async function attorneyPayoutReadiness(input: {
 	let unstartedCases = 0;
 	let unfinishedCases = 0;
 	let inReviewCases = 0;
+	let blockedCases = 0;
 	for (const k of cases) {
 		const account =
 			k.payoutAccountForCase?.userId === input.userId
@@ -130,13 +150,18 @@ export async function attorneyPayoutReadiness(input: {
 		} else if (!account.transfersEnabled) {
 			unfinishedCases += 1;
 			if (account.detailsSubmitted) inReviewCases += 1;
+		} else {
+			// Can already receive — not waiting on this attorney for anything.
+			continue;
 		}
+		if (k.status === "pending_payout") blockedCases += 1;
 	}
 	return {
 		unstartedCases,
 		unfinishedCases,
 		inReviewCases,
 		waitingCases: unstartedCases + unfinishedCases,
+		blockedCases,
 	};
 }
 
@@ -476,16 +501,45 @@ export type BindResult =
 				| "attorney_no_account";
 	  };
 
+/**
+ * The destination a bind would write, derived entirely from the case row.
+ *
+ * Shared by `bindCasePayout` and `goLiveCase` so there is exactly one place that
+ * decides whose account a case's money goes to. Neither the account id nor the
+ * attorney id is a parameter anywhere in that chain — that is the whole point.
+ */
+async function resolveBindTarget(caseId: string, ownerId: string) {
+	const k = await prisma.case.findFirst({
+		where: { id: caseId, ownerId, deletedAt: null },
+		select: REPRESENTING_SELECT,
+	});
+	if (!k) return { ok: false as const, reason: "case_not_found" as const, k };
+
+	// Nobody linked means no firm to pay. Reported separately from "the firm hasn't
+	// onboarded" because they are different problems with different fixes: get your
+	// attorney onto the platform, versus wait on the one who is already here.
+	const representing = await representingAttorney(k);
+	if (!representing) {
+		return { ok: false as const, reason: "no_attorney" as const, k };
+	}
+	const { attorney } = representing;
+	// This case's own account, and only if the representing attorney holds it.
+	const account = accountHeldBy(k.payoutAccountForCase, attorney.id);
+	if (!account) {
+		return { ok: false as const, reason: "attorney_no_account" as const, k };
+	}
+	return { ok: true as const, k, attorney, account };
+}
+
 export async function bindCasePayout(input: {
 	caseId: string;
 	/** The case owner, as known to the caller — guards against binding others' cases. */
 	ownerId: string;
 }): Promise<BindResult> {
-	const k = await prisma.case.findFirst({
-		where: { id: input.caseId, ownerId: input.ownerId, deletedAt: null },
-		select: REPRESENTING_SELECT,
-	});
-	if (!k) return { ok: false, reason: "case_not_found" };
+	const target = await resolveBindTarget(input.caseId, input.ownerId);
+	if (!target.ok && target.reason === "case_not_found") {
+		return { ok: false, reason: "case_not_found" };
+	}
 	// The invariant is "don't move the destination after donors were shown one" —
 	// not "never touch a live case". A live case with nothing bound has shown no
 	// donor a recipient (the donate panel reads "not accepting donations yet"), so
@@ -493,19 +547,11 @@ export async function bindCasePayout(input: {
 	// refused. Guarding on status alone would have stranded every case that went
 	// live before payouts existed: unbindable, and therefore permanently unable to
 	// accept donations.
-	if (k.status === "live" && k.payoutAccountId) {
+	if (target.k.status === "live" && target.k.payoutAccountId) {
 		return { ok: false, reason: "already_live" };
 	}
-
-	// Nobody linked means no firm to pay. Reported separately from "the firm hasn't
-	// onboarded" because they are different problems with different fixes: get your
-	// attorney onto the platform, versus wait on the one who is already here.
-	const representing = await representingAttorney(k);
-	if (!representing) return { ok: false, reason: "no_attorney" };
-	const { attorney } = representing;
-	// This case's own account, and only if the representing attorney holds it.
-	const account = accountHeldBy(k.payoutAccountForCase, attorney.id);
-	if (!account) return { ok: false, reason: "attorney_no_account" };
+	if (!target.ok) return { ok: false, reason: target.reason };
+	const { k, attorney, account } = target;
 
 	// `attorney` is the only value a bind writes. The column is what the donor-facing
 	// disclosure reads from — a case must be able to *state* who receives, not have it
@@ -515,6 +561,82 @@ export async function bindCasePayout(input: {
 		where: { id: k.id },
 		data: { payoutRecipient: "attorney", payoutAccountId: account.id },
 	});
+	return {
+		ok: true,
+		firmName: attorney.firmName?.trim() || null,
+		attorneyName: attorney.name,
+	};
+}
+
+/**
+ * Take a committed case public — the `pending_payout` → `live` transition.
+ *
+ * Binding and publishing are one act here, deliberately. A case reaches the
+ * public exactly when it can take a donation, so the destination is written in
+ * the same statement that makes the page visible; there is no interval in which
+ * a live case has no recipient. It is still the plaintiff who calls this: they
+ * own the case and they decide when it opens. What they cannot do — here as in
+ * `bindCasePayout` — is choose where the money goes.
+ *
+ * `transfersEnabled` is the gate, not `detailsSubmitted`. An attorney can finish
+ * Stripe's hosted flow and still be held for review, and a case published on the
+ * strength of a submitted form would be public and unable to receive, which is
+ * the exact failure this whole state exists to prevent. It is also a cache of
+ * Stripe's view, written only by the webhook (see `syncPayoutAccount`), never by
+ * anything the attorney or plaintiff can assert.
+ *
+ * Safe to call speculatively: the publish action runs it immediately after
+ * `publishCase`, so a case whose firm is already set up never visibly sits in
+ * `pending_payout`. Every refusal is a real state the caller renders as "waiting
+ * on your attorney", not an error.
+ *
+ * The status guard lives in the `where`, so two concurrent calls cannot both
+ * publish — the second matches nothing and reports the case as already live.
+ */
+export type GoLiveResult =
+	| { ok: true; firmName: string | null; attorneyName: string }
+	| {
+			ok: false;
+			reason:
+				| "case_not_found"
+				| "already_live"
+				| "not_pending"
+				| "no_attorney"
+				| "attorney_no_account"
+				| "transfers_disabled";
+	  };
+
+export async function goLiveCase(input: {
+	caseId: string;
+	ownerId: string;
+}): Promise<GoLiveResult> {
+	const target = await resolveBindTarget(input.caseId, input.ownerId);
+	if (!target.ok && target.reason === "case_not_found") {
+		return { ok: false, reason: "case_not_found" };
+	}
+	if (target.k.status === "live") return { ok: false, reason: "already_live" };
+	if (target.k.status !== "pending_payout") {
+		return { ok: false, reason: "not_pending" };
+	}
+	if (!target.ok) return { ok: false, reason: target.reason };
+	const { k, attorney, account } = target;
+	if (!account.transfersEnabled) {
+		return { ok: false, reason: "transfers_disabled" };
+	}
+
+	const res = await prisma.case.updateMany({
+		where: { id: k.id, ownerId: input.ownerId, status: "pending_payout" },
+		data: {
+			status: "live",
+			payoutRecipient: "attorney",
+			payoutAccountId: account.id,
+			// Re-stamped, because this is the moment the case reached the public and
+			// `publishedAt` is what the directory's "newest" sort reads. A case that
+			// waited a week on its firm is new to donors today, not a week old.
+			publishedAt: new Date(),
+		},
+	});
+	if (res.count === 0) return { ok: false, reason: "already_live" };
 	return {
 		ok: true,
 		firmName: attorney.firmName?.trim() || null,

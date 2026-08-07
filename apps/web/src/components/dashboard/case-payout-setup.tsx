@@ -196,12 +196,17 @@ export function CasePayoutSetup({
 				</p>
 			)}
 			{/* The plaintiff's step, named so a fully-onboarded attorney doesn't read a
-			    still-closed case as their own failure. */}
-			{stage === "ready" && !payout.bound && caseStatus === "live" && (
-				<p className="mt-2.5 text-[12.5px] text-muted-foreground leading-relaxed">
-					Waiting on your client to open donations on their side.
-				</p>
-			)}
+			    still-closed case as their own failure. `pending_payout` counts too: the
+			    account is ready, and publishing is the client's to press. */}
+			{stage === "ready" &&
+				!payout.bound &&
+				(caseStatus === "live" || caseStatus === "pending_payout") && (
+					<p className="mt-2.5 text-[12.5px] text-muted-foreground leading-relaxed">
+						{caseStatus === "pending_payout"
+							? "Nothing outstanding here — your client publishes their case whenever they're ready."
+							: "Waiting on your client to open donations on their side."}
+					</p>
+				)}
 
 			<div className="mt-4 flex flex-wrap items-center gap-2">
 				{copy.cta && (

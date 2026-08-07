@@ -47,10 +47,17 @@ const STAGE_LABEL: Record<PayoutStage, string> = {
 	ready: "Payouts active",
 };
 
-/** A published case whose account can't receive is the only state the attorney
- *  themselves is blocking — that is what earns the loud treatment. */
+/** A case whose account can't receive is the state the attorney themselves is
+ *  blocking — that is what earns the loud treatment.
+ *
+ *  Two flavours, and `pending_payout` is the worse one: that client's case is not
+ *  merely unable to take money, it is not public at all, and cannot be until this
+ *  is done. A `live` case at least raises the moment the account clears. */
 function blocking(c: AttorneyCase) {
-	return c.status === "live" && !c.payout.transfersEnabled;
+	return (
+		(c.status === "live" || c.status === "pending_payout") &&
+		!c.payout.transfersEnabled
+	);
 }
 
 export function PayoutChip({ case: c }: { case: AttorneyCase }) {
@@ -187,11 +194,23 @@ function CaseRow({ case: c }: { case: AttorneyCase }) {
 					cls: "bg-surface-2 text-ink-soft",
 					dot: "bg-ink-soft",
 				}
-			: {
-					text: "Fee not agreed",
-					cls: "bg-brass-wash text-brass-deep",
-					dot: "bg-brass-deep",
-				};
+			: c.status === "pending_payout"
+				? {
+						// Named for what the attorney has to do, not for the state the
+						// case is in — this row is the only place they will learn it.
+						text: c.payout.transfersEnabled
+							? "Ready · client to publish"
+							: "Waiting on your setup",
+						cls: c.payout.transfersEnabled
+							? "bg-brass-wash text-brass-deep"
+							: "bg-gold-bright/20 text-gold-bright-ink",
+						dot: c.payout.transfersEnabled ? "bg-brass-deep" : "bg-gold-bright",
+					}
+				: {
+						text: "Fee not agreed",
+						cls: "bg-brass-wash text-brass-deep",
+						dot: "bg-brass-deep",
+					};
 
 	return (
 		<Link
@@ -247,9 +266,15 @@ function CaseRow({ case: c }: { case: AttorneyCase }) {
 					<p className="text-[13px] text-ink-soft leading-relaxed">
 						{c.status === "closed"
 							? "Closed — no longer raising."
-							: c.goalCents > 0
-								? `${money(c.goalCents)} agreed. Not raising until your client publishes.`
-								: "Your client hasn't agreed the fee with you yet, so there's no goal to raise."}
+							: c.status === "pending_payout"
+								? c.payout.transfersEnabled
+									? `${money(c.goalCents)} agreed and your account is ready. Your client publishes when they're set.`
+									: // The one line that says the quiet part: their client's
+										// campaign does not exist yet, and this is why.
+										`${money(c.goalCents)} agreed. Their case can't go public until this one's payout account is set up.`
+								: c.goalCents > 0
+									? `${money(c.goalCents)} agreed. Not raising until your client publishes.`
+									: "Your client hasn't agreed the fee with you yet, so there's no goal to raise."}
 					</p>
 				)}
 				{/* Outside the funding branch on purpose: an attorney posts updates on a

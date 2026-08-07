@@ -739,11 +739,17 @@ function CaseRow({ c }: { c: CaseSummary }) {
 					cls: "bg-brass-wash text-brass-deep",
 					dot: "bg-brass-deep",
 				}
-			: {
-					text: "Draft",
-					cls: "bg-surface-2 text-ink-soft",
-					dot: "bg-ink-soft",
-				};
+			: c.status === "pending_payout"
+				? {
+						text: "Awaiting firm",
+						cls: "bg-gold-bright/20 text-gold-bright-ink",
+						dot: "bg-gold-bright",
+					}
+				: {
+						text: "Draft",
+						cls: "bg-surface-2 text-ink-soft",
+						dot: "bg-ink-soft",
+					};
 
 	// Drafts resume in the wizard; live cases open Manage; seeking opens requests.
 	const href = (
@@ -910,6 +916,9 @@ function StepTracker({
 	hasGoal: boolean;
 }) {
 	const isLive = status === "live";
+	// Finished and sent, waiting on the firm's payout account. The last step is
+	// underway rather than untouched, and it is not the plaintiff's to finish.
+	const isPending = status === "pending_payout";
 	const steps = [
 		{ label: "Submit your case", done: true },
 		{ label: "Choose your attorney", done: hasAttorney },
@@ -942,6 +951,14 @@ function StepTracker({
 			text: "Your campaign is live — keep sharing to reach your goal.",
 			href: manage,
 			cta: "Manage your case",
+		};
+	else if (isPending)
+		// The only state where the next move is not theirs. Say so plainly rather
+		// than offering a "finish your case" they cannot finish.
+		next = {
+			text: "Your case is ready and private. It goes public as soon as your attorney's payout account can receive donations.",
+			href: manage,
+			cta: "Check payout setup",
 		};
 	else
 		next = {

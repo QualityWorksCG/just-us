@@ -128,6 +128,7 @@ export default async function DashboardHome({
 					waitingCases={payout.waitingCases}
 					unstartedCases={payout.unstartedCases}
 					inReviewCases={payout.inReviewCases}
+					blockedCases={payout.blockedCases}
 				/>
 				<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 					{home.sub}

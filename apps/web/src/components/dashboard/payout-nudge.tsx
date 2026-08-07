@@ -24,12 +24,15 @@ export function PayoutNudge({
 	waitingCases,
 	unstartedCases,
 	inReviewCases,
+	blockedCases = 0,
 }: {
 	waitingCases: number;
 	/** Of those waiting, how many have no account at all yet. */
 	unstartedCases: number;
 	/** Of those waiting, how many are simply awaiting Stripe rather than the holder. */
 	inReviewCases: number;
+	/** Of those waiting, how many are `pending_payout` — not public at all yet. */
+	blockedCases?: number;
 }) {
 	if (waitingCases < 1) return null;
 
@@ -50,7 +53,9 @@ export function PayoutNudge({
 			</span>
 			<div className="min-w-0 flex-1">
 				<p className="font-bold text-[14px] text-ink">
-					{cases} can't accept donations yet
+					{blockedCases > 0
+						? `${cases} can't go public yet`
+						: `${cases} can't accept donations yet`}
 				</p>
 				<p className="mt-1 text-[13px] text-ink-soft leading-relaxed">
 					{detailsSubmitted
@@ -59,6 +64,16 @@ export function PayoutNudge({
 							? "The payout accounts for these cases aren't finished, so donations to them are blocked. Your clients can't do anything about it from their side."
 							: "Each case is paid into its own account against your firm's operating account, and these don't have one yet. Until they do, the cases are published but unable to raise."}
 				</p>
+				{/* The sharper consequence, and the one an attorney will not guess: a
+				    case held at `pending_payout` has no public page at all. Their client
+				    finished everything and still has nothing to share. */}
+				{blockedCases > 0 && !detailsSubmitted && (
+					<p className="mt-1.5 text-[13px] text-ink-soft leading-relaxed">
+						{blockedCases === 1
+							? "One of them hasn't been published at all — that client is waiting on this before their campaign can even start."
+							: `${blockedCases} of them haven't been published at all — those clients are waiting on this before their campaigns can even start.`}
+					</p>
+				)}
 				{!detailsSubmitted && (
 					// To the cases themselves: each one carries its own setup, so this is
 					// where the outstanding work actually is.
