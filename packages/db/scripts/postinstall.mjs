@@ -17,7 +17,9 @@
  * change of its own.
  *
  * The migrate step is skipped when DATABASE_URL is unresolvable (a fresh clone
- * with no .env yet) and whenever SKIP_DB_MIGRATE is set.
+ * with no .env yet), whenever SKIP_DB_MIGRATE is set, and on any preview build
+ * for a branch that does not own its own database — see
+ * DATABASE_OWNING_BRANCHES below for why that last one matters.
  *
  * Failure handling differs by environment, deliberately:
  *   - On Vercel/CI a failed migration FAILS the build. Deploying code that its
@@ -54,18 +56,51 @@ loadEnv({
 // deployment; see the note above.
 const isDeployBuild = !!(process.env.VERCEL || process.env.CI);
 
+/**
+ * Branches with a DATABASE_URL of their own in Vercel, and so the only ones
+ * entitled to migrate on a preview build.
+ *
+ * Every other branch — every feature branch, every PR — has no branch-specific
+ * override and falls back to the environment-wide preview DATABASE_URL, which
+ * points at a database these branches share. Migrating there applies a branch's
+ * *unmerged* migrations to a database other deployments depend on, and a single
+ * failure is not confined to the branch that caused it: the failed attempt is
+ * recorded in `_prisma_migrations`, and from that moment `migrate deploy`
+ * refuses to run against that database at all (P3009). One PR takes down every
+ * other PR and the shared environment with it — which is exactly what happened
+ * when the stripe branch's `add_stripe_donations` failed against the dev
+ * database and blocked every deployment behind it.
+ *
+ * Keep this list in step with the branch-scoped DATABASE_URL entries in Vercel.
+ */
+const DATABASE_OWNING_BRANCHES = ["dev", "qa", "demo"];
+
+// Scoped to preview builds specifically: production has its own DATABASE_URL,
+// and CI has no VERCEL_GIT_COMMIT_REF at all, so neither should be judged by the
+// branch list. An unknown ref on a preview build is treated as not owning a
+// database — the safe direction, since guessing wrong here is what poisons a
+// shared database.
+const branch = process.env.VERCEL_GIT_COMMIT_REF;
+const sharesPreviewDatabase =
+	process.env.VERCEL_ENV === "preview" &&
+	!DATABASE_OWNING_BRANCHES.includes(branch);
+
 const skipReason = process.env.SKIP_DB_MIGRATE
 	? "SKIP_DB_MIGRATE is set"
 	: !process.env.DATABASE_URL
 		? "DATABASE_URL is not set"
-		: null;
+		: sharesPreviewDatabase
+			? `branch ${branch ?? "(unknown)"} has no database of its own and shares the preview database`
+			: null;
 
 if (skipReason) {
-	// On a deploy build this is not routine: the deployment is about to serve
-	// traffic against whatever schema the database happens to have. Say so
-	// loudly, but still let the intentional escape hatch work.
+	// Sharing the preview database is the one skip that is working as intended:
+	// the preview is *meant* to run against whatever schema that database has,
+	// and the whole point is to leave it untouched. The others mean a deployment
+	// is about to serve traffic against an unknown schema, which on a deploy
+	// build is worth saying loudly.
 	console.log(
-		isDeployBuild
+		isDeployBuild && !sharesPreviewDatabase
 			? `[db] WARNING: skipping migrate deploy on a deploy build: ${skipReason}. The deployment may run against an out-of-date schema.`
 			: `[db] skipping migrate deploy: ${skipReason}`,
 	);
