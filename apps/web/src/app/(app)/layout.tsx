@@ -1,8 +1,7 @@
 import type { Role } from "@just-us/auth";
-import { cookies } from "next/headers";
-
-import { AppShell } from "@/components/dashboard/app-shell";
 import { unreadMessageCount } from "@just-us/db/messages";
+import { cookies } from "next/headers";
+import { AppShell } from "@/components/dashboard/app-shell";
 import { requireOnboarded } from "@/lib/auth-server";
 import { getFlags } from "@/lib/flags-server";
 

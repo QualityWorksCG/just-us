@@ -1,42 +1,143 @@
-import type { PayoutRecipient } from "../prisma/generated/client";
 import prisma from "./index";
 
 /**
  * Payout-account reads and writes (donations).
  *
- * The capability columns here are a **cache of Stripe's view**, so everything
- * that writes them takes them from a Stripe payload — never from a form. See
- * `syncPayoutAccount`.
+ * Donations pay the **operating account of the firm representing the case**, and there
+ * is **one Stripe account per case**: an attorney onboards separately for each case
+ * they represent, so no two cases share a balance or a bank destination. The attorney
+ * onboards it; the plaintiff binds their case to it; the attorney moves the money into
+ * trust under their own bar's rules. Nothing here routes money to a plaintiff.
+ *
+ * Everything is therefore keyed on a **case**, not a person. `userId` is who holds the
+ * account, and is no longer unique.
+ *
+ * The capability columns are a **cache of Stripe's view**, so everything that writes
+ * them takes them from a Stripe payload — never from a form. See `syncPayoutAccount`.
  */
 
 /**
- * The case page best suited to standing as this plaintiff's "business website"
- * during Stripe onboarding, or null if they have none published.
+ * Candidate pages for the "business website" Stripe asks for when onboarding the
+ * account for one case.
  *
- * Stripe requires a business URL and states that placeholder sites are not
- * supported — it wants a page showing the actual activity. The platform homepage
- * does not: it says nothing about *this* person. Their own public case page does,
- * with a story, a funding goal, and a named attorney, which is exactly what a
- * reviewer is looking for.
+ * Stripe requires a business URL and states that placeholder sites are not supported
+ * — it wants a page evidencing the actual activity. Three sources, best first, and
+ * the caller turns whichever exists into a URL:
  *
- * Prefers a `live` case, then the most recently published one. Cases not yet
- * public (`draft`, `seeking`) are excluded — linking a reviewer to a page they
- * cannot load is worse than linking the platform.
+ *  - `firmWebsiteUrl` — the firm's own site. For a law firm this is a real business
+ *    website with a real address and named practitioners, which is exactly what a
+ *    reviewer wants and better than anything we could host.
+ *  - `caseId` — **this** case's public page, when it is live: the story, the goal and
+ *    the attorney's own name on it. Since the account exists for one case, that page
+ *    is the most direct evidence of what the account is for.
+ *  - `profileId` — their public JustUs directory profile, which only resolves for a
+ *    bar-verified listed attorney. Linking a reviewer to a page that 404s is worse
+ *    than linking the platform, so this is only offered when it will load.
  */
-export async function publicCaseIdForOwner(
-	ownerId: string,
-): Promise<string | null> {
-	const k = await prisma.case.findFirst({
-		where: { ownerId, status: "live", deletedAt: null },
-		orderBy: { publishedAt: "desc" },
-		select: { id: true },
-	});
-	return k?.id ?? null;
+export async function attorneyBusinessUrlSources(input: {
+	userId: string;
+	caseId: string;
+}): Promise<{
+	firmWebsiteUrl: string | null;
+	profileId: string | null;
+	caseId: string | null;
+}> {
+	const [profile, kase] = await Promise.all([
+		prisma.attorneyProfile.findUnique({
+			where: { userId: input.userId },
+			select: { id: true, websiteUrl: true, verificationStatus: true },
+		}),
+		prisma.case.findFirst({
+			where: { id: input.caseId, status: "live", deletedAt: null },
+			select: { id: true },
+		}),
+	]);
+	return {
+		firmWebsiteUrl: profile?.websiteUrl?.trim() || null,
+		// Matches what `/attorneys/[id]` will actually serve — see getDirectoryAttorney.
+		profileId: profile?.verificationStatus === "verified" ? profile.id : null,
+		caseId: kase?.id ?? null,
+	};
 }
 
-/** A user's payout account, or null if they have not started onboarding. */
-export async function getPayoutAccount(userId: string) {
-	return prisma.payoutAccount.findUnique({ where: { userId } });
+/**
+ * The account opened for one case, or null if onboarding has not started for it.
+ *
+ * Keyed on the case rather than the holder: an attorney with three cases has three
+ * accounts, and "their account" is not a question with one answer.
+ */
+export async function getPayoutAccountForCase(caseId: string) {
+	return prisma.payoutAccount.findUnique({ where: { caseId } });
+}
+
+/**
+ * How many live cases are held up by this attorney not finishing an account.
+ *
+ * Per-case onboarding moved the blocking step onto someone who has no reason to look
+ * for it, and multiplied it: a plaintiff can publish, tell their donors, and be stuck
+ * because their attorney completed setup for a *different* case and assumed they were
+ * done. The attorney's home screen is where that has to surface.
+ *
+ * Only counts what **they** can act on — a case whose own account can already receive
+ * is excluded even if the plaintiff has not pressed bind yet, because that step is the
+ * plaintiff's and nagging an attorney about it would be noise they cannot clear.
+ *
+ * `live` only. A draft or seeking case is not waiting on anyone's bank details.
+ */
+export async function attorneyPayoutReadiness(input: {
+	userId: string;
+	email: string;
+}): Promise<{
+	/** Live cases of theirs with no account started at all. */
+	unstartedCases: number;
+	/** Live cases whose account exists but cannot yet receive. */
+	unfinishedCases: number;
+	/** Of the unfinished, how many are simply awaiting Stripe rather than them. */
+	inReviewCases: number;
+	waitingCases: number;
+}> {
+	const cases = await prisma.case.findMany({
+		where: {
+			status: "live",
+			deletedAt: null,
+			// Both routes an attorney can be on a case — see `representingAttorney`.
+			OR: [
+				{ match: { attorneyId: input.userId } },
+				{ attorneyEmail: { equals: input.email, mode: "insensitive" } },
+			],
+		},
+		select: {
+			payoutAccountForCase: {
+				select: {
+					userId: true,
+					detailsSubmitted: true,
+					transfersEnabled: true,
+				},
+			},
+		},
+	});
+
+	let unstartedCases = 0;
+	let unfinishedCases = 0;
+	let inReviewCases = 0;
+	for (const k of cases) {
+		const account =
+			k.payoutAccountForCase?.userId === input.userId
+				? k.payoutAccountForCase
+				: null;
+		if (!account) {
+			unstartedCases += 1;
+		} else if (!account.transfersEnabled) {
+			unfinishedCases += 1;
+			if (account.detailsSubmitted) inReviewCases += 1;
+		}
+	}
+	return {
+		unstartedCases,
+		unfinishedCases,
+		inReviewCases,
+		waitingCases: unstartedCases + unfinishedCases,
+	};
 }
 
 /** Look up by Stripe id — how the requirements webhook finds its row. */
@@ -45,17 +146,19 @@ export async function getPayoutAccountByStripeId(stripeAccountId: string) {
 }
 
 /**
- * Record a Stripe account against a user, or update the capabilities of one
+ * Record the Stripe account opened for a case, or update the capabilities of the one
  * already recorded.
  *
- * Upsert on `userId` rather than insert, because onboarding is resumable: someone
- * who abandons the hosted flow and comes back must land on the same Stripe
- * account, not a second one. `stripeAccountId` is only written on create — a
- * user's account id never changes, and quietly repointing it would orphan the
- * money already sent to the old one.
+ * Upsert on `caseId` rather than insert, because onboarding is resumable: an attorney
+ * who abandons the hosted flow and comes back must land on the same Stripe account for
+ * that case, not a second one. `stripeAccountId` and `userId` are only written on
+ * create — an account's id never changes, and quietly repointing either would orphan
+ * money already sent to the old one, or hand one firm's account to another.
  */
 export async function syncPayoutAccount(input: {
 	userId: string;
+	/** The case this account exists for. */
+	caseId: string;
 	stripeAccountId: string;
 	detailsSubmitted: boolean;
 	transfersEnabled: boolean;
@@ -68,9 +171,10 @@ export async function syncPayoutAccount(input: {
 		syncedAt: new Date(),
 	};
 	return prisma.payoutAccount.upsert({
-		where: { userId: input.userId },
+		where: { caseId: input.caseId },
 		create: {
 			userId: input.userId,
+			caseId: input.caseId,
 			stripeAccountId: input.stripeAccountId,
 			...capabilities,
 		},
@@ -114,18 +218,20 @@ export async function applyAccountUpdate(input: {
 /**
  * The destination a case's donations go to, resolved for the charge path.
  *
- * Reads the **bound** account (`Case.payoutAccountId`), never the matched
- * attorney's, so re-matching a case cannot redirect money mid-campaign. Returns a
- * reason rather than throwing, because every failure here is a legitimate state
- * the donate button has to explain: no recipient chosen yet, or a recipient
- * partway through onboarding.
+ * Reads the **bound** account (`Case.payoutAccountId`) rather than deriving one at
+ * charge time, so nothing that happens to a case later — a re-match, a change of
+ * attorney — can redirect money mid-campaign. Returns a reason rather than
+ * throwing, because every failure here is a legitimate state the donate button has
+ * to explain: nothing bound yet, or a recipient partway through onboarding.
  */
 export type PayoutDestination =
 	| {
 			ok: true;
 			stripeAccountId: string;
-			recipient: PayoutRecipient;
+			/** The account holder — the attorney who onboarded the firm's account. */
 			holderName: string;
+			/** Their firm, when they gave one at sign-up. The name money is paid to. */
+			holderFirm: string | null;
 	  }
 	| { ok: false; reason: "not_live" | "unbound" | "transfers_disabled" };
 
@@ -136,139 +242,248 @@ export async function resolvePayoutDestination(
 		where: { id: caseId, deletedAt: null },
 		select: {
 			status: true,
-			payoutRecipient: true,
 			payoutAccount: {
 				select: {
 					stripeAccountId: true,
 					transfersEnabled: true,
-					user: { select: { name: true } },
+					user: { select: { name: true, firmName: true } },
 				},
 			},
 		},
 	});
 	if (!k || k.status !== "live") return { ok: false, reason: "not_live" };
-	if (!k.payoutAccount || !k.payoutRecipient) {
-		return { ok: false, reason: "unbound" };
-	}
+	if (!k.payoutAccount) return { ok: false, reason: "unbound" };
 	if (!k.payoutAccount.transfersEnabled) {
 		return { ok: false, reason: "transfers_disabled" };
 	}
 	return {
 		ok: true,
 		stripeAccountId: k.payoutAccount.stripeAccountId,
-		recipient: k.payoutRecipient,
 		holderName: k.payoutAccount.user.name,
+		holderFirm: k.payoutAccount.user.firmName?.trim() || null,
 	};
 }
 
 /**
- * Bind a case to a payout destination.
+ * Everything the payout screens and the bind path need about an attorney.
  *
- * Refuses unless the account belongs to the party named by `recipient` — the
- * plaintiff must be the case owner, the attorney must be the one matched to it.
- * Without that check a caller could point any case at any account, which is the
- * one mistake in this file that would move real money to the wrong person.
- *
- * Idempotent and re-runnable while a case is not yet live; rebinding a `live`
- * case is refused, because donors have already been shown a recipient.
+ * No account is selected through the *attorney* any more. Accounts are per case, so
+ * "this attorney's account" is not a question with one answer — the case's own account
+ * comes from `payoutAccountForCase` on the case row instead.
  */
-export type BindResult =
-	| { ok: true }
-	| {
-			ok: false;
-			// No "wrong holder" case: ownership is enforced by *deriving* whose
-			// account to look up, so a mismatched one is unreachable rather than
-			// rejected.
-			reason:
-				| "case_not_found"
-				| "already_live"
-				| "no_account"
-				| "no_attorney_matched";
-	  };
+const ATTORNEY_SELECT = {
+	id: true,
+	name: true,
+	email: true,
+	firmName: true,
+	barNumber: true,
+} as const;
+
+/** The case columns `representingAttorney` resolves from. */
+const REPRESENTING_SELECT = {
+	id: true,
+	status: true,
+	payoutAccountId: true,
+	attorneyEmail: true,
+	// The account opened for *this* case. `userId` comes back so the caller can refuse
+	// an account opened by a different firm for a case that has since changed counsel.
+	payoutAccountForCase: {
+		select: {
+			id: true,
+			userId: true,
+			detailsSubmitted: true,
+			transfersEnabled: true,
+		},
+	},
+	// Read from the match rather than the case's own `attorneyName` text: the wizard's
+	// copy is what the plaintiff typed, this is the account money will reach.
+	match: { select: { attorney: { select: ATTORNEY_SELECT } } },
+} as const;
+
+type RepresentingAttorney = {
+	id: string;
+	name: string;
+	email: string;
+	firmName: string | null;
+	barNumber: string | null;
+};
+
+/** The account opened for a case, but only if the representing attorney holds it. */
+type CaseAccount = {
+	id: string;
+	userId: string;
+	detailsSubmitted: boolean;
+	transfersEnabled: boolean;
+} | null;
+
+function accountHeldBy(account: CaseAccount, attorneyId: string): CaseAccount {
+	return account && account.userId === attorneyId ? account : null;
+}
 
 /**
- * Everything the payout step of a case needs to render: which recipients are
- * actually available, and why one isn't.
+ * The user whose firm account a case pays out to, and how that link was made.
  *
- * Availability is per side and depends on that side having onboarded — so this
- * reports the onboarding state of both candidates rather than just listing two
- * radio buttons the plaintiff might not be able to use. `null` for the attorney
- * side means no attorney is matched yet, which is different from matched but not
- * onboarded.
+ * Two routes reach an attorney, and both have to be able to fund — a plaintiff who
+ * brought their own attorney is not a second-class case:
+ *
+ *  - **`match`** — an accepted expression of interest. Authoritative: both sides
+ *    agreed, on the record, and it names a `User` directly.
+ *  - **`invited_email`** — the case has no `Match` (the bring-your-own path writes
+ *    only `attorneyEmail`), so the attorney the plaintiff *designated* is looked up by
+ *    that address. It resolves only to a registered `attorney` account, so an address
+ *    belonging to nobody, or to a donor, is no link at all. This is what makes "your
+ *    attorney signs up and links their firm's account" work without a separate
+ *    invitation record.
+ *
+ * The email route is a designation by the plaintiff, so `via` comes back with the
+ * attorney: the bind screen names the firm and the address before the plaintiff
+ * confirms, because a mistyped address is the one way this points at the wrong firm.
+ */
+async function representingAttorney(k: {
+	attorneyEmail: string | null;
+	match: { attorney: RepresentingAttorney } | null;
+}): Promise<{
+	attorney: RepresentingAttorney;
+	via: "match" | "invited_email";
+} | null> {
+	if (k.match) return { attorney: k.match.attorney, via: "match" };
+	const email = k.attorneyEmail?.trim();
+	if (!email) return null;
+	const attorney = await prisma.user.findFirst({
+		// Role-gated on purpose: only an attorney account can hold the firm's payout
+		// account, and resolving to any other role would let a plaintiff route their
+		// own case's money to an ordinary account by typing the right address.
+		where: { email: { equals: email, mode: "insensitive" }, role: "attorney" },
+		select: ATTORNEY_SELECT,
+	});
+	return attorney ? { attorney, via: "invited_email" } : null;
+}
+
+/**
+ * The case an attorney is entitled to open a payout account for, or null.
+ *
+ * **The authorization check for onboarding.** Onboarding is now per case, so the case
+ * id arrives from the client, and without this an attorney could attach a Stripe
+ * account to a stranger's case — then be bound to it the moment that plaintiff opened
+ * donations, and receive their money. Representation is re-derived here from the case
+ * row rather than trusted from the request.
+ *
+ * Returns the title as well, because the account's display name and Stripe metadata are
+ * built from it and the caller should not have to re-read the case to get it.
+ */
+export async function attorneyRepresentedCase(input: {
+	userId: string;
+	email: string;
+	caseId: string;
+}): Promise<{ id: string; title: string; status: string } | null> {
+	const k = await prisma.case.findFirst({
+		where: {
+			id: input.caseId,
+			deletedAt: null,
+			OR: [
+				{ match: { attorneyId: input.userId } },
+				{ attorneyEmail: { equals: input.email, mode: "insensitive" } },
+			],
+		},
+		select: { id: true, title: true, status: true },
+	});
+	return k;
+}
+
+/**
+ * What the payout step of a case needs to render: whether the destination is bound,
+ * and how far the representing firm's Stripe onboarding has got.
+ *
+ * There is no recipient *choice* to report. Donations pay the firm representing the
+ * case, so this is a readiness check on one account — but unlike the previous model
+ * that account belongs to someone other than the person reading the screen, and the
+ * plaintiff can do nothing but wait on it. That is why the attorney's name, firm and
+ * contact email come back too: the plaintiff's only available action is to chase
+ * them, and a screen that says "not ready" without saying *who* is not ready leaves
+ * them stuck.
+ *
+ * The account reported is the one opened **for this case**, not any other the attorney
+ * holds. With per-case onboarding, an attorney who is fully set up on two other matters
+ * has done nothing for this one — reporting their readiness in general would tell the
+ * plaintiff their case is ready to fund when it cannot take a dollar.
+ *
+ * `attorney` is null when nobody is linked yet — a `draft`/`seeking` case, or one
+ * whose designated attorney has not registered. `designatedEmail` is returned
+ * alongside so that state can name the address being waited on.
  */
 export async function getCasePayoutOptions(caseId: string, ownerId: string) {
 	const k = await prisma.case.findFirst({
 		where: { id: caseId, ownerId, deletedAt: null },
-		select: {
-			id: true,
-			status: true,
-			payoutRecipient: true,
-			payoutAccountId: true,
-			owner: {
-				select: {
-					name: true,
-					payoutAccount: {
-						select: { detailsSubmitted: true, transfersEnabled: true },
-					},
-				},
-			},
-			match: {
-				select: {
-					attorney: {
-						select: {
-							name: true,
-							payoutAccount: {
-								select: { detailsSubmitted: true, transfersEnabled: true },
-							},
-						},
-					},
-				},
-			},
-		},
+		select: REPRESENTING_SELECT,
 	});
 	if (!k) return null;
 
-	const side = (
-		holder: {
-			name: string;
-			payoutAccount: {
-				detailsSubmitted: boolean;
-				transfersEnabled: boolean;
-			} | null;
-		} | null,
-	) =>
-		holder
-			? {
-					name: holder.name,
-					hasAccount: !!holder.payoutAccount,
-					detailsSubmitted: holder.payoutAccount?.detailsSubmitted ?? false,
-					transfersEnabled: holder.payoutAccount?.transfersEnabled ?? false,
-				}
-			: null;
-
+	const representing = await representingAttorney(k);
+	const attorney = representing?.attorney;
+	const account = attorney
+		? accountHeldBy(k.payoutAccountForCase, attorney.id)
+		: null;
 	return {
 		status: k.status,
-		recipient: k.payoutRecipient,
 		bound: !!k.payoutAccountId,
-		plaintiff: side(k.owner),
-		attorney: side(k.match?.attorney ?? null),
+		designatedEmail: k.attorneyEmail?.trim() || null,
+		attorney: attorney
+			? {
+					name: attorney.name,
+					email: attorney.email,
+					firmName: attorney.firmName?.trim() || null,
+					// Surfaced, not enforced: bar standing gates the directory badge, not the
+					// money. A case whose attorney is mid-verification can still fund.
+					barNumber: attorney.barNumber?.trim() || null,
+					via: representing.via,
+					hasAccount: !!account,
+					detailsSubmitted: account?.detailsSubmitted ?? false,
+					transfersEnabled: account?.transfersEnabled ?? false,
+				}
+			: null,
 	};
 }
+
+/**
+ * Bind a case to its payout destination.
+ *
+ * The destination is **the account opened for this case**, and it must be held by the
+ * attorney the case's own match or designated email resolves to. Both halves of that
+ * are derived from the case row rather than passed in, so there is no input a caller
+ * could vary to point a case at an arbitrary account. That is the one mistake in this
+ * file that would move real money to the wrong person, and the reason neither the
+ * account id nor the attorney id is a parameter.
+ *
+ * Checking the holder is not redundant with `caseId` being unique. A case that changes
+ * counsel keeps the previous firm's account row until the new firm opens theirs, and
+ * binding in that window would send the new attorney's client's money to the firm that
+ * left.
+ *
+ * The plaintiff is still the one who calls this: they own the case and they decide
+ * when it opens for donations. What they cannot do is choose the destination.
+ *
+ * Idempotent and re-runnable while a case is not yet live; rebinding a `live` case is
+ * refused, because donors have already been shown who receives.
+ */
+export type BindResult =
+	| { ok: true; firmName: string | null; attorneyName: string }
+	| {
+			ok: false;
+			reason:
+				| "case_not_found"
+				| "already_live"
+				| "no_attorney"
+				| "attorney_no_account";
+	  };
 
 export async function bindCasePayout(input: {
 	caseId: string;
 	/** The case owner, as known to the caller — guards against binding others' cases. */
 	ownerId: string;
-	recipient: PayoutRecipient;
 }): Promise<BindResult> {
 	const k = await prisma.case.findFirst({
 		where: { id: input.caseId, ownerId: input.ownerId, deletedAt: null },
-		select: {
-			id: true,
-			status: true,
-			payoutAccountId: true,
-			match: { select: { attorneyId: true } },
-		},
+		select: REPRESENTING_SELECT,
 	});
 	if (!k) return { ok: false, reason: "case_not_found" };
 	// The invariant is "don't move the destination after donors were shown one" —
@@ -282,25 +497,27 @@ export async function bindCasePayout(input: {
 		return { ok: false, reason: "already_live" };
 	}
 
-	// Whose account may this case point at?
-	let holderId: string;
-	if (input.recipient === "plaintiff") {
-		holderId = input.ownerId;
-	} else {
-		if (!k.match?.attorneyId)
-			return { ok: false, reason: "no_attorney_matched" };
-		holderId = k.match.attorneyId;
-	}
+	// Nobody linked means no firm to pay. Reported separately from "the firm hasn't
+	// onboarded" because they are different problems with different fixes: get your
+	// attorney onto the platform, versus wait on the one who is already here.
+	const representing = await representingAttorney(k);
+	if (!representing) return { ok: false, reason: "no_attorney" };
+	const { attorney } = representing;
+	// This case's own account, and only if the representing attorney holds it.
+	const account = accountHeldBy(k.payoutAccountForCase, attorney.id);
+	if (!account) return { ok: false, reason: "attorney_no_account" };
 
-	const account = await prisma.payoutAccount.findUnique({
-		where: { userId: holderId },
-		select: { id: true },
-	});
-	if (!account) return { ok: false, reason: "no_account" };
-
+	// `attorney` is the only value a bind writes. The column is what the donor-facing
+	// disclosure reads from — a case must be able to *state* who receives, not have it
+	// inferred at render time — and existing `plaintiff` rows keep that value so their
+	// already-delivered disclosure stays true. See `PayoutRecipient`.
 	await prisma.case.update({
 		where: { id: k.id },
-		data: { payoutRecipient: input.recipient, payoutAccountId: account.id },
+		data: { payoutRecipient: "attorney", payoutAccountId: account.id },
 	});
-	return { ok: true };
+	return {
+		ok: true,
+		firmName: attorney.firmName?.trim() || null,
+		attorneyName: attorney.name,
+	};
 }

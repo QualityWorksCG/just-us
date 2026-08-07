@@ -9,8 +9,9 @@
  * the recipient's connected account, and `application_fee_amount` comes back to
  * us. Deliberately *without* `on_behalf_of` — setting it would move Stripe's
  * processing fee onto the connected account and break the published "$100 in →
- * $95 to the recipient" promise. The recipient is either the plaintiff or their
- * attorney, per case — see `Case.payoutRecipient`. See also `./fees`.
+ * $95 to the recipient" promise. The recipient is the operating account of the firm
+ * representing the case, one per case — see `Case.payoutRecipient` and
+ * `PayoutAccount`. See also `./fees`.
  */
 import { env } from "@just-us/env/server";
 import Stripe from "stripe";

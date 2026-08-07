@@ -1,16 +1,34 @@
 // biome-ignore-all lint/performance/noImgElement: case images are user-uploaded Blob URLs, not static assets
 import { getPublicCase } from "@just-us/db/cases";
+import {
+	donorSupportForCase,
+	getDonationForCheckoutSession,
+	listCaseBackers,
+} from "@just-us/db/donations";
 import { resolvePayoutDestination } from "@just-us/db/payouts";
 import {
 	donationPresets,
 	minDonationCents,
 	platformFeeBps,
 } from "@just-us/payments";
-import { Eye, Lock, Megaphone, Scale, ShieldCheck } from "lucide-react";
+import {
+	Eye,
+	HeartHandshake,
+	Lock,
+	Megaphone,
+	Scale,
+	ShieldCheck,
+} from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { DonationReceipt } from "@/components/donation-receipt";
 import { PublicCaseActions } from "@/components/public-case-actions";
+import { getSession } from "@/lib/auth-server";
+import {
+	syncDonationBySession,
+	syncPendingDonationsForCase,
+} from "@/lib/donation-sync";
 
 function money(n: number) {
 	return new Intl.NumberFormat("en-US", {
@@ -18,6 +36,52 @@ function money(n: number) {
 		currency: "USD",
 		maximumFractionDigits: 0,
 	}).format(n);
+}
+
+function exactMoney(cents: number) {
+	return new Intl.NumberFormat("en-US", {
+		style: "currency",
+		currency: "USD",
+		minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+	}).format(cents / 100);
+}
+
+/**
+ * How a backer is named in public.
+ *
+ * First name and last initial, not the full name Checkout collected. That name was
+ * given to pay for something, not to be published next to an amount on a page
+ * anyone can read — and there is no "give anonymously" choice on the donate card
+ * yet, so the conservative rendering is the only consent we can honour. A donation
+ * with no name at all shows as "Anonymous" rather than an empty row.
+ */
+function backerName(name: string | null) {
+	const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+	if (parts.length === 0) return "Anonymous";
+	const [first, ...rest] = parts;
+	const lastInitial = rest.at(-1)?.[0];
+	return lastInitial ? `${first} ${lastInitial.toUpperCase()}.` : first;
+}
+
+/** "2 hours ago" — a backers list is about recency, not timestamps. */
+function timeAgo(date: Date | null) {
+	if (!date) return "just now";
+	const seconds = Math.max(0, (Date.now() - date.getTime()) / 1000);
+	const units: [Intl.RelativeTimeFormatUnit, number][] = [
+		["year", 31_536_000],
+		["month", 2_592_000],
+		["week", 604_800],
+		["day", 86_400],
+		["hour", 3600],
+		["minute", 60],
+	];
+	const rtf = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
+	for (const [unit, secondsPer] of units) {
+		if (seconds >= secondsPer) {
+			return rtf.format(-Math.floor(seconds / secondsPer), unit);
+		}
+	}
+	return "just now";
 }
 
 function initials(name: string) {
@@ -47,10 +111,24 @@ export async function generateMetadata({
 
 export default async function PublicCasePage({
 	params,
+	searchParams,
 }: {
 	params: Promise<{ id: string }>;
+	/** Set by Stripe's return URL after a payment — see `donate-actions.ts`. */
+	searchParams: Promise<{ donated?: string; session_id?: string }>;
 }) {
 	const { id } = await params;
+	const sp = await searchParams;
+
+	// Reconcile *before* the case is read, so the totals below are the ones after
+	// any paid-but-unapplied donation lands rather than one render behind it. The
+	// donor's own session id is reconciled first and exactly; the sweep then covers
+	// donations by anyone else that a late or undelivered webhook left pending.
+	const returningSessionId =
+		sp.donated === "1" && sp.session_id ? sp.session_id : null;
+	if (returningSessionId) await syncDonationBySession(returningSessionId);
+	await syncPendingDonationsForCase(id);
+
 	const c = await getPublicCase(id);
 	if (!c) notFound();
 
@@ -73,28 +151,68 @@ export default async function PublicCasePage({
 		unbound:
 			"This case is still setting up where donations go, so it can't accept them yet.",
 		transfers_disabled:
-			"The recipient's payout setup is still being verified. Donations open as soon as it clears.",
+			"The receiving law firm's payout setup is still being verified. Donations open as soon as it clears.",
 	};
 
-	// Who this case's donations are paid to. A donor decides partly on this, and
-	// terms §4 commits to stating it per case, so it is read from the case's own
-	// `payoutRecipient` rather than asserted globally — the recipient is either
-	// side depending on how the case was set up. Null means no payout account has
-	// been designated yet, and the note must claim neither rather than guess.
+	// Who this case's donations are paid to, read from the case's own
+	// `payoutRecipient` rather than asserted globally — terms §4 commits to stating it
+	// *per case*, and cases bound before the move to firm accounts still pay the
+	// plaintiff. Telling their donors otherwise would make a disclosure those donors
+	// already acted on retroactively false. Null means nothing is designated yet, and
+	// the note must claim nobody rather than promise on a case that cannot receive.
+	const firmLabel =
+		destination.ok && (destination.holderFirm ?? destination.holderName)
+			? (destination.holderFirm ?? destination.holderName)
+			: (c.attorneyFirm ?? c.attorneyName ?? null);
 	const fundsNote =
-		c.payoutRecipient === "plaintiff"
-			? `Funds go to ${ownerFirst}'s account — ${ownerFirst} pays the attorney directly.`
-			: c.payoutRecipient === "attorney"
-				? `Funds go straight to ${c.attorneyName ?? "the attorney"}'s account — never through ${ownerFirst}.`
+		c.payoutRecipient === "attorney"
+			? firmLabel
+				? `Funds go to ${firmLabel} — the law firm representing ${ownerFirst}, not to ${ownerFirst} and never to JustUs.`
+				: `Funds go to the law firm representing ${ownerFirst} — never to JustUs.`
+			: c.payoutRecipient === "plaintiff"
+				? `Funds go to ${ownerFirst}'s account — ${ownerFirst} pays the attorney directly.`
 				: "Funds go to the recipient this case designates — never to JustUs.";
 	const paragraphs = c.story
 		.split(/\n{2,}|\n/)
 		.map((p) => p.trim())
 		.filter(Boolean);
 
+	// Who's already given, and whether the person reading is one of them. The email
+	// is only offered as a match key when it is *verified*, for the same reason
+	// `claimGuestDonations` insists on one: anyone can type another person's address
+	// into Checkout, and an unverified match would report a stranger's giving back.
+	const session = await getSession();
+	const viewer = session?.user ?? null;
+	const [backers, mySupport, myDonation] = await Promise.all([
+		listCaseBackers(c.id),
+		viewer
+			? donorSupportForCase({
+					caseId: c.id,
+					donorId: viewer.id,
+					donorEmail: viewer.emailVerified ? viewer.email : null,
+				})
+			: Promise.resolve({ totalCents: 0, count: 0 }),
+		returningSessionId
+			? getDonationForCheckoutSession({
+					stripeCheckoutSessionId: returningSessionId,
+					caseId: c.id,
+				})
+			: Promise.resolve(null),
+	]);
+	const iBackedThis = mySupport.count > 0;
+
 	return (
 		<main className="h-full overflow-y-auto bg-paper">
 			<div className="mx-auto max-w-[1100px] px-6 py-10 sm:py-14">
+				{/* Just paid. Confirms the gift and keeps refreshing this render until the
+				    donation settles, so the totals below catch up without a manual reload. */}
+				{returningSessionId && (
+					<DonationReceipt
+						settled={myDonation?.status === "succeeded"}
+						amountLabel={myDonation ? exactMoney(myDonation.amountCents) : null}
+					/>
+				)}
+
 				{/* Header */}
 				<div className="mb-2.5 flex flex-wrap gap-1.5">
 					<span className="rounded-[var(--radius-chip)] bg-brass-wash px-2.5 py-0.5 font-semibold text-[12px] text-brass-deep">
@@ -223,6 +341,24 @@ export default async function PublicCasePage({
 							<p className="mt-3 font-semibold text-[13px] text-ink">
 								{c.donorsCount} {c.donorsCount === 1 ? "donor" : "donors"}
 							</p>
+
+							{/* Recognise a returning donor. Someone who has already given and
+							    is shown the same undifferentiated donate card has no way to
+							    tell whether their gift registered. */}
+							{iBackedThis && (
+								<p className="mt-3 flex items-center gap-2 rounded-[var(--radius-card-sm)] bg-green-soft px-3 py-2 font-semibold text-[12.5px] text-green-deep">
+									<HeartHandshake
+										className="size-4 shrink-0"
+										aria-hidden="true"
+									/>
+									You backed this case — {exactMoney(mySupport.totalCents)}{" "}
+									given
+									{mySupport.count > 1
+										? ` across ${mySupport.count} gifts`
+										: ""}
+								</p>
+							)}
+
 							<div className="mt-5">
 								<PublicCaseActions
 									sharePath={`/cases/${c.id}`}
@@ -231,6 +367,7 @@ export default async function PublicCasePage({
 										presetsCents: donationPresets(),
 										minCents: minDonationCents(),
 										feeBps: platformFeeBps(),
+										alreadyBacked: iBackedThis,
 										canDonate: destination.ok,
 										blockedReason: destination.ok
 											? null
@@ -240,15 +377,53 @@ export default async function PublicCasePage({
 							</div>
 						</div>
 
-						{/* Recent backers — no backer records yet, honest empty state */}
+						{/* Recent backers */}
 						<div className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">
 							<p className="mb-3 font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.08em]">
 								Recent backers
 							</p>
-							{c.donorsCount > 0 ? (
-								<p className="text-[13px] text-ink-soft">
-									{c.donorsCount} people have backed this case.
-								</p>
+							{backers.length > 0 ? (
+								<>
+									<ul className="flex flex-col gap-3">
+										{backers.map((b) => {
+											const mine = !!viewer && b.donorId === viewer.id;
+											return (
+												<li key={b.id} className="flex items-center gap-2.5">
+													<span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brass-wash font-bold text-[10.5px] text-brass-deep">
+														{b.donorName ? initials(b.donorName) : "★"}
+													</span>
+													<span className="min-w-0 flex-1">
+														<span className="flex items-center gap-1.5">
+															<span className="truncate font-semibold text-[13px] text-ink">
+																{mine ? "You" : backerName(b.donorName)}
+															</span>
+															{mine && (
+																<span className="rounded-[var(--radius-chip)] bg-green-soft px-1.5 py-px font-mono font-semibold text-[9.5px] text-green-deep uppercase tracking-[0.06em]">
+																	Your gift
+																</span>
+															)}
+														</span>
+														<span className="block text-[11.5px] text-muted-foreground">
+															{timeAgo(b.succeededAt)}
+														</span>
+													</span>
+													<span className="shrink-0 font-bold text-[13px] text-brass-deep tabular-nums">
+														{exactMoney(b.amountCents)}
+													</span>
+												</li>
+											);
+										})}
+									</ul>
+									{c.donorsCount > backers.length && (
+										<p className="mt-3 border-border border-t pt-3 text-[12px] text-muted-foreground">
+											…and {c.donorsCount - backers.length} more{" "}
+											{c.donorsCount - backers.length === 1
+												? "donor"
+												: "donors"}
+											.
+										</p>
+									)}
+								</>
 							) : (
 								<p className="text-[13px] text-muted-foreground leading-relaxed">
 									No backers yet — be the first to help {ownerFirst} fund this

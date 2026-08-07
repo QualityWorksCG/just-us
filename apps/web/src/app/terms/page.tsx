@@ -11,7 +11,7 @@ export default function TermsPage() {
 	return (
 		<LegalPage
 			title="Terms of Service"
-			updated="July 22, 2026"
+			updated="August 5, 2026"
 			intro="These Terms are a plain-language agreement between you and JustUs Financial. They explain what JustUs does, what it does not do, and the rules for using the platform. Please read them together with our Privacy Policy. If you do not agree, do not use JustUs."
 		>
 			<section>
@@ -68,7 +68,9 @@ export default function TermsPage() {
 				<p>
 					Because donated funds move quickly toward a live legal matter,
 					donations are generally non-refundable except where required by law or
-					expressly stated at the time of giving.
+					expressly stated at the time of giving. Where a refund is made, it is
+					net of the payment processing fees on the original transaction — see
+					section 4.
 				</p>
 			</section>
 
@@ -87,20 +89,54 @@ export default function TermsPage() {
 						balance never receives a donated dollar.
 					</li>
 					<li>
-						<strong>Each case names who receives its funds.</strong> Depending
-						on how the case is set up, the recipient is either the{" "}
-						<strong>plaintiff</strong> or their{" "}
-						<strong>retained attorney</strong>. Whichever it is, that recipient
-						opens and controls the receiving account themselves, and it is
-						stated on the case page before you give. JustUs does not choose the
-						recipient and does not direct how funds are used once received.
+						<strong>
+							The law firm representing the case receives the funds.
+						</strong>{" "}
+						Donations are paid into the <strong>operating account</strong> of
+						the firm whose attorney represents the case, opened and controlled
+						by that firm. The recipient is stated on the case page before you
+						give. Funds are <strong>not</strong> paid to the plaintiff, and
+						JustUs does not direct how they are applied once received.
 					</li>
 					<li>
-						Where the plaintiff is the recipient, funds are received by them
-						directly and are <strong>not</strong> held in an attorney trust
-						account or subject to the professional obligations that attach to
-						one. Where the attorney is the recipient, their handling of client
-						funds is governed by their own professional rules, not by JustUs.
+						<strong>Each case is funded through its own account.</strong> A firm
+						representing more than one case on JustUs holds a separate connected
+						account per case, so one case's donations, refunds, and balance are
+						never combined with another's — a reversal on one case cannot be
+						taken out of a different client's funds.
+					</li>
+					<li>
+						Funds are received by the firm as an{" "}
+						<strong>advance payment of fees from a third party</strong> for the
+						client's matter. Handling them from that point — including any
+						obligation to deposit them in a client trust or IOLTA account, to
+						account for them, and to refund any unearned portion — is governed
+						by the rules of professional conduct of the firm's jurisdiction and
+						is the firm's responsibility alone. JustUs neither administers nor
+						supervises trust accounting, and is not a party to the fee agreement
+						between an attorney and their client.
+					</li>
+					<li>
+						<strong>Refunds are net of processing fees.</strong> Where a
+						donation is voluntarily refunded, it is refunded{" "}
+						<strong>
+							minus the non-refundable third-party payment processing fees
+						</strong>{" "}
+						charged on the original transaction (currently 2.9% + $0.30 per
+						transaction). Those fees are retained by the payment processor and
+						are not returned to JustUs on a refund, so they cannot be returned
+						to the donor.
+					</li>
+					<li>
+						<strong>Chargebacks are the receiving firm's liability.</strong> By
+						connecting an account to receive donations, a law firm agrees that
+						any chargeback, fraud reversal, or refund on a donation routed to it
+						— including reversals forced by a card network or bank, and the
+						associated processor fees — is the firm's liability and not
+						JustUs's. JustUs may recover such amounts from the firm's connected
+						balance, including by reversing transfers to it or withholding
+						subsequent transfers, and any shortfall remains a debt owed to
+						JustUs.
 					</li>
 					<li>
 						We do not take any share of legal fees or settlements. Fees and
@@ -138,6 +174,18 @@ export default function TermsPage() {
 						Attorneys remain independently responsible for their professional
 						conduct, their fee agreements with clients, and compliance with the
 						rules of every jurisdiction in which they practice.
+					</li>
+					<li>
+						An attorney who connects an account to receive donations does so on
+						behalf of their firm, warrants that they are authorized to do so,
+						and must use the firm's <strong>operating account</strong> — not a
+						client trust or IOLTA account, which our payment processor cannot
+						support. A separate account is connected for{" "}
+						<strong>each case</strong> the firm represents, so completing setup
+						for one matter does not enable another. Applying received funds to
+						the client's matter in accordance with trust-accounting rules, and
+						the liability for refunds and chargebacks on them, sit with the
+						firm. See section 4.
 					</li>
 					<li>
 						JustUs does not supervise legal work, guarantee attorney

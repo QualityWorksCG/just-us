@@ -451,7 +451,7 @@ export function AttorneyProfileView({
 									aria-hidden="true"
 								/>
 								<span>
-									Funds settle to the recipient each case names — never to
+									Funds settle to the plaintiff each case names — never to
 									JustUs.
 								</span>
 							</li>

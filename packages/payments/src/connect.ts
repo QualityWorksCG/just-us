@@ -22,9 +22,23 @@
  * Stripe's cut coming out of our platform fee rather than the recipient's
  * transfer.
  *
- * **Recipient-agnostic.** Either a plaintiff or an attorney can hold the receiving
- * account (see `Case.payoutRecipient`), so nothing here assumes a role beyond the
- * one place it genuinely differs: the MCC.
+ * `losses_collector: "application"` is a deliberate keep, not an oversight, and it
+ * is what the terms have to be written against. On a destination charge with no
+ * `on_behalf_of`, JustUs is the merchant of record: a chargeback is raised against
+ * the platform's balance, and the only way to recover it from the firm is to reverse
+ * the transfer. Stripe's alternative (`"stripe"`) makes Stripe — not the connected
+ * account — carry negative balances, so it would not put the loss on the firm
+ * either. Terms §4 therefore states the firm's liability and JustUs's right to
+ * recover, rather than claiming Stripe debits them automatically. The reversal
+ * itself is not wired up yet; the dispute webhook only marks the donation.
+ *
+ * **The account is a law firm's operating account.** The holder is the attorney
+ * representing the case; the money lands in the firm's business checking account and
+ * the attorney moves it into their IOLTA/trust account under their state bar's rules.
+ * To Stripe this is an ordinary business onboarding: a firm name, an EIN, a business
+ * bank account, through the standard hosted flow. Pointing Stripe at a trust account
+ * instead would fail — those accounts reject the automated debit relationship Stripe
+ * requires — and paying a private individual was the model this replaced.
  *
  * Nothing here writes to the database. These functions talk to Stripe and return
  * plain values; persisting the account id and the capability flags is the caller's
@@ -59,23 +73,19 @@ export type ConnectAccountStatus = {
 	payoutsEnabled: boolean;
 };
 
-/** Which side of a case is receiving — mirrors the `PayoutRecipient` enum. */
-export type RecipientKind = "plaintiff" | "attorney";
-
 /**
  * What Stripe's underwriters are told this account is for. Internal to Stripe, and
  * deliberately explicit that no goods or services are sold — a balance receiving
- * public money with an unexplained purpose is what triggers a hold.
+ * public money with an unexplained purpose is what triggers a hold. It also names
+ * the trust-accounting step, because "law firm receives third-party money toward a
+ * client's fees" is a shape a reviewer recognises and a bare "receives donations"
+ * is not.
  */
-const PRODUCT_DESCRIPTION: Record<RecipientKind, string> = {
-	plaintiff:
-		"Receives donations from the public toward the legal fee for their own civil litigation, raised through the JustUs Financial platform. No goods or services are sold; donations are gifts and carry no financial return.",
-	attorney:
-		"Receives donations from the public toward legal fees for clients they represent in civil litigation, raised through the JustUs Financial platform. No goods or services are sold to donors; donations are gifts and carry no financial return.",
-};
+const PRODUCT_DESCRIPTION =
+	"A law firm's operating account receiving donations from the public toward legal fees for clients it represents in civil litigation, raised through the JustUs Financial platform. Funds are received as an advance payment of fees from third parties and handled under the firm's state bar trust-accounting rules. No goods or services are sold to donors; donations are gifts and carry no financial return.";
 
 /**
- * Create a v2 account for a donation recipient.
+ * Create a v2 account for a law firm receiving donations.
  *
  * **MCC is not settable here.** It is a field on the `merchant` configuration, not
  * `recipient` — passing `configuration.recipient.mcc` is rejected outright as an
@@ -84,15 +94,13 @@ const PRODUCT_DESCRIPTION: Record<RecipientKind, string> = {
  * this file set `8111` for attorneys and would have failed every attorney's
  * onboarding.)
  *
- * `entity_type` is set **only for plaintiffs**, where the answer is never in
- * doubt: a plaintiff receiving donations toward their own lawsuit is an
- * individual. Supplying it skips Stripe's "Business type" step, which otherwise
- * asks a private person to choose between unregistered business, LLC, nonprofit,
- * and government entity — none of which describes them, and one of which
- * (nonprofit) would imply a tax-deductibility their donors do not get.
- *
- * For an attorney it is genuinely unknown — solo practitioner or firm — so it is
- * left unset and the hosted flow asks them.
+ * `entity_type` is left **unset** and the hosted flow asks. It is genuinely unknown
+ * here — a solo practitioner may be an individual or a sole proprietorship while a
+ * firm is a company — and guessing wrong is worse than one extra question: an
+ * account created as `individual` cannot simply be re-declared as the firm it
+ * actually is. This is the standard business onboarding, which is the whole reason
+ * the operating account is the destination: firm name, EIN, business checking
+ * account, no custom banking work on our side.
  *
  * Only `stripe_balance.stripe_transfers` is requested. `stripe_balance.payouts`
  * shows up in the requirements Stripe raises but is not a requestable field on the
@@ -101,10 +109,23 @@ const PRODUCT_DESCRIPTION: Record<RecipientKind, string> = {
  */
 export async function createPayoutAccount(input: {
 	email: string;
-	/** Display name Stripe shows the holder during onboarding. */
+	/**
+	 * Display name Stripe shows the holder during onboarding, and the
+	 * `doing_business_as` on the account. The **firm's** name when we have one — this
+	 * is the name that appears against the money, and a firm's account labelled with
+	 * one partner's personal name is a mismatch a reviewer has to resolve.
+	 */
 	displayName: string;
-	/** Which side of the case is receiving. */
-	recipientKind: RecipientKind;
+	/**
+	 * The case this account exists for. One account per case, so this is what makes an
+	 * attorney's three accounts tellable apart — in their own Stripe dashboard list, in
+	 * Stripe's emails to them, and to anyone at Stripe reviewing them.
+	 *
+	 * Appended to the display name rather than replacing the firm's, so the legal
+	 * entity being verified still reads first.
+	 */
+	caseId: string;
+	caseTitle: string;
 	/**
 	 * A public page describing what this account is for. Stripe *requires* a
 	 * business URL (it raises `defaults.profile.business_url` as a requirement), so
@@ -115,13 +136,12 @@ export async function createPayoutAccount(input: {
 }): Promise<ConnectAccountStatus> {
 	const account = await stripe().v2.core.accounts.create({
 		contact_email: input.email,
-		display_name: input.displayName,
-		identity: {
-			country: "us",
-			...(input.recipientKind === "plaintiff"
-				? { entity_type: "individual" as const }
-				: {}),
-		},
+		display_name: displayNameFor(input.displayName, input.caseTitle),
+		identity: { country: "us" },
+		// Which case this account belongs to, readable from Stripe's side. When a firm
+		// holds several, this is what makes a balance, a payout or a dispute in the
+		// dashboard traceable to a matter without going through our database.
+		metadata: { caseId: input.caseId },
 		configuration: {
 			recipient: {
 				capabilities: {
@@ -140,18 +160,37 @@ export async function createPayoutAccount(input: {
 			},
 			profile: {
 				business_url: input.businessUrl,
+				// The firm alone, without the case. This is the trading name of the legal
+				// entity Stripe is verifying; qualifying it with a matter would describe
+				// something that is not a business.
 				doing_business_as: input.displayName,
 				// Stripe's docs call this internal-only, for risk and underwriting. An
 				// account receiving public donations toward litigation with no stated
 				// purpose is exactly the shape that gets held for review, so say plainly
 				// what it is — including that nothing is being sold, which is the
 				// question a reviewer is actually asking.
-				product_description: PRODUCT_DESCRIPTION[input.recipientKind],
+				product_description: `${PRODUCT_DESCRIPTION} This account receives for a single matter only: ${input.caseTitle}.`,
 			},
 		},
 		include: [...INCLUDE],
 	});
 	return toStatus(account);
+}
+
+/**
+ * "Firm — Case title", within Stripe's 100-character limit on `display_name`.
+ *
+ * The firm is never truncated and the case title gives way, because the display name's
+ * first job is to name the entity being verified; telling matters apart is the second.
+ * A firm name long enough to fill the field on its own is simply used alone.
+ */
+function displayNameFor(firm: string, caseTitle: string): string {
+	const MAX = 100;
+	const title = caseTitle.trim();
+	if (!title) return firm.slice(0, MAX);
+	const room = MAX - firm.length - " — ".length;
+	if (room < 12) return firm.slice(0, MAX);
+	return `${firm} — ${title.length > room ? `${title.slice(0, room - 1)}…` : title}`;
 }
 
 /**

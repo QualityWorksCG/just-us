@@ -16,6 +16,8 @@ export type DonateConfig = {
 	minCents: number;
 	/** Platform fee rate, resolved server-side — never assumed in the browser. */
 	feeBps: number;
+	/** True when the viewer has already given here — changes the CTA to "give again". */
+	alreadyBacked: boolean;
 	/** False when the case can't take money; `blockedReason` says why. */
 	canDonate: boolean;
 	blockedReason: string | null;
@@ -192,8 +194,10 @@ export function PublicCaseActions({
 						{pending
 							? "Taking you to checkout…"
 							: breakdown
-								? `Back this case — ${exactUsd(breakdown.amountCents)}`
-								: "Back this case"}
+								? `${config.alreadyBacked ? "Give again" : "Back this case"} — ${exactUsd(breakdown.amountCents)}`
+								: config.alreadyBacked
+									? "Give again"
+									: "Back this case"}
 					</button>
 
 					<p className="flex items-start gap-1.5 text-[11.5px] text-muted-foreground leading-relaxed">

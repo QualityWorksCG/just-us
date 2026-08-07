@@ -48,7 +48,12 @@ export async function createDonationCheckout(input: {
 	 */
 	donorEmail: string | null;
 	amountCents: number;
-	/** The case's bound destination — never resolved from the matched attorney. */
+	/**
+	 * The case's **bound** destination, passed in by the caller. Deliberately not
+	 * re-derived from the case's attorney here: binding froze the destination, and
+	 * resolving it again at charge time would let a later change of counsel redirect
+	 * money donors gave against a stated recipient.
+	 */
 	destinationAccountId: string;
 	/** Absolute URLs; Stripe rejects relative ones. */
 	successUrl: string;

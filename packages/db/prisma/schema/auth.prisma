@@ -56,10 +56,12 @@ model User {
   representationInterests AttorneyRequest[]
   matches                 Match[]
 
-  // Stripe Connect destination for donations, held by whoever receives — a
-  // plaintiff or an attorney. Absent until they start onboarding. See
-  // PayoutAccount.
-  payoutAccount PayoutAccount?
+  // Stripe Connect destinations for donations — the firm's operating account, one
+  // per case this attorney represents, so no two cases share a balance. Only
+  // attorneys onboard these; a plaintiff's cases pay out to the firm representing
+  // them. Some plaintiff rows still carry a single account from before that pivot,
+  // which nothing routes to. See PayoutAccount.
+  payoutAccounts PayoutAccount[]
 
   // Administration (JUS-67): invitations this user sent, and their audit trail.
   sentAdminInvitations AdminInvitation[] @relation("AdminInvitationInviter")

@@ -7,18 +7,46 @@
 // lands in; the donation ledger itself is `Donation` in case.prisma, next to the
 // case it funds.
 //
-// Who receives is deliberately **not** fixed here. Either the plaintiff or the
-// retained attorney may be the payout recipient, decided per case — see
-// `Case.payoutRecipient`. Everything below is recipient-agnostic on purpose: to
-// Stripe, and to this schema, a recipient is just an onboarded account that can
-// accept a charge.
+// **The recipient is the representing law firm's operating account.** Donations
+// land in the business checking account of the firm that represents the case, and
+// the attorney moves them into their own IOLTA/trust account as an advance of
+// fees under their state bar's rules. Two things follow, and both are why this is
+// the model rather than paying the plaintiff:
+//
+//   - The platform never routes crowd-raised legal fees to a private individual,
+//     which is what created the liability the previous model carried.
+//   - The trust-accounting obligation lands where the professional duty already
+//     is — with the attorney, under bar supervision — instead of on JustUs.
+//
+// A trust account is deliberately *not* what Stripe is pointed at: IOLTA accounts
+// carry restrictions banks reject an automated debit relationship against, so the
+// operating account is both the compliant and the technically viable destination.
+// To Stripe this is an ordinary business receiving funds — an EIN, a firm name,
+// and a business checking account through the standard hosted flow.
 
-/// A user's Stripe Connect (Express) account — a destination donations can be
-/// sent to. Held by whoever is receiving: a plaintiff or an attorney.
+/// A Stripe Connect (Express) account donations can be sent to — the law firm's
+/// operating account, held by the attorney who onboarded it.
 ///
-/// One per **person**, not per case and not per role. Stripe KYCs a human once,
-/// and an attorney representing nine cases cannot be re-verified nine times. A
-/// case points at one of these (`Case.payoutAccountId`) rather than owning one.
+/// **One account per case, not per person and not per firm.** A firm running three
+/// cases onboards three times and holds three `acct_…` ids. That is more work for the
+/// attorney than a single firm-wide account, and it is deliberate:
+///
+///   - **Funds never mix.** Each case's donations land in their own balance, so a
+///     chargeback or refund on one case cannot be taken out of another case's money.
+///     Sharing a balance means one donor's dispute reduces a different client's fund.
+///   - **Separate bank routing.** Each account carries its own external bank account,
+///     so a firm can route one case's funds to one internal account and another's
+///     elsewhere. A single connected account has one destination and no way to split.
+///   - **Clean per-case accounting** on Stripe's side as well as ours, with no
+///     reconciling of one balance against our ledger to work out whose money is whose.
+///
+/// The cost is a full Stripe onboarding — identity, EIN, bank account, review — per
+/// case, and an Express dashboard per case rather than one. That is accepted as the
+/// price of the isolation above.
+///
+/// Held by a `User` because the account is opened by a verifiable individual: an
+/// attorney with a bar number on file, who bears the professional obligation for the
+/// money afterwards.
 ///
 /// Every column except `stripeAccountId` is a **cache of Stripe's own view**,
 /// written only by the `account.updated` webhook and the initial create call.
@@ -27,10 +55,28 @@
 model PayoutAccount {
   id String @id @default(cuid())
 
-  /// The person this account belongs to — any role. Unique: one Stripe account
-  /// per human, so a case's destination is unambiguous once bound.
+  /// The case this account was opened for. Unique — one account per case — and the
+  /// **resume key**: an attorney who abandons the hosted flow and comes back must land
+  /// on the account already created for this case, not a second one.
+  ///
+  /// Deliberately distinct from `Case.payoutAccountId`, which is the destination the
+  /// case is *bound* to. The two point at each other in the ordinary path and differ
+  /// in exactly the two situations that need the distinction: between creating an
+  /// account and opening donations (created, not yet bound), and after a change of
+  /// counsel, where the new firm's account is opened while the old one still holds
+  /// what was already raised.
+  ///
+  /// Nullable only for accounts predating per-case onboarding — one firm-wide account
+  /// with cases already bound to it. Every account created from now on has one.
+  /// `SetNull`, not `Cascade`: a hard-deleted case must not take an account that
+  /// received real money with it.
+  case   Case?   @relation("PayoutAccountCase", fields: [caseId], references: [id], onDelete: SetNull)
+  caseId String? @unique
+
+  /// The attorney who onboarded and holds this account. **Not unique** — one attorney
+  /// holds one of these per case they represent.
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String @unique
+  userId String
 
   /// Stripe's `acct_…` id. The only column not derived from Stripe.
   stripeAccountId String @unique
@@ -64,28 +110,37 @@ model PayoutAccount {
   /// silently never receiving money.
   syncedAt DateTime?
 
-  /// Cases routing donations here. Many, because one attorney's account serves
-  /// every case they represent.
-  cases Case[]
+  /// Cases *bound* to this account as their destination. A list rather than one
+  /// because the legacy firm-wide accounts still carry several; every account created
+  /// per-case has exactly the one it was opened for.
+  cases Case[] @relation("CasePayoutDestination")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
+  /// "Every account this attorney holds" — the settings screen's query, and what the
+  /// nudge counts. Indexed rather than unique since per-case onboarding: Postgres does
+  /// not index foreign keys on its own.
+  @@index([userId])
   @@map("payout_account")
 }
 
 /// Who a given case pays out to.
 ///
-/// Recorded per case rather than decided platform-wide, because the two sides
-/// settle it between themselves: some plaintiffs bring their own attorney and
-/// receive funds directly, some retain through an attorney who holds them.
+/// **Only `attorney` is written now.** Donations go to the operating account of the
+/// firm representing the case; the attorney moves them into trust themselves.
 ///
-///   plaintiff — the case owner receives; they pay the attorney themselves.
-///   attorney  — the retained attorney receives directly.
+///   attorney  — the matched attorney's firm receives. The only value new binds write.
+///   plaintiff — **historical.** Paying the case owner directly was the model until
+///               the pivot to firm operating accounts. Rows already bound this way
+///               keep it: donors were shown that recipient before they gave, and
+///               rewriting the column would make a delivered disclosure retroactively
+///               false. Nothing writes it any more, and `bindCasePayout` cannot.
 ///
-/// This is the value the **donor-facing disclosure reads from**. A donor is told
-/// which of the two applies before they confirm, so it must be set and stated,
-/// never inferred at render time.
+/// This is the value the **donor-facing disclosure reads from**. A donor is told who
+/// receives before they confirm, so it must be set and stated, never inferred at
+/// render time — and a legacy `plaintiff` case must keep telling the truth about
+/// itself rather than inheriting the new wording.
 enum PayoutRecipient {
   plaintiff
   attorney

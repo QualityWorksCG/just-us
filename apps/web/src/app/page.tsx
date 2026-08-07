@@ -79,7 +79,7 @@ const promises = [
 	{
 		stat: "$0",
 		title: "We never hold the money",
-		body: "It routes straight to the case's recipient.",
+		body: "It routes straight to the attorney's firm.",
 		icon: Lock,
 		accent: "green" as const,
 	},
@@ -108,7 +108,7 @@ const trustItems = [
 	{
 		icon: Lock,
 		title: "Funds we never touch",
-		body: "Donations settle straight into an account held by the case's recipient — the plaintiff or their attorney, named on every case.",
+		body: "Donations settle straight into an account the plaintiff holds and controls, named on every case.",
 		badge: "Stripe Connect · $0 to JustUs",
 	},
 	{
@@ -577,7 +577,7 @@ export default async function Home() {
 						</div>
 						<div className="flex justify-between py-4 text-[14.5px]">
 							<span className="font-semibold text-ink">
-								Straight to the case's recipient
+								Straight to the plaintiff
 							</span>
 							<span className="font-extrabold text-[18px] text-brass-deep tabular-nums">
 								$95.00
@@ -585,9 +585,9 @@ export default async function Home() {
 						</div>
 						<p className="mt-2 flex gap-2 rounded-[var(--radius-card-sm)] bg-brass-wash px-3.5 py-3 text-[13px] text-brass-deep leading-relaxed">
 							<Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-							Funds route directly to an account held by the case's recipient —
-							the plaintiff or their retained attorney, stated on the case
-							before you give. JustUs never takes custody.
+							Funds route directly to an account the plaintiff holds and
+							controls, stated on the case before you give. They pay their
+							attorney themselves. JustUs never takes custody.
 						</p>
 					</div>
 				</div>

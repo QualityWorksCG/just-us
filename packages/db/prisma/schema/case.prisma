@@ -41,27 +41,37 @@ model Case {
   attorneyEmail    String?
   attorneyPhone    String?
   goalCents        Int
-  // Wizard field: the *method* the recipient wants funds by (e.g. bank transfer,
-  // debit card). Distinct from `payoutRecipient` below, which is *who* is paid —
-  // and largely superseded by it, since Stripe Connect onboarding collects the
-  // method itself. Kept because the wizard still writes it.
+  // Wizard field: the *method* funds arrive by (e.g. bank transfer, debit card).
+  // **Vestigial.** It described a payout the plaintiff would receive, and they no
+  // longer receive one — the firm does, and Stripe collects the firm's method during
+  // onboarding. The wizard still defaults and writes it, so the column stays rather
+  // than breaking publish; nothing reads it.
   payoutType       String?
 
   // ── Payout routing ────────────────────────────────────────────────────────
-  // Who this case pays out to, and the account it is bound to. Either the
-  // plaintiff or the retained attorney may receive; the pair is decided per case.
+  // Who this case pays out to, and the account it is bound to. The **matched
+  // attorney's firm operating account**: the firm receives, and the attorney moves
+  // the funds into their IOLTA/trust account under their own bar's rules. See
+  // `PayoutRecipient` for why some existing rows still read `plaintiff`.
   //
   // `payoutAccountId` is **bound**, not resolved. It would be shorter to walk
-  // `match.attorney.payoutAccount` at charge time, but then re-matching a case
-  // mid-campaign would silently redirect money donors gave on the basis of a
-  // stated recipient. Freezing the destination when the case goes live means the
-  // recipient a donor was shown is the recipient who is paid.
+  // `match.attorney.payoutAccount` at charge time, but binding freezes the
+  // destination, so nothing that happens to the case later — a re-match, a change
+  // of counsel — can redirect money donors gave on the basis of a stated recipient.
   //
-  // Both null while a case is draft/seeking. Going `live` requires both set, and
-  // the bound account's `transfersEnabled` true — that is the donation gate.
+  // Both null while a case is draft/seeking, which is also when there is no `match`
+  // to bind to. Accepting donations requires both set, and the bound account's
+  // `transfersEnabled` true — that is the donation gate.
   payoutRecipient PayoutRecipient?
-  payoutAccount   PayoutAccount?   @relation(fields: [payoutAccountId], references: [id], onDelete: Restrict)
+  payoutAccount   PayoutAccount?   @relation("CasePayoutDestination", fields: [payoutAccountId], references: [id], onDelete: Restrict)
   payoutAccountId String?
+
+  // The Stripe account opened *for this case* — one per case, so a firm running three
+  // cases holds three, and one case's donations, refunds and balance never touch
+  // another's. Present from the moment onboarding starts, which is before the case is
+  // bound; `payoutAccount` above is the destination donations actually route to. See
+  // `PayoutAccount.caseId` for why both exist.
+  payoutAccountForCase PayoutAccount? @relation("PayoutAccountCase")
 
   // Live funding progress.
   raisedCents Int @default(0)
@@ -144,7 +154,7 @@ model Donation {
   caseId String
 
   // What the donor was charged, the platform fee taken from it, and what reached
-  // the attorney's connected account. amountCents = feeCents + netCents.
+  // the firm's connected account. amountCents = feeCents + netCents.
   amountCents Int
   feeCents    Int @default(0)
   netCents    Int @default(0)

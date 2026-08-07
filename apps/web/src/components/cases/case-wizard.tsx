@@ -57,8 +57,15 @@ import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
 import { CASE_CATEGORIES } from "@/lib/case-categories";
 
-/** A piece of evidence: an uploaded file (has `size`) or a link (has `url`). */
-export type EvidenceItem = { name: string; size?: number; url?: string };
+/** A piece of evidence: a document the plaintiff uploaded, or a link they pasted.
+ *  Both carry a `url` — a file's is where it is stored, a link's is the address
+ *  itself — so `kind` is what tells them apart rather than the shape. */
+export type EvidenceItem = {
+	name: string;
+	size?: number;
+	url?: string;
+	kind?: "file" | "link";
+};
 
 export type WizardInitial = {
 	id: string;
@@ -209,6 +216,7 @@ export function CaseWizard({
 	const [moreImages, setMoreImages] = useState<string[]>(initial?.images ?? []);
 	const [uploadingCover, setUploadingCover] = useState(false);
 	const [uploadingMore, setUploadingMore] = useState(false);
+	const [uploadingEvidence, setUploadingEvidence] = useState(false);
 
 	// Step 3 — representation (do you have an attorney?)
 	const [repChoice, setRepChoice] = useState<"have" | "find" | null>(
@@ -483,12 +491,50 @@ export function CaseWizard({
 			setUploadingMore(false);
 		}
 	}
-	function onPickEvidence(e: React.ChangeEvent<HTMLInputElement>) {
-		const files = Array.from(e.target.files ?? []).map((f) => ({
-			name: f.name,
-			size: f.size,
-		}));
-		setEvidence((p) => [...p, ...files]);
+	/**
+	 * Evidence is uploaded, not just noted.
+	 *
+	 * It used to record a name and a byte count and drop the file on the floor,
+	 * which produced a case whose evidence nobody — not the plaintiff, not their
+	 * attorney — could ever open. The upload goes to the same Blob route as the
+	 * images, tagged so the server applies the document limits rather than the
+	 * image ones.
+	 *
+	 * Each file is added on its own as it lands, so one refusal (too big, wrong
+	 * type) doesn't discard the others that succeeded.
+	 */
+	async function onPickEvidence(e: React.ChangeEvent<HTMLInputElement>) {
+		const files = Array.from(e.target.files ?? []);
+		if (!files.length) return;
+		// Clear the input so re-picking the same file after a failure still fires.
+		e.target.value = "";
+		setUploadingEvidence(true);
+		try {
+			await Promise.all(
+				files.map(async (file) => {
+					try {
+						const blob = await upload(file.name, file, {
+							access: "public",
+							handleUploadUrl: "/api/cases/upload",
+							clientPayload: "evidence",
+						});
+						setEvidence((p) => [
+							...p,
+							{
+								name: file.name,
+								size: file.size,
+								url: blob.url,
+								kind: "file",
+							},
+						]);
+					} catch {
+						toast.error(`Couldn't upload ${file.name}. Please try again.`);
+					}
+				}),
+			);
+		} finally {
+			setUploadingEvidence(false);
+		}
 	}
 
 	function addLink() {
@@ -502,7 +548,10 @@ export function CaseWizard({
 				toast.error("That link is already added.");
 				return;
 			}
-			setEvidence((p) => [...p, { name: parsed.hostname, url: parsed.href }]);
+			setEvidence((p) => [
+				...p,
+				{ name: parsed.hostname, url: parsed.href, kind: "link" },
+			]);
 			setLinkUrl("");
 		} catch {
 			toast.error("Enter a valid link (e.g. https://…).");
@@ -898,7 +947,7 @@ export function CaseWizard({
 									className="size-4 shrink-0 text-brass-deep"
 									aria-hidden="true"
 								/>
-								Funds land in your account — you pay your attorney
+								Funds go straight to your attorney's firm
 							</li>
 							<li className="flex items-center gap-2.5 text-[13px] text-ink-soft">
 								<Eye
@@ -1437,14 +1486,17 @@ export function CaseWizard({
 										<button
 											type="button"
 											onClick={() => evidenceInput.current?.click()}
-											className="flex w-full flex-col items-center gap-1.5 rounded-[var(--radius-card-lg)] border border-line-strong border-dashed bg-surface px-6 py-8 text-center transition-colors hover:border-brass hover:border-solid hover:ring-1 hover:ring-brass"
+											disabled={uploadingEvidence}
+											className="flex w-full flex-col items-center gap-1.5 rounded-[var(--radius-card-lg)] border border-line-strong border-dashed bg-surface px-6 py-8 text-center transition-colors hover:border-brass hover:border-solid hover:ring-1 hover:ring-brass disabled:opacity-60"
 										>
 											<Upload
 												className="size-5 text-brass-deep"
 												aria-hidden="true"
 											/>
 											<span className="font-bold text-[14px] text-ink">
-												Drag files here, or browse
+												{uploadingEvidence
+													? "Uploading…"
+													: "Drag files here, or browse"}
 											</span>
 											<span className="text-[12.5px] text-muted-foreground">
 												PDF, JPG, PNG · up to 25MB each
@@ -1483,55 +1535,76 @@ export function CaseWizard({
 											</Button>
 										</div>
 
-										{evidence.map((f, i) => (
-											<div
-												key={`${f.url ?? f.name}-${i}`}
-												className="mt-2.5 flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-surface px-3.5 py-2.5"
-											>
-												{f.url ? (
-													<>
-														<Link2
-															className="size-4 shrink-0 text-brass-deep"
-															aria-hidden="true"
-														/>
-														<a
-															href={f.url}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="flex-1 truncate text-[13.5px] text-brass-deep hover:underline"
-														>
-															{f.name}
-														</a>
-														<span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.06em]">
-															Link
-														</span>
-													</>
-												) : (
-													<>
-														<FileText
-															className="size-4 shrink-0 text-brass-deep"
-															aria-hidden="true"
-														/>
-														<span className="flex-1 truncate text-[13.5px] text-ink">
-															{f.name}
-														</span>
-														<span className="text-[12px] text-muted-foreground tabular-nums">
-															{f.size != null ? formatSize(f.size) : ""}
-														</span>
-													</>
-												)}
-												<button
-													type="button"
-													aria-label="Remove evidence"
-													onClick={() =>
-														setEvidence((p) => p.filter((_, idx) => idx !== i))
-													}
-													className="text-muted-foreground hover:text-ink"
+										{evidence.map((f, i) => {
+											// A pasted address opens where it points; an uploaded
+											// document opens from where it was stored. Both are the
+											// plaintiff's own, on the plaintiff's own screen — the
+											// authorized route is for the people who read the case
+											// later, and there is no case id to address here yet.
+											const isLink = f.kind === "link" || (!!f.url && !f.size);
+											return (
+												<div
+													key={`${f.url ?? f.name}-${i}`}
+													className="mt-2.5 flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-surface px-3.5 py-2.5"
 												>
-													<X className="size-4" aria-hidden="true" />
-												</button>
-											</div>
-										))}
+													{isLink ? (
+														<>
+															<Link2
+																className="size-4 shrink-0 text-brass-deep"
+																aria-hidden="true"
+															/>
+															<a
+																href={f.url}
+																target="_blank"
+																rel="noopener noreferrer"
+																className="flex-1 truncate text-[13.5px] text-brass-deep hover:underline"
+															>
+																{f.name}
+															</a>
+															<span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.06em]">
+																Link
+															</span>
+														</>
+													) : (
+														<>
+															<FileText
+																className="size-4 shrink-0 text-brass-deep"
+																aria-hidden="true"
+															/>
+															{f.url ? (
+																<a
+																	href={f.url}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	className="flex-1 truncate text-[13.5px] text-brass-deep hover:underline"
+																>
+																	{f.name}
+																</a>
+															) : (
+																<span className="flex-1 truncate text-[13.5px] text-ink">
+																	{f.name}
+																</span>
+															)}
+															<span className="text-[12px] text-muted-foreground tabular-nums">
+																{f.size != null ? formatSize(f.size) : ""}
+															</span>
+														</>
+													)}
+													<button
+														type="button"
+														aria-label="Remove evidence"
+														onClick={() =>
+															setEvidence((p) =>
+																p.filter((_, idx) => idx !== i),
+															)
+														}
+														className="text-muted-foreground hover:text-ink"
+													>
+														<X className="size-4" aria-hidden="true" />
+													</button>
+												</div>
+											);
+										})}
 									</div>
 
 									<p className="flex gap-2.5 rounded-[var(--radius-card-sm)] bg-green-soft px-4 py-3 text-[13px] text-green-deep leading-relaxed">
@@ -1892,8 +1965,8 @@ export function CaseWizard({
 											Your funding goal is {money(goal)}
 										</p>
 										<p className="text-ink-soft">
-											The most that's ever raised — it lands in your account,
-											then you pay your attorney.
+											The most that's ever raised — it's paid to your attorney's
+											firm and applied to this fee.
 										</p>
 									</div>
 								</div>

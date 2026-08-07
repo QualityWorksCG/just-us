@@ -45,7 +45,7 @@ const DESTINATION_REASONS: Record<string, string> = {
 	unbound:
 		"This case hasn't finished setting up where donations go. It can't accept them yet.",
 	transfers_disabled:
-		"This case's payout setup is still being verified, so it can't accept donations yet. Please check back shortly.",
+		"The receiving law firm's payout setup is still being verified, so this case can't accept donations yet. Please check back shortly.",
 };
 
 export async function startDonation(
@@ -99,7 +99,12 @@ export async function startDonation(
 			donorEmail: donor?.email ?? null,
 			amountCents,
 			destinationAccountId: destination.stripeAccountId,
-			successUrl: `${origin}/cases/${caseId}?donated=1`,
+			// `{CHECKOUT_SESSION_ID}` is substituted by Stripe on redirect. The case
+			// page needs it because the webhook that folds the gift into the case
+			// totals lands out-of-band: without knowing *which* donation just
+			// happened, the page can only show stale totals and hope. Left literal —
+			// encoding the braces would send Stripe's placeholder through unexpanded.
+			successUrl: `${origin}/cases/${caseId}?donated=1&session_id={CHECKOUT_SESSION_ID}`,
 			cancelUrl: `${origin}/cases/${caseId}`,
 		});
 

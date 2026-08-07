@@ -1,10 +1,9 @@
-import { getPayoutAccount } from "@just-us/db/payouts";
+import { attorneyPayoutReadiness } from "@just-us/db/payouts";
 import { getOwnProfile } from "@just-us/db/profile";
-import { isPaymentsConfigured } from "@just-us/payments";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
 
-import { PayoutAccount } from "@/components/dashboard/payout-account";
+import { PayoutCasesLink } from "@/components/dashboard/payout-cases-link";
+import { PayoutExplainer } from "@/components/dashboard/payout-explainer";
 import { ProfileSettings } from "@/components/dashboard/profile-settings";
 import { requireOnboarded } from "@/lib/auth-server";
 
@@ -14,11 +13,19 @@ export default async function SettingsPage() {
 
 	if (!profile) redirect("/login");
 
-	// Only the two roles that can receive donations get a payout section. Donors
-	// and administrators never hold a receiving account.
-	const canReceive =
-		profile.role === "plaintiff" || profile.role === "attorney";
-	const payout = canReceive ? await getPayoutAccount(profile.id) : null;
+	// Neither role sets a payout up here any more. Donations pay the operating account
+	// of the firm representing a case, and there is one account per case — so the
+	// attorney's setup lives on each case, and this points them there rather than
+	// keeping a second copy of it. Donors and administrators never receive donated
+	// money, and a plaintiff no longer does either, so for them this stays an
+	// explanation of where their case's money goes.
+	const readiness =
+		profile.role === "attorney"
+			? await attorneyPayoutReadiness({
+					userId: profile.id,
+					email: profile.email,
+				})
+			: null;
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -34,20 +41,13 @@ export default async function SettingsPage() {
 					createdAt: profile.createdAt.toISOString(),
 				}}
 			/>
-			{canReceive && (
-				// PayoutAccount reads ?payout= to detect the return from Stripe's hosted
-				// flow, and useSearchParams needs a Suspense boundary to prerender.
-				<Suspense fallback={null}>
-					<PayoutAccount
-						initial={{
-							stripeAccountId: payout?.stripeAccountId ?? null,
-							detailsSubmitted: payout?.detailsSubmitted ?? false,
-							transfersEnabled: payout?.transfersEnabled ?? false,
-							payoutsEnabled: payout?.payoutsEnabled ?? false,
-							configured: isPaymentsConfigured(),
-						}}
-					/>
-				</Suspense>
+			{readiness ? (
+				<PayoutCasesLink
+					waitingCases={readiness.waitingCases}
+					inReviewCases={readiness.inReviewCases}
+				/>
+			) : (
+				profile.role === "plaintiff" && <PayoutExplainer />
 			)}
 		</div>
 	);

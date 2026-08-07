@@ -233,6 +233,134 @@ export async function markDonationRefunded(
 	});
 }
 
+/**
+ * One donation, looked up by the Checkout Session it was created for.
+ *
+ * This is what the case page reads when a donor lands back on it from Stripe with
+ * `session_id` in the URL. The webhook that marks the row `succeeded` and folds it
+ * into the case totals is delivered out-of-band, so on the first render after a
+ * payment the row may still be `pending` — the page uses this status to tell "your
+ * gift is landing" from "your gift landed" instead of silently showing stale
+ * totals.
+ *
+ * Scoped to a case id by the caller so a session id from one case cannot be used
+ * to read a donation on another, and deliberately returns **no donor identity** —
+ * the URL that carries a session id is shareable, and nothing here should be.
+ */
+export async function getDonationForCheckoutSession(input: {
+	stripeCheckoutSessionId: string;
+	caseId: string;
+}): Promise<{ status: string; amountCents: number } | null> {
+	const donation = await prisma.donation.findFirst({
+		where: {
+			stripeCheckoutSessionId: input.stripeCheckoutSessionId,
+			caseId: input.caseId,
+		},
+		select: { status: true, amountCents: true },
+	});
+	return donation ?? null;
+}
+
+/**
+ * Pending donations on a case, oldest first — the reconciliation work-list.
+ *
+ * A row sits here when the donor was sent to Checkout but no
+ * `checkout.session.completed` has been applied. Usually that means seconds of
+ * webhook lag; it can also mean the delivery was lost, or that nothing is
+ * forwarding webhooks at all (every local environment without `stripe listen`).
+ * Either way the money may well have moved at Stripe while the case totals say it
+ * did not, so these are re-checked against Stripe on read — see
+ * `syncPendingDonationsForCase` in the web app.
+ *
+ * `newerThanMs` skips rows too young to be worth a Stripe round-trip: the donor
+ * might still be on the payment screen. `olderThanMs` bounds how far back a page
+ * render will reach — anything staler is a job for reconciliation, not a page view.
+ */
+export async function listPendingDonationsForCase(input: {
+	caseId: string;
+	limit?: number;
+	newerThanMs?: number;
+	olderThanMs?: number;
+}) {
+	const now = Date.now();
+	return prisma.donation.findMany({
+		where: {
+			caseId: input.caseId,
+			status: "pending",
+			createdAt: {
+				...(input.newerThanMs
+					? { gte: new Date(now - input.newerThanMs) }
+					: {}),
+				...(input.olderThanMs
+					? { lte: new Date(now - input.olderThanMs) }
+					: {}),
+			},
+		},
+		orderBy: { createdAt: "asc" },
+		take: input.limit ?? 5,
+		select: { id: true, stripeCheckoutSessionId: true },
+	});
+}
+
+/**
+ * Public backers of a case, newest paid first.
+ *
+ * Only `succeeded` rows: a pending donation is an unfinished checkout, and listing
+ * one would show a gift that may never arrive. Returns the name Checkout collected
+ * and nothing else identifying — **never the email**, which is on the row for
+ * receipts and claiming, not for display.
+ */
+export async function listCaseBackers(caseId: string, take = 8) {
+	return prisma.donation.findMany({
+		where: { caseId, status: "succeeded" },
+		orderBy: { succeededAt: "desc" },
+		take,
+		select: {
+			id: true,
+			donorId: true,
+			donorName: true,
+			amountCents: true,
+			succeededAt: true,
+		},
+	});
+}
+
+/**
+ * What this donor has already given to this case — the basis for showing them
+ * "you backed this case" rather than making them wonder whether it registered.
+ *
+ * `donorEmail` matches a donation the donor made *before* signing in, so their own
+ * guest gift is recognised. The caller must only pass it for a **verified** email,
+ * for the same reason `claimGuestDonations` insists on one: anyone can type another
+ * person's address into Checkout, and an unverified match would report a stranger's
+ * giving back to them.
+ */
+export async function donorSupportForCase(input: {
+	caseId: string;
+	donorId: string;
+	/** Only when the account's email is verified; otherwise null. */
+	donorEmail: string | null;
+}): Promise<{ totalCents: number; count: number }> {
+	const result = await prisma.donation.aggregate({
+		where: {
+			caseId: input.caseId,
+			status: "succeeded",
+			OR: [
+				{ donorId: input.donorId },
+				...(input.donorEmail
+					? [{ donorId: null, donorEmail: input.donorEmail }]
+					: []),
+			],
+		},
+		_sum: { amountCents: true },
+		_count: { _all: true },
+	});
+	return {
+		totalCents: result._sum.amountCents ?? 0,
+		count: result._count._all,
+	};
+}
+
 /** A donor's donations, newest first, with the case + owner name for display. */
 export async function listDonations(donorId: string) {
 	return prisma.donation.findMany({

@@ -23,9 +23,16 @@ export type CaseFields = {
 	/** How the plaintiff receives raised funds. */
 	payoutType?: string | null;
 	attorney?: CaseAttorney | null;
-	/** Evidence: uploaded files (name + size) or links (name + url). Files aren't
-	 *  stored yet — only their metadata. */
-	evidence?: { name: string; size?: number; url?: string }[];
+	/** Evidence: an uploaded document (`kind: "file"`, with the storage URL and
+	 *  byte size) or an address the plaintiff pasted (`kind: "link"`). Rows written
+	 *  before evidence was stored carry neither `kind` nor `url` — see
+	 *  `caseEvidence`, which is the only thing that should read this shape. */
+	evidence?: {
+		name: string;
+		size?: number;
+		url?: string;
+		kind?: "file" | "link";
+	}[];
 	/** Vercel Blob URL of the cover image. */
 	coverImageUrl?: string | null;
 	/** Vercel Blob URLs of the gallery images. */
@@ -141,6 +148,127 @@ export async function getResumableDraft(ownerId: string) {
 /** A specific case owned by the plaintiff — used to resume a chosen draft. */
 export async function getOwnedCase(id: string, ownerId: string) {
 	return prisma.case.findFirst({ where: { id, ownerId } });
+}
+
+/**
+ * Evidence as a screen should render it.
+ *
+ * `Case.evidence` is Json written by the wizard across three eras, so its shape is
+ * normalised here rather than asserted at each of the half-dozen places that show
+ * it:
+ *
+ *  - **file** — an uploaded document. `href` is the app's own authorized route,
+ *    never the storage URL: a Vercel Blob URL is readable by anyone holding it, so
+ *    the URL itself is the credential and it stays server-side. See
+ *    `caseEvidenceFile`, which is what that route calls.
+ *  - **link** — an address the plaintiff pasted. Theirs, external, and safe to
+ *    hand out as-is.
+ *  - **record** — filed before documents were stored, so there is a name and a
+ *    size and nothing to open. Rendering it as a link would promise a file that
+ *    was never kept.
+ */
+export type CaseEvidence = {
+	name: string;
+	/** Bytes, when it was an upload. */
+	size: number | null;
+	kind: "file" | "link" | "record";
+	/** Where to send the viewer, or null for a `record`. */
+	href: string | null;
+};
+
+type StoredEvidence = {
+	name?: unknown;
+	size?: unknown;
+	url?: unknown;
+	kind?: unknown;
+};
+
+/** The stored rows, filtered to the ones with a usable name. Index is preserved
+ *  because it is what the serving route addresses a file by. */
+function storedEvidence(json: unknown): { item: StoredEvidence; at: number }[] {
+	if (!Array.isArray(json)) return [];
+	return json
+		.map((item, at) => ({ item: (item ?? {}) as StoredEvidence, at }))
+		.filter(
+			({ item }) => typeof item.name === "string" && item.name.length > 0,
+		);
+}
+
+/**
+ * Which of the three an entry is.
+ *
+ * `kind` is written explicitly from now on. Older rows are inferred, and the
+ * inference is deliberately conservative: only an entry with a URL *and* no byte
+ * size was a pasted link, because that is the one combination the wizard could
+ * produce for a link. Anything else with a URL is a stored document, and anything
+ * without one cannot be opened at all.
+ */
+function kindOf(item: StoredEvidence): CaseEvidence["kind"] {
+	if (item.kind === "file" || item.kind === "link") return item.kind;
+	if (typeof item.url !== "string" || !item.url) return "record";
+	return typeof item.size === "number" ? "file" : "link";
+}
+
+export function caseEvidence(json: unknown, caseId: string): CaseEvidence[] {
+	return storedEvidence(json).map(({ item, at }) => {
+		const kind = kindOf(item);
+		return {
+			name: item.name as string,
+			size: typeof item.size === "number" ? item.size : null,
+			kind,
+			href:
+				kind === "link"
+					? (item.url as string)
+					: kind === "file"
+						? `/api/cases/${caseId}/evidence/${at}`
+						: null,
+		};
+	});
+}
+
+/**
+ * One evidence document, for the route that serves it — **the authorization
+ * check** for reading a plaintiff's filings.
+ *
+ * Two people may open a case's documents: the plaintiff who filed them, and the
+ * attorney actually representing the case. Both are re-derived from the case row
+ * rather than trusted from the request, and an attorney *browsing* the queue is
+ * deliberately not among them — the queue view says documents are shared once you
+ * are representing the matter, and this is where that holds.
+ *
+ * Returns null for every failure — wrong case, wrong viewer, no such entry, an
+ * entry that is not a stored file — so the caller answers all of them with a 404
+ * and nothing here reveals whether a case exists.
+ */
+export async function caseEvidenceFile(input: {
+	caseId: string;
+	index: number;
+	viewerId: string;
+	/** The viewer's account email, for the bring-your-own attorney link. */
+	viewerEmail: string;
+}): Promise<{ name: string; url: string } | null> {
+	const kase = await prisma.case.findFirst({
+		where: {
+			id: input.caseId,
+			deletedAt: null,
+			OR: [
+				{ ownerId: input.viewerId },
+				{ match: { attorneyId: input.viewerId } },
+				{ attorneyEmail: { equals: input.viewerEmail, mode: "insensitive" } },
+			],
+		},
+		select: { evidence: true },
+	});
+	if (!kase) return null;
+
+	const entry = storedEvidence(kase.evidence).find(
+		({ at }) => at === input.index,
+	);
+	if (!entry || kindOf(entry.item) !== "file") return null;
+	const url = entry.item.url;
+	return typeof url === "string" && url
+		? { name: entry.item.name as string, url }
+		: null;
 }
 
 /** Live, publicly-fundable cases for the landing page + directory. Most-funded
