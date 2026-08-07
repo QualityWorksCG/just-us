@@ -12,6 +12,7 @@ import { cn } from "@just-us/ui/lib/utils";
 import {
 	ArrowLeft,
 	ArrowRight,
+	Clock,
 	FolderOpen,
 	ImageIcon,
 	Megaphone,
@@ -33,6 +34,9 @@ const TABS: { key: CaseFilter; label: string }[] = [
 	{ key: "active", label: "Active" },
 	{ key: "draft", label: "Draft" },
 	{ key: "seeking", label: "Seeking" },
+	// Finished and sent, held back until the firm's payout account can receive.
+	// Its own tab because these are the cases with someone to chase.
+	{ key: "pending", label: "Awaiting firm" },
 	{ key: "deleted", label: "Deleted" },
 ];
 
@@ -78,6 +82,7 @@ function isFilter(v: string | undefined): v is CaseFilter {
 		v === "active" ||
 		v === "draft" ||
 		v === "seeking" ||
+		v === "pending" ||
 		v === "deleted"
 	);
 }
@@ -217,6 +222,11 @@ export default async function MyCasesPage({
 						const isDeleted = !!c.deletedAt;
 						const isLive = !isDeleted && c.status === "live";
 						const isSeeking = !isDeleted && c.status === "seeking";
+						// Finished and sent, waiting on the firm's payout account. Not a
+						// draft: there is nothing left for the plaintiff to fill in, so
+						// offering "Continue draft" would send them looking for work that
+						// isn't theirs.
+						const isPending = !isDeleted && c.status === "pending_payout";
 						const readiness = readinessOf(c);
 						const meta = [c.category, c.location].filter(Boolean).join(" · ");
 						const resume = `/cases/new?draft=${c.id}` as Route;
@@ -227,7 +237,9 @@ export default async function MyCasesPage({
 								? { text: "Live", dot: "bg-success" }
 								: isSeeking
 									? { text: "Seeking", dot: "bg-brass-deep" }
-									: { text: "Draft", dot: "bg-ink-soft" };
+									: isPending
+										? { text: "Awaiting firm", dot: "bg-gold-bright" }
+										: { text: "Draft", dot: "bg-ink-soft" };
 						const hasNewUpdate = !isDeleted && casesWithNewUpdate.has(c.id);
 
 						return (
@@ -297,6 +309,16 @@ export default async function MyCasesPage({
 													? `${interests[c.id]?.open} ${interests[c.id]?.open === 1 ? "attorney" : "attorneys"} interested`
 													: "Out to attorneys"}
 											</p>
+										) : isPending ? (
+											<p className="inline-flex items-start gap-1.5 text-[13px] text-ink-soft">
+												<Clock
+													className="mt-0.5 size-4 shrink-0 text-gold-bright-ink"
+													aria-hidden="true"
+												/>
+												Ready to publish once{" "}
+												{c.attorneyName ?? "your attorney"} finishes payout
+												setup.
+											</p>
 										) : isDeleted ? (
 											<p className="text-[13px] text-muted-foreground">
 												Removed — restore to keep working on it.
@@ -331,6 +353,16 @@ export default async function MyCasesPage({
 												{(interests[c.id]?.unseen ?? 0) > 0
 													? `Review ${interests[c.id]?.unseen} new`
 													: "Review interest"}
+												<ArrowRight className="size-3.5" aria-hidden="true" />
+											</Link>
+										) : isPending ? (
+											// Back into the wizard, which lands on the review step and
+											// carries the payout step's account status behind it.
+											<Link
+												href={resume}
+												className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-brass-deep hover:underline"
+											>
+												Check &amp; publish
 												<ArrowRight className="size-3.5" aria-hidden="true" />
 											</Link>
 										) : (

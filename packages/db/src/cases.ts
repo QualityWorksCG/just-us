@@ -84,23 +84,55 @@ export async function saveDraft(
 }
 
 /**
- * Publish a case live — no human review step. Updates the draft in place when
- * `id` is given, otherwise creates the case outright. Returns id + status.
+ * Commit the finished case. It does **not** become public here.
+ *
+ * The case lands in `pending_payout`: everything the plaintiff owns is settled —
+ * story, goal, attorney, agreed fee — and what remains is the one thing they
+ * cannot do themselves, their attorney opening this case's Stripe account. Going
+ * public before that would put up a campaign with a goal and a progress bar that
+ * refuses every donation, which is what this state exists to prevent.
+ *
+ * `live` is reached from here by `goLiveCase`, and only once that account can
+ * actually receive. The ordinary path still feels like one step: the publish
+ * action calls `goLiveCase` straight after this, so a case whose firm is already
+ * set up goes public in the same request and never visibly passes through here.
+ *
+ * Updates in place when `id` is given, otherwise creates the case outright.
  */
 export async function publishCase(
 	input: { ownerId: string; id?: string } & CaseFields,
 ) {
 	const data = {
 		...toData(input),
-		status: "live" as const,
+		status: "pending_payout" as const,
+		// Stamped on every visibility change, not once — see `goLiveCase`, which
+		// re-stamps it when the case actually reaches the public.
 		publishedAt: new Date(),
 	};
 	if (input.id) {
 		const res = await prisma.case.updateMany({
-			where: { id: input.id, ownerId: input.ownerId },
+			where: {
+				id: input.id,
+				ownerId: input.ownerId,
+				// A case that is already raising must not be walked backwards into a
+				// private state by re-running the wizard against its id: donors are on
+				// it. `closed` is likewise final. Only the pre-public states publish.
+				status: { in: ["draft", "seeking", "pending_payout"] },
+			},
 			data,
 		});
-		if (res.count > 0) return { id: input.id, status: "live" as const };
+		if (res.count > 0) {
+			return { id: input.id, status: "pending_payout" as const };
+		}
+		// Nothing updated. Either the id belongs to someone else — in which case
+		// there is nothing to report and a fresh case is the right answer — or it is
+		// this owner's case in a status that refuses to publish, and creating a
+		// second copy of it would be the worst possible response.
+		const existing = await prisma.case.findFirst({
+			where: { id: input.id, ownerId: input.ownerId },
+			select: { id: true, status: true },
+		});
+		if (existing) return existing;
 	}
 	const created = await prisma.case.create({
 		data: { ownerId: input.ownerId, ...data },
@@ -362,7 +394,13 @@ export async function countLiveCases(opts?: BrowseFilters) {
 }
 
 /** The tabs on the My cases page. */
-export type CaseFilter = "all" | "active" | "draft" | "seeking" | "deleted";
+export type CaseFilter =
+	| "all"
+	| "active"
+	| "draft"
+	| "seeking"
+	| "pending"
+	| "deleted";
 
 /** Prisma `where` for a given filter — "all" and the status tabs exclude
  *  soft-deleted rows; "deleted" shows only them. */
@@ -372,6 +410,12 @@ function whereForFilter(ownerId: string, filter: CaseFilter) {
 	if (filter === "active") return { ...base, status: "live" as const };
 	if (filter === "draft") return { ...base, status: "draft" as const };
 	if (filter === "seeking") return { ...base, status: "seeking" as const };
+	// Finished, private, waiting on the firm. Its own tab rather than folded into
+	// "active": these need chasing, and a plaintiff who cannot find them cannot
+	// chase them.
+	if (filter === "pending") {
+		return { ...base, status: "pending_payout" as const };
+	}
 	return base;
 }
 
@@ -416,6 +460,7 @@ export async function caseCounts(ownerId: string) {
 		active: by("live"),
 		draft: by("draft"),
 		seeking: by("seeking"),
+		pending: by("pending_payout"),
 		deleted,
 	};
 }

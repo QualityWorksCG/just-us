@@ -118,11 +118,17 @@ function CardHeader({ view }: { view: RepresentationView }) {
 							cls: "bg-surface-2 text-ink-soft",
 							dot: "bg-ink-soft",
 						}
-					: {
-							text: "Draft",
-							cls: "bg-surface-2 text-ink-soft",
-							dot: "bg-ink-soft",
-						};
+					: view.status === "pending_payout"
+						? {
+								text: "Awaiting firm",
+								cls: "bg-gold-bright/20 text-gold-bright-ink",
+								dot: "bg-gold-bright",
+							}
+						: {
+								text: "Draft",
+								cls: "bg-surface-2 text-ink-soft",
+								dot: "bg-ink-soft",
+							};
 	const meta = [view.category, view.location].filter(Boolean).join(" · ");
 
 	return (

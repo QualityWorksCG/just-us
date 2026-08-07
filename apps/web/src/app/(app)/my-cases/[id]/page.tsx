@@ -111,11 +111,17 @@ export default async function CasePage({
 						cls: "bg-brass-wash text-brass-deep",
 						dot: "bg-brass-deep",
 					}
-				: {
-						text: "Draft",
-						cls: "bg-surface-2 text-ink-soft",
-						dot: "bg-ink-soft",
-					};
+				: c.status === "pending_payout"
+					? {
+							text: "Awaiting firm",
+							cls: "bg-gold-bright/20 text-gold-bright-ink",
+							dot: "bg-gold-bright",
+						}
+					: {
+							text: "Draft",
+							cls: "bg-surface-2 text-ink-soft",
+							dot: "bg-ink-soft",
+						};
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -160,7 +166,9 @@ export default async function CasePage({
 				<p className="mt-1.5 text-[14.5px] text-ink-soft">
 					{c.status === "live"
 						? "Manage your case, or view how your public fundraiser page looks to donors."
-						: "Manage your case — edit the details, update images, or remove it."}
+						: c.status === "pending_payout"
+							? "Your case is finished and private. It goes public as soon as your attorney's payout account can receive — publish it below."
+							: "Manage your case — edit the details, update images, or remove it."}
 				</p>
 			</div>
 

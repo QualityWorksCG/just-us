@@ -4,7 +4,10 @@ import { Check, Landmark, Lock, Mail, UserPlus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { bindCasePayoutAction } from "@/app/(app)/my-cases/[id]/payout-actions";
+import {
+	bindCasePayoutAction,
+	goLiveAction,
+} from "@/app/(app)/my-cases/[id]/payout-actions";
 
 /** The firm this case pays out to, and how far its Stripe setup has got. */
 export type PayoutAttorney = {
@@ -54,11 +57,16 @@ export type CasePayoutData = {
  */
 export function CasePayout({ data }: { data: CasePayoutData }) {
 	const [bound, setBound] = useState(data.bound);
+	const [status, setStatus] = useState(data.status);
 	const [pending, startTransition] = useTransition();
 
 	// Matches the server rule: a live case that has never been bound has shown no
 	// donor a recipient, so it can still be set. Only a bound live case is locked.
-	const locked = data.status === "live" && data.bound;
+	const locked = status === "live" && bound;
+	// Finished, private, waiting on the firm. Here the destination and the
+	// publication are one act, so this panel offers publishing rather than
+	// binding — see `goLiveCase`.
+	const isPending = status === "pending_payout";
 	const attorney = data.attorney;
 	const ready = !!attorney?.transfersEnabled;
 	const recipient = attorney
@@ -72,6 +80,21 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 				setBound(true);
 				toast.success(
 					`Donations to this case will go to ${result.recipientName}.`,
+				);
+			} else {
+				toast.error(result.error);
+			}
+		});
+	}
+
+	function publish() {
+		startTransition(async () => {
+			const result = await goLiveAction({ caseId: data.caseId });
+			if (result.ok) {
+				setBound(true);
+				setStatus("live");
+				toast.success(
+					`Your case is live. Donations go to ${result.recipientName}.`,
 				);
 			} else {
 				toast.error(result.error);
@@ -150,6 +173,29 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 						This case is raising, so the destination is locked. Donors were
 						shown who receives their money before they gave.
 					</p>
+				) : isPending ? (
+					// One button for both halves: publishing a case and binding its
+					// destination are the same server-side act, so the page can never be
+					// public with nothing to receive.
+					<>
+						<button
+							type="button"
+							onClick={publish}
+							disabled={pending || !ready}
+							className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-[var(--radius-control)] bg-brass px-4 font-bold text-[13.5px] text-white transition-colors hover:bg-brass-deep disabled:cursor-not-allowed disabled:opacity-60"
+						>
+							{pending
+								? "Publishing…"
+								: ready
+									? "Publish & go live"
+									: "Waiting on your attorney"}
+						</button>
+						<p className="text-[12px] text-muted-foreground leading-relaxed">
+							{ready
+								? `Your case goes public straight away, raising toward its goal, with ${recipient} receiving. The destination is fixed from that moment — donors are shown it before they give.`
+								: "Your case is finished and private. It publishes the moment the account above can receive — nothing else is outstanding."}
+						</p>
+					</>
 				) : bound ? (
 					!ready && (
 						<p className="mt-1 text-[12.5px] text-muted-foreground leading-relaxed">

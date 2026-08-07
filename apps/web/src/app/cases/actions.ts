@@ -11,11 +11,17 @@ import {
 	softDeleteCase,
 	updateOwnedCase,
 } from "@just-us/db/cases";
+import { getCasePayoutOptions } from "@just-us/db/payouts";
 import { acceptInterest, declineInterest } from "@just-us/db/requests";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth-server";
+
+/** How far the representing firm's Stripe setup for this case has got. */
+export type CasePayoutReadiness = NonNullable<
+	Awaited<ReturnType<typeof getCasePayoutOptions>>
+>;
 
 const attorneySchema = z
 	.object({
@@ -91,6 +97,15 @@ export type PublishForAttorneysInput = z.infer<typeof seekingSchema>;
 
 export type CreateCaseResult =
 	| { ok: true; caseId: string }
+	| { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+/**
+ * What `commitCaseAction` hands back: the case is saved and its attorney can now
+ * see it, plus how far that attorney's payout setup has got — which is the only
+ * thing left between here and a public campaign.
+ */
+export type CommitCaseResult =
+	| { ok: true; caseId: string; payout: CasePayoutReadiness }
 	| { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 /** Publish the case out to attorneys ("No, not yet" path) — no fee/attorney. */
@@ -329,10 +344,24 @@ export async function saveCaseDraftAction(
 	}
 }
 
-/** Publish the case live — updating the draft in place when an id is given. */
-export async function createCaseAction(
+/**
+ * Commit the finished case, handing it to the attorney. **It does not go public.**
+ *
+ * This is the wizard's payout step, and the reason it is a step rather than the
+ * publish button: donations land in a Stripe account the plaintiff's *attorney*
+ * opens for this case, and until that exists the case cannot take a dollar. A
+ * campaign published before it can be funded is a goal, a progress bar and a
+ * donate panel that refuses — so the case is parked in `pending_payout` instead,
+ * where the attorney can finally see it (`myCasesWhere` excludes drafts, which is
+ * why saving harder would not have worked) and clear it.
+ *
+ * Returns that attorney's readiness alongside the id, because the screen this
+ * answers has to say who is being waited on and how far they have got.
+ * `goLiveAction` is what makes it public afterwards.
+ */
+export async function commitCaseAction(
 	input: CreateCaseInput,
-): Promise<CreateCaseResult> {
+): Promise<CommitCaseResult> {
 	const { session } = await requireRole("plaintiff");
 
 	const parsed = createCaseSchema.safeParse(input);
@@ -358,11 +387,36 @@ export async function createCaseAction(
 			attorney: attorney ?? null,
 			...rest,
 		});
-		return { ok: true, caseId: created.id };
+		const payout = await getCasePayoutOptions(created.id, session.user.id);
+		if (!payout) return { ok: false, error: "Couldn't find that case." };
+		// The attorney's own screens now list this case and count it as waiting on
+		// them — see `attorneyPayoutReadiness`.
+		revalidatePath("/my-cases");
+		revalidatePath("/representation");
+		revalidatePath("/home");
+		return { ok: true, caseId: created.id, payout };
 	} catch {
 		return {
 			ok: false,
-			error: "Could not publish your case. Please try again.",
+			error: "Could not save your case. Please try again.",
 		};
 	}
+}
+
+/**
+ * Re-read how far the firm's payout setup has got, for the wizard's payout step.
+ *
+ * The plaintiff is waiting on someone else's Stripe onboarding, which finishes
+ * without anything happening in their browser. This is what their "Check again"
+ * asks — cheap, owner-scoped, and read-only.
+ */
+export async function casePayoutReadinessAction(
+	caseId: string,
+): Promise<
+	{ ok: true; payout: CasePayoutReadiness } | { ok: false; error: string }
+> {
+	const { session } = await requireRole("plaintiff");
+	const payout = await getCasePayoutOptions(caseId, session.user.id);
+	if (!payout) return { ok: false, error: "Couldn't find that case." };
+	return { ok: true, payout };
 }

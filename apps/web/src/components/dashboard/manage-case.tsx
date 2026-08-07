@@ -202,6 +202,9 @@ export function ManageCase({
 
 	const isLive = data.status === "live";
 	const isSeeking = data.status === "seeking";
+	// Finished and private, waiting on the firm's payout account. Everything the
+	// plaintiff owns is done, so it must not be described as an unfinished draft.
+	const isPending = data.status === "pending_payout";
 	const goal = data.goalCents / 100;
 	const raised = data.raisedCents / 100;
 	const pct = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
@@ -338,7 +341,9 @@ export function ManageCase({
 										? "Raising now"
 										: isSeeking
 											? "Out to attorneys"
-											: "Draft — not live yet"}
+											: isPending
+												? "Ready — awaiting your firm"
+												: "Draft — not live yet"}
 								</span>
 								<div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
 									<span className="font-extrabold text-[44px] text-ink tabular-nums leading-none tracking-[-0.03em]">
@@ -484,7 +489,9 @@ export function ManageCase({
 						<Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 						{isLive
 							? "You're live and building momentum — keep sharing updates so backers stay invested in your journey to justice."
-							: "Fill out your story and add photos in Edit & settings — cases with a clear story and cover image raise far more."}
+							: isPending
+								? "Your case is finished and waiting only on your attorney's payout account. Use the time to line up who you'll share it with the day it goes live."
+								: "Fill out your story and add photos in Edit & settings — cases with a clear story and cover image raise far more."}
 					</div>
 				</div>
 			) : (

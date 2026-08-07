@@ -370,6 +370,12 @@ export async function listMyInterests(attorneyId: string) {
  * to anyone, including an attorney named in it — and there is nothing an attorney
  * can do about a case that has not been sent out.
  *
+ * `pending_payout` is **not** excluded, and that is the point of the state. Such a
+ * case is finished and committed and waiting on exactly one thing: this attorney
+ * opening its Stripe account. It is the only case status that is invisible to the
+ * public and yet blocked on the person reading this list, so leaving it out would
+ * park a plaintiff behind an attorney who was never told.
+ *
  * What is withheld is the same line the queue draws, moved: the plaintiff's *name*
  * and account id come back, because this is their client and messaging needs the
  * id, but their email and phone never do. An attorney still cannot open the
@@ -379,7 +385,9 @@ export async function listMyInterests(attorneyId: string) {
 function myCasesWhere(userId: string, email: string) {
 	return {
 		deletedAt: null,
-		status: { in: ["seeking", "live", "closed"] as CaseStatus[] },
+		status: {
+			in: ["seeking", "pending_payout", "live", "closed"] as CaseStatus[],
+		},
 		OR: [
 			{ match: { attorneyId: userId } },
 			{ attorneyEmail: { equals: email, mode: "insensitive" as const } },

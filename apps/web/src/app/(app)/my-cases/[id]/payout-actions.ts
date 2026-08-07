@@ -5,6 +5,7 @@ import {
 	attorneyRepresentedCase,
 	bindCasePayout,
 	getPayoutAccountForCase,
+	goLiveCase,
 	syncPayoutAccount,
 } from "@just-us/db/payouts";
 import { env } from "@just-us/env/server";
@@ -32,8 +33,8 @@ import { requireRole } from "@/lib/auth-server";
  *    case a firm represents gets its own account, so an attorney fully onboarded on
  *    two matters has done nothing for a third.
  *  - **The plaintiff** decides when their case opens for donations
- *    (`bindCasePayoutAction`). What they cannot do is choose the destination — that
- *    is derived from the case's own attorney link.
+ *    (`goLiveAction`, `bindCasePayoutAction`). What they cannot do is choose the
+ *    destination — that is derived from the case's own attorney link.
  *
  * These actions used to live under `/settings`, where payouts were one per person.
  * Per-case accounts made that screen a list of other people's cases; they now sit on
@@ -94,6 +95,59 @@ export async function bindCasePayoutAction(
 	revalidatePath(`/my-cases/${parsed.data.caseId}`);
 	// Named back to the caller so the confirmation says who was bound rather than a
 	// bare "saved" — this is the moment the destination becomes irreversible.
+	return { ok: true, recipientName: result.firmName ?? result.attorneyName };
+}
+
+/** Human wording for each refusal `goLiveCase` can return. */
+const GO_LIVE_REASONS: Record<string, string> = {
+	case_not_found: "That case couldn't be found.",
+	already_live: "This case is already live.",
+	not_pending:
+		"This case isn't ready to publish. Finish it in the case wizard first.",
+	no_attorney: REASONS.no_attorney,
+	attorney_no_account: REASONS.attorney_no_account,
+	transfers_disabled:
+		"Your attorney's payout account for this case can't receive donations yet. Stripe is still verifying their firm's details — your case goes live as soon as that clears.",
+};
+
+/**
+ * Take a finished case public. The plaintiff's own act, and the last step.
+ *
+ * Nothing here decides *whether* the case may go live — `goLiveCase` re-derives the
+ * recipient and re-checks that Stripe can transfer to it, from the case row rather
+ * than from anything the client sent. This action supplies the owner id from the
+ * session and turns each refusal into something the plaintiff can act on, which for
+ * every reason but `case_not_found` means naming what is being waited on.
+ */
+export async function goLiveAction(
+	input: z.input<typeof caseInput>,
+): Promise<{ ok: true; recipientName: string } | { ok: false; error: string }> {
+	const { session } = await requireRole("plaintiff");
+	const parsed = caseInput.safeParse(input);
+	if (!parsed.success) return { ok: false, error: "That case isn't valid." };
+
+	const result = await goLiveCase({
+		caseId: parsed.data.caseId,
+		// From the session, never the form — otherwise a caller could publish
+		// someone else's case by passing its id.
+		ownerId: session.user.id,
+	});
+
+	if (!result.ok) {
+		return {
+			ok: false,
+			error: GO_LIVE_REASONS[result.reason] ?? "Couldn't publish this case.",
+		};
+	}
+
+	// The case is public from this moment, so everything that lists or renders it
+	// publicly is now stale, not just the owner's own view.
+	revalidatePath(`/my-cases/${parsed.data.caseId}`);
+	revalidatePath(`/cases/${parsed.data.caseId}`);
+	revalidatePath("/my-cases");
+	revalidatePath("/discover");
+	revalidatePath("/cases");
+	revalidatePath("/home");
 	return { ok: true, recipientName: result.firmName ?? result.attorneyName };
 }
 
