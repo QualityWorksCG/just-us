@@ -1,0 +1,90 @@
+// Who authored a message in an assistant thread. `system` covers the prompt
+// preamble when it is persisted alongside the conversation.
+enum ChatMessageRole {
+  user
+  assistant
+  system
+}
+
+// One assistant conversation. A user keeps as many as they start; the active one
+// is the most recent by updatedAt, which is what the chat panel reopens. The rest
+// stay readable through the panel's history list until the user deletes them.
+model Chat {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  // The role the thread was opened under, snapshotted rather than read live.
+  // A user whose role changes gets a differently-scoped assistant, and the old
+  // thread must stay readable as the conversation it actually was.
+  role  String
+  title String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("chat")
+}
+
+// A single turn in a thread. Ids come from the AI SDK, so there is no default —
+// the client's id is the identity, which is what makes a re-sent stream safe to
+// upsert rather than duplicate.
+model ChatMessage {
+  id     String @id
+  chat   Chat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId String
+
+  role  ChatMessageRole
+  // The UIMessage parts array, stored verbatim. Kept opaque so new part types
+  // (tool calls, reasoning, files) persist without a migration.
+  parts Json
+
+  createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
+  @@map("chat_message")
+}
+
+// Append-only ledger of model spend, one row per generation. Like AuditLog,
+// `userId` is a plain id rather than a relation — spend history must survive
+// its actor.
+model AiUsage {
+  id     String  @id @default(cuid())
+  userId String
+  chatId String?
+
+  feature String @default("chat")
+  // Role the request was made under, so spend can be read per audience.
+  role    String
+
+  model        String
+  provider     String?
+  finishReason String?
+
+  inputTokens     Int @default(0)
+  outputTokens    Int @default(0)
+  cacheReadTokens Int @default(0)
+  reasoningTokens Int @default(0)
+
+  // Millionths of a dollar. Integer on purpose — budgets are compared and
+  // summed, and floating-point cents drift.
+  costMicroUsd Int @default(0)
+
+  // Provider-side id for the generation, for reconciling against their billing.
+  generationId String?
+
+  steps     Int      @default(1)
+  toolNames String[] @default([])
+
+  latencyMs Int?
+  ttftMs    Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("ai_usage")
+}

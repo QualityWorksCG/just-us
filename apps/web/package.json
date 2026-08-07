@@ -7,9 +7,12 @@
 		"build": "next build",
 		"test:jus65": "tsx jus65-check.ts",
 		"start": "next start",
-		"e2e:jus67": "bun jus67-e2e.ts"
+		"e2e:jus67": "bun jus67-e2e.ts",
+		"e2e:jus68": "bun jus68-e2e.ts"
 	},
 	"dependencies": {
+		"@ai-sdk/react": "^4.0.51",
+		"@just-us/ai": "workspace:*",
 		"@just-us/auth": "workspace:*",
 		"@just-us/db": "workspace:*",
 		"@just-us/env": "workspace:*",
@@ -19,16 +22,18 @@
 		"@swc/helpers": "^0.5.23",
 		"@tanstack/react-form": "^1.33.0",
 		"@vercel/blob": "^2.6.1",
+		"ai": "^7.0.48",
 		"babel-plugin-react-compiler": "^1.0.0",
 		"better-auth": "catalog:",
 		"dotenv": "catalog:",
-		"evlog": "^2.22.0",
+		"evlog": "^2.24.0",
 		"lucide-react": "catalog:",
 		"next": "^16.2.0",
 		"react": "catalog:",
 		"react-dom": "catalog:",
 		"sharp": "^0.35.3",
 		"sonner": "catalog:",
+		"streamdown": "^2.5.0",
 		"zod": "catalog:"
 	},
 	"devDependencies": {
