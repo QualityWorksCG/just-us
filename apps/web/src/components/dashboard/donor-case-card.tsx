@@ -8,6 +8,7 @@ import {
 	Heart,
 	Home,
 	type LucideIcon,
+	Megaphone,
 	Plus,
 	Scale,
 	Share2,
@@ -78,10 +79,14 @@ export function DonorCaseCard({
 	c,
 	initialSaved,
 	variant = "full",
+	hasNewUpdate = false,
 }: {
 	c: DonorCase;
 	initialSaved: boolean;
 	variant?: "full" | "compact";
+	/** Show a "New update" tag — a followed case has updates the donor hasn't
+	 *  seen. */
+	hasNewUpdate?: boolean;
 }) {
 	const [saved, setSaved] = useState(initialSaved);
 	const [, startSave] = useTransition();
@@ -152,11 +157,19 @@ export function DonorCaseCard({
 					)}
 				</div>
 			</Link>
-			{/* Status badge */}
-			<span className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-surface/90 px-2.5 py-1 font-mono font-semibold text-[10px] text-ink uppercase tracking-[0.06em] backdrop-blur-sm">
-				<span className={cn("size-1.5 rounded-full", status.dot)} />
-				{status.label}
-			</span>
+			{/* Status badge + optional "new update" tag */}
+			<div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-1.5">
+				<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-surface/90 px-2.5 py-1 font-mono font-semibold text-[10px] text-ink uppercase tracking-[0.06em] backdrop-blur-sm">
+					<span className={cn("size-1.5 rounded-full", status.dot)} />
+					{status.label}
+				</span>
+				{hasNewUpdate && (
+					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-gold-bright px-2.5 py-1 font-mono font-semibold text-[10px] text-gold-bright-ink uppercase tracking-[0.06em] shadow-[var(--shadow-rest)]">
+						<Megaphone className="size-3" aria-hidden="true" />
+						New update
+					</span>
+				)}
+			</div>
 			<button
 				type="button"
 				onClick={toggleSave}

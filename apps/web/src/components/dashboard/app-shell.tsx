@@ -16,12 +16,16 @@ import {
 	SidebarTrigger,
 } from "@just-us/ui/components/sidebar";
 import { cn } from "@just-us/ui/lib/utils";
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Brandmark } from "@/components/brandmark";
+import {
+	type BellNotification,
+	NotificationBell,
+} from "@/components/dashboard/notification-bell";
 import { authClient } from "@/lib/auth-client";
 import {
 	findScreenByPath,
@@ -69,6 +73,7 @@ export function AppShell({
 	defaultOpen,
 	flags,
 	messageUnreadCount = 0,
+	notifications = [],
 	children,
 }: {
 	role: Role;
@@ -82,6 +87,8 @@ export function AppShell({
 	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
 	flags: FlagState;
 	messageUnreadCount?: number;
+	/** Unseen attorney requests for the header bell — plaintiffs only, else empty. */
+	notifications?: BellNotification[];
 	children: React.ReactNode;
 }) {
 	const pathname = usePathname();
@@ -263,12 +270,17 @@ export function AppShell({
 						<h1 className="flex-1 truncate font-extrabold text-[19px] text-ink tracking-[-0.02em]">
 							{current?.title}
 						</h1>
-						<span
-							className="flex size-9 items-center justify-center rounded-full border border-border text-ink-soft"
-							aria-hidden="true"
-						>
-							<Bell className="size-[17px]" />
-						</span>
+						<NotificationBell
+							items={notifications}
+							poll={role === "plaintiff" || role === "donor"}
+							emptyHint={
+								role === "plaintiff"
+									? "Attorney requests and case updates will show up here."
+									: role === "donor"
+										? "Updates on cases you follow will show up here."
+										: "New notifications will show up here."
+							}
+						/>
 					</div>
 				</header>
 

@@ -154,11 +154,27 @@ export async function listLiveCases(take = 6) {
 	});
 }
 
-/** A single live case for its public page. Null if not found or not live. */
+/** A single live case for its public page. Null if not found or not live.
+ *  Includes the broadcast updates (newest first) so every donor reading the case
+ *  sees the same progress the plaintiff and attorney posted (JUS-33). */
 export async function getPublicCase(id: string) {
 	return prisma.case.findFirst({
 		where: { id, status: "live", deletedAt: null },
-		include: { owner: { select: { name: true } } },
+		include: {
+			owner: { select: { name: true } },
+			updates: {
+				orderBy: { createdAt: "desc" },
+				select: {
+					id: true,
+					body: true,
+					createdAt: true,
+					editedAt: true,
+					authorId: true,
+					tag: true,
+					attachments: true,
+				},
+			},
+		},
 	});
 }
 

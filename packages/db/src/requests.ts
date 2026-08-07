@@ -118,6 +118,19 @@ function toInterest(row: {
 	};
 }
 
+/**
+ * The match on a case, if an attorney has already been chosen. Its presence is
+ * what proves a choice was made, independent of the case's status — a case sits
+ * at `seeking` between "attorney accepted" and "published live", and the requests
+ * screen relies on this so that limbo never reads as "no attorney chosen yet".
+ */
+export async function getCaseMatch(caseId: string, ownerId: string) {
+	return prisma.match.findFirst({
+		where: { caseId, case: { ownerId } },
+		select: { attorneyId: true, createdAt: true },
+	});
+}
+
 /** Open expressions of interest on a case the plaintiff owns, newest first.
  *
  *  Ordered by date alone. The old ordering put the best-rated first, which is a
@@ -178,6 +191,55 @@ export async function interestCountsByCase(
 		counts[row.caseId] = entry;
 	}
 	return counts;
+}
+
+export type PlaintiffNewInterest = {
+	id: string;
+	caseId: string;
+	caseTitle: string;
+	attorneyName: string;
+	createdAt: Date;
+};
+
+/**
+ * A plaintiff's *unseen* expressions of interest across all their live cases,
+ * newest first — the feed behind the header notification bell (JUS-25).
+ *
+ * Scoped to `pending`, the same "hasn't laid eyes on it yet" status the per-case
+ * "N new" badge uses: opening a case's requests flips its rows to `viewed`
+ * (see `markCaseInterestsViewed`), which is what clears the bell for that case.
+ * So the bell answers exactly "requests you haven't looked at yet", and reaching
+ * the inbox is what dismisses them — no separate read-tracking to drift.
+ */
+export async function listNewInterestsForPlaintiff(
+	ownerId: string,
+	take = 15,
+): Promise<PlaintiffNewInterest[]> {
+	const rows = await prisma.attorneyRequest.findMany({
+		where: { status: "pending", case: { ownerId, deletedAt: null } },
+		orderBy: { createdAt: "desc" },
+		take,
+		select: {
+			id: true,
+			caseId: true,
+			createdAt: true,
+			case: { select: { title: true } },
+			attorney: {
+				select: {
+					name: true,
+					attorneyProfile: { select: { legalName: true } },
+				},
+			},
+		},
+	});
+	return rows.map((r) => ({
+		id: r.id,
+		caseId: r.caseId,
+		caseTitle: r.case.title || "Untitled case",
+		// The bar-record name where there is one, matching the requests inbox.
+		attorneyName: r.attorney.attorneyProfile?.legalName ?? r.attorney.name,
+		createdAt: r.createdAt,
+	}));
 }
 
 /**
