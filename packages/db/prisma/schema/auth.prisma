@@ -78,6 +78,10 @@ model User {
   reportedConversations       ConversationReport[]              @relation("ConversationReportReporter")
   resolvedConversationReports ConversationReport[]              @relation("ConversationReportResolver")
 
+  // Assistant conversations. Model spend has no back-relation here on purpose —
+  // see AiUsage.
+  chats Chat[]
+
   @@unique([email])
   @@map("user")
 }

@@ -162,7 +162,12 @@ export function AttorneyInterestCard({ interest }: { interest: CaseInterest }) {
 				</button>
 				{interest.profileId ? (
 					<Link
-						href={`/find-attorney/${interest.profileId}` as Route}
+						// Carry the case through so the profile's back link returns to this
+						// case's requests, not the attorney directory the profile normally
+						// belongs to.
+						href={
+							`/find-attorney/${interest.profileId}?fromCase=${interest.caseId}` as Route
+						}
 						className={cn(
 							buttonVariants({ variant: "outline", size: "lg" }),
 							"h-10 px-4",

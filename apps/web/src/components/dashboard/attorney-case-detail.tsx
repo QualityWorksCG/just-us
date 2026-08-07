@@ -106,6 +106,7 @@ export function AttorneyCaseDetailView({
 	item,
 	conversationId,
 	payoutPanel,
+	updatesPanel,
 }: {
 	item: AttorneyCaseDetail;
 	/** An existing thread with this client, if they have started one. */
@@ -113,6 +114,10 @@ export function AttorneyCaseDetailView({
 	/** The payout panel, passed in so the page can wrap its client component in
 	 *  the Suspense boundary `useSearchParams` needs. */
 	payoutPanel: React.ReactNode;
+	/** Progress updates: the composer and the posts already published (JUS-33).
+	 *  Passed in for the same reason as `payoutPanel` — the page owns the data
+	 *  fetching, this component owns where it sits on the screen. */
+	updatesPanel: React.ReactNode;
 }) {
 	const paragraphs = item.story
 		.split(/\n{2,}|\n/)
@@ -189,8 +194,11 @@ export function AttorneyCaseDetailView({
 				)}
 			</div>
 
-			{/* Payouts first — the one thing here that can be blocking the client. */}
+			{/* Payouts first — the one thing here that can be blocking the client.
+			    Updates follow: the work the attorney does here regularly, versus the
+			    setup they do once. */}
 			{payoutPanel}
+			{updatesPanel}
 
 			<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_360px]">
 				<div className="flex min-w-0 flex-col gap-6">

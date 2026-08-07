@@ -7,6 +7,7 @@ import {
 	Briefcase,
 	Hourglass,
 	Landmark,
+	Megaphone,
 	Search,
 	Users,
 } from "lucide-react";
@@ -251,6 +252,16 @@ function CaseRow({ case: c }: { case: AttorneyCase }) {
 								: "Your client hasn't agreed the fee with you yet, so there's no goal to raise."}
 					</p>
 				)}
+				{/* Outside the funding branch on purpose: an attorney posts updates on a
+				    case whether or not it is currently raising, and "no updates posted" is
+				    the nudge (JUS-33). Plain text rather than a link — this whole row is
+				    already one, and the composer lives on the case's own screen. */}
+				<p className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
+					<Megaphone className="size-3.5" aria-hidden="true" />
+					{c.updatesCount === 0
+						? "no updates posted"
+						: `${c.updatesCount} ${c.updatesCount === 1 ? "update" : "updates"} posted`}
+				</p>
 			</div>
 
 			<span className="inline-flex shrink-0 items-center gap-1 font-semibold text-[13px] text-brass-deep">

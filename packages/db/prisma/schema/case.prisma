@@ -85,6 +85,10 @@ model Case {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   publishedAt DateTime?
+  // When the owner (plaintiff) last looked at this case's attorney updates. Drives
+  // the "new update" notification: updates newer than this are unseen. Null means
+  // they've never opened the case since an update landed. (JUS-33)
+  ownerUpdatesSeenAt DateTime?
   // Soft delete — set when the plaintiff removes a case. Rows are kept so they
   // can appear in the "Deleted" filter and be restored, not hard-deleted.
   deletedAt   DateTime?
@@ -100,6 +104,10 @@ model Case {
   // what puts a `seeking` case in the attorney queue — see listSeekingQueue.
   match         Match?
   conversations Conversation[]
+  // Broadcast progress updates the matched attorney posts, read by every backer.
+  updates CaseUpdate[]
+  // Users following the case for its updates (JUS-33).
+  follows CaseFollow[]
 
   @@index([ownerId])
   @@index([status])
@@ -108,6 +116,58 @@ model Case {
   // account receiving, and for which cases".
   @@index([payoutAccountId])
   @@map("case")
+}
+
+// A broadcast progress update posted to a case, read by every donor backing it
+// (JUS-33). One-to-many, chronological, immutable.
+//
+// `authorId` is the poster's User id, kept as a plain id (like `SavedCase.userId`
+// and `Donation.donorId`) rather than a relation, so this story adds no
+// back-relation to the auth `User` model. Who may write a row is enforced at the
+// data-layer boundary: `postCaseUpdate` refuses unless the author is the case's
+// owner (the plaintiff) or the attorney matched to it — the two people running
+// the case. The author's role for display is derived by comparing `authorId` to
+// the case's `ownerId`.
+model CaseUpdate {
+  id     String @id @default(cuid())
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId String
+
+  authorId String
+
+  body      String
+  // Optional category chosen when posting (e.g. "court_date", "settlement") —
+  // rendered as a labelled pill. Null when the author didn't categorise it.
+  tag       String?
+  // Uploaded images/files attached to the update: `[{ url, name, contentType }]`.
+  // Files live in Blob storage; only their metadata is kept here.
+  attachments Json?
+  createdAt DateTime  @default(now())
+  // Set when the author revises an update, so readers see it was edited. Only
+  // the author can edit, and only body/tag change — never authorship or time.
+  editedAt  DateTime?
+
+  @@index([caseId, createdAt])
+  @@map("case_update")
+}
+
+// A user following a case to get its updates without (necessarily) donating.
+// Distinct from `SavedCase` (a donor's private bookmark) and from donations:
+// following is a public "notify me" that the plaintiff's update audience counts.
+// `userId` is a plain id, matching the SavedCase/Donation convention.
+model CaseFollow {
+  id        String   @id @default(cuid())
+  userId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId    String
+  createdAt DateTime @default(now())
+  // When this follower last looked at the case's updates. Updates newer than this
+  // are "new" to them — drives their bell + the card tag. Null until first view.
+  updatesSeenAt DateTime?
+
+  @@unique([userId, caseId])
+  @@index([caseId])
+  @@map("case_follow")
 }
 
 // A donor bookmarking a case to come back to. `userId` is the donor's User id

@@ -26,16 +26,13 @@ import {
 	ImageIcon,
 	Link2,
 	Lock,
-	Mail,
 	Megaphone,
-	MessageCircle,
 	Pencil,
 	Plus,
 	Rocket,
 	Scale,
 	Search,
 	Send,
-	Share2,
 	Sparkles,
 	Upload,
 	UserPlus,
@@ -86,6 +83,10 @@ export type WizardInitial = {
 	evidence: EvidenceItem[];
 	coverImageUrl: string | null;
 	images: string[];
+	/** True when an attorney has already been matched to this case through the
+	 *  request/accept flow. The attorney is settled — the representation step shows
+	 *  them as confirmed rather than asking to invite one again. */
+	attorneyConfirmed?: boolean;
 };
 
 type View = "wizard" | "preview" | "success" | "published-attorneys";
@@ -219,6 +220,12 @@ export function CaseWizard({
 	const [uploadingEvidence, setUploadingEvidence] = useState(false);
 
 	// Step 3 — representation (do you have an attorney?)
+	// A matched attorney (accepted from a request) is already settled: the step
+	// shows them as confirmed instead of the invite form, unless the plaintiff
+	// chooses to change attorney, which drops back into the normal selection.
+	const [attorneyConfirmed, setAttorneyConfirmed] = useState(
+		initial?.attorneyConfirmed ?? false,
+	);
 	const [repChoice, setRepChoice] = useState<"have" | "find" | null>(
 		initial?.attorney ? "have" : null,
 	);
@@ -282,6 +289,14 @@ export function CaseWizard({
 		}
 		setStep((s) => Math.max(1, s - 1));
 		window.scrollTo({ top: 0 });
+	}
+
+	// Drop a confirmed (matched) attorney back into the normal selection so the
+	// plaintiff can pick a different one. The existing details stay pre-filled in
+	// case they only meant to tweak them.
+	function changeAttorney() {
+		setAttorneyConfirmed(false);
+		setRepChoice("have");
 	}
 
 	// Step 3, "Yes, I have an attorney" → record them and move to the fee.
@@ -558,9 +573,17 @@ export function CaseWizard({
 		}
 	}
 
+	// The public page for the case just published. `/cases` (the directory) was
+	// being copied instead — a link to the browse page, not the campaign, so
+	// backers landed on a list rather than the case they were sent.
+	function caseShareUrl() {
+		if (typeof window === "undefined" || !caseId) return "";
+		return `${window.location.origin}/cases/${caseId}`;
+	}
+
 	function copyLink() {
-		const url =
-			typeof window !== "undefined" ? `${window.location.origin}/cases` : "";
+		const url = caseShareUrl();
+		if (!url) return;
 		navigator.clipboard?.writeText(url);
 		toast.success("Link copied to clipboard.");
 	}
@@ -741,22 +764,6 @@ export function CaseWizard({
 							<Link2 className="size-4" aria-hidden="true" />
 							Copy link
 						</button>
-						{[
-							{ icon: Send, label: "Share on X" },
-							{ icon: Share2, label: "Share on Facebook" },
-							{ icon: MessageCircle, label: "Share on WhatsApp" },
-							{ icon: Mail, label: "Share by email" },
-						].map((s) => (
-							<button
-								key={s.label}
-								type="button"
-								aria-label={s.label}
-								onClick={() => toast.success("Sharing link copied.")}
-								className="flex size-11 items-center justify-center rounded-full border border-border bg-surface text-ink-soft transition-colors hover:border-line-strong hover:text-ink"
-							>
-								<s.icon className="size-4" aria-hidden="true" />
-							</button>
-						))}
 					</div>
 
 					<div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -1619,7 +1626,51 @@ export function CaseWizard({
 							</>
 						)}
 
-						{step === 3 && (
+						{step === 3 && attorneyConfirmed && attorney ? (
+							<>
+								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
+									Your attorney
+								</h1>
+								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
+									You've already chosen {attorney.name} and they accepted your
+									case — there's nothing to invite or send again. Continue to
+									review the rest, or change your attorney.
+								</p>
+
+								<div className="mt-8 flex items-center gap-4 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+									<span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[14px] text-white">
+										{attorney.name
+											.split(/\s+/)
+											.slice(0, 2)
+											.map((p) => p[0]?.toUpperCase() ?? "")
+											.join("")}
+									</span>
+									<div className="min-w-0 flex-1">
+										<p className="font-bold text-[16px] text-ink">
+											{attorney.name}
+										</p>
+										<p className="text-[13px] text-muted-foreground">
+											{[attorney.area, attorney.location, attorney.firm]
+												.filter(Boolean)
+												.join(" · ") || "Representing you"}
+										</p>
+									</div>
+									<span className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1.5 font-semibold text-[12px] text-green-deep">
+										<CircleCheck className="size-3.5" aria-hidden="true" />
+										Representing you
+									</span>
+								</div>
+
+								<button
+									type="button"
+									onClick={changeAttorney}
+									className="mt-4 inline-flex items-center gap-1.5 font-semibold text-[13.5px] text-brass-deep transition-colors hover:text-brass"
+								>
+									<Search className="size-4" aria-hidden="true" />
+									Choose a different attorney
+								</button>
+							</>
+						) : step === 3 ? (
 							<>
 								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
 									Do you have an attorney?
@@ -1886,7 +1937,7 @@ export function CaseWizard({
 									</>
 								)}
 							</>
-						)}
+						) : null}
 
 						{step === 4 && (
 							<>
@@ -2075,6 +2126,11 @@ export function CaseWizard({
 							>
 								<Rocket data-icon="inline-start" aria-hidden="true" />
 								{publishing ? "Publishing…" : "Publish & go live"}
+							</Button>
+						) : step === 3 && attorneyConfirmed ? (
+							<Button type="button" size="lg" className="px-6" onClick={next}>
+								Continue
+								<ArrowRight data-icon="inline-end" aria-hidden="true" />
 							</Button>
 						) : step === 3 && repChoice === "have" ? (
 							<Button

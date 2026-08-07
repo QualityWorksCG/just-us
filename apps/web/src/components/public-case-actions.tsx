@@ -4,10 +4,13 @@
 // Stripe client and the platform secret key into the browser bundle.
 import { breakdownAtBps, checkDonationAmount } from "@just-us/payments/fees";
 import { cn } from "@just-us/ui/lib/utils";
-import { HandCoins, Lock, Share2 } from "lucide-react";
+import { Bell, Bookmark, HandCoins, Lock, Share2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { toggleSaveAction } from "@/app/(app)/donor-actions";
+import { toggleFollowAction } from "@/app/(app)/follow-actions";
 import { startDonation } from "@/app/cases/[id]/donate-actions";
 
 export type DonateConfig = {
@@ -51,16 +54,33 @@ export function PublicCaseActions({
 	sharePath,
 	caseId,
 	config,
+	canSave = false,
+	initialSaved = false,
+	canFollow = false,
+	initialFollowing = false,
 }: {
 	sharePath: string;
 	caseId: string;
 	config: DonateConfig;
+	/** True only for a signed-in donor — the role that can save cases. */
+	canSave?: boolean;
+	initialSaved?: boolean;
+	/** True for a signed-in user who isn't the case's own team. */
+	canFollow?: boolean;
+	initialFollowing?: boolean;
 }) {
+	const router = useRouter();
 	const [selected, setSelected] = useState<number | null>(
 		config.presetsCents[0] ?? config.minCents,
 	);
 	const [customInput, setCustomInput] = useState("");
 	const [pending, startTransition] = useTransition();
+	// Save and follow are optimistic and independent of each other, so they get a
+	// transition each — one in flight must not gate the other's button.
+	const [saved, setSaved] = useState(initialSaved);
+	const [, startSave] = useTransition();
+	const [following, setFollowing] = useState(initialFollowing);
+	const [, startFollow] = useTransition();
 
 	// A custom entry wins over a preset whenever it parses; typing clears the
 	// preset selection so two amounts are never highlighted at once.
@@ -95,6 +115,27 @@ export function PublicCaseActions({
 		});
 	}
 
+	function toggleFollow() {
+		if (!canFollow) {
+			toast("Sign in to follow this case.");
+			router.push("/login?mode=create");
+			return;
+		}
+		const next = !following;
+		setFollowing(next);
+		startFollow(async () => {
+			const res = await toggleFollowAction({ caseId, follow: next });
+			if (!res.ok) {
+				setFollowing(!next);
+				toast.error(res.error);
+			} else {
+				toast.success(
+					next ? "Following — you'll see every update." : "Unfollowed.",
+				);
+			}
+		});
+	}
+
 	function share() {
 		const url =
 			typeof window !== "undefined"
@@ -102,6 +143,25 @@ export function PublicCaseActions({
 				: "";
 		navigator.clipboard?.writeText(url);
 		toast.success("Link copied — thanks for sharing!");
+	}
+
+	function toggleSave() {
+		if (!canSave) {
+			toast("Sign in as a donor to save cases.");
+			router.push("/login?mode=create");
+			return;
+		}
+		const next = !saved;
+		setSaved(next);
+		startSave(async () => {
+			const res = await toggleSaveAction(caseId, next);
+			if (!res.ok) {
+				setSaved(!next);
+				toast.error("Couldn't update saved cases.");
+			} else {
+				toast.success(next ? "Saved for later." : "Removed from saved.");
+			}
+		});
 	}
 
 	return (
@@ -220,12 +280,48 @@ export function PublicCaseActions({
 
 			<button
 				type="button"
-				onClick={share}
-				className="inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-border bg-surface px-5 font-semibold text-[14px] text-ink transition-colors hover:border-brass-deep"
+				onClick={toggleFollow}
+				aria-pressed={following}
+				className={cn(
+					"inline-flex h-12 items-center justify-center gap-2 rounded-[var(--radius-control)] border px-4 font-semibold text-[14px] transition-colors",
+					following
+						? "border-green-deep bg-green-soft text-green-deep"
+						: "border-border bg-surface text-ink hover:border-brass-deep",
+				)}
 			>
-				<Share2 className="size-4" aria-hidden="true" />
-				Share
+				<Bell
+					className={cn("size-4", following && "fill-green-deep")}
+					aria-hidden="true"
+				/>
+				{following ? "Following" : "Follow for updates"}
 			</button>
+			<div className="flex gap-2.5">
+				<button
+					type="button"
+					onClick={toggleSave}
+					aria-pressed={saved}
+					className={cn(
+						"inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] border px-4 font-semibold text-[14px] transition-colors",
+						saved
+							? "border-brass bg-brass-wash text-brass-deep"
+							: "border-border bg-surface text-ink hover:border-brass-deep",
+					)}
+				>
+					<Bookmark
+						className={cn("size-4", saved && "fill-brass-deep")}
+						aria-hidden="true"
+					/>
+					{saved ? "Saved" : "Save"}
+				</button>
+				<button
+					type="button"
+					onClick={share}
+					className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-border bg-surface px-4 font-semibold text-[14px] text-ink transition-colors hover:border-brass-deep"
+				>
+					<Share2 className="size-4" aria-hidden="true" />
+					Share
+				</button>
+			</div>
 		</div>
 	);
 }

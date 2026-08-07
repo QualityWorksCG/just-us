@@ -8,6 +8,7 @@ import {
 	Heart,
 	Home,
 	type LucideIcon,
+	Megaphone,
 	Plus,
 	Scale,
 	Share2,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +29,17 @@ function money(n: number) {
 		currency: "USD",
 		maximumFractionDigits: 0,
 	}).format(n);
+}
+
+function initials(name: string) {
+	return (
+		name
+			.trim()
+			.split(/\s+/)
+			.slice(0, 2)
+			.map((p) => p[0]?.toUpperCase() ?? "")
+			.join("") || "—"
+	);
 }
 
 // Category → header tint + watermark icon for the fallback cover.
@@ -54,23 +67,46 @@ const CAT_STYLES: Record<string, { bg: string; fg: string; icon: LucideIcon }> =
 	};
 const DEFAULT_CAT = { bg: "bg-brass-wash", fg: "text-brass-deep", icon: Scale };
 
+// Case status → the frosted badge shown on the card cover.
+const STATUS_BADGE: Record<string, { label: string; dot: string }> = {
+	live: { label: "Live · Raising", dot: "bg-success" },
+	seeking: { label: "Seeking attorney", dot: "bg-brass-deep" },
+	closed: { label: "Resolved", dot: "bg-green-deep" },
+	draft: { label: "Draft", dot: "bg-ink-soft" },
+};
+
 export function DonorCaseCard({
 	c,
 	initialSaved,
 	variant = "full",
+	hasNewUpdate = false,
 }: {
 	c: DonorCase;
 	initialSaved: boolean;
 	variant?: "full" | "compact";
+	/** Show a "New update" tag — a followed case has updates the donor hasn't
+	 *  seen. */
+	hasNewUpdate?: boolean;
 }) {
 	const [saved, setSaved] = useState(initialSaved);
 	const [, startSave] = useTransition();
+	const pathname = usePathname();
 	const pct =
 		c.goal > 0 ? Math.min(100, Math.round((c.raised / c.goal) * 100)) : 0;
 	const style = CAT_STYLES[c.category] ?? DEFAULT_CAT;
 	const Icon = style.icon;
-	const href = `/cases/${c.id}` as Route;
+	// The in-app case screen, not the public `/cases/[id]` page: a signed-in donor
+	// sent to the public page lost the sidebar and the marketing header at once,
+	// leaving the case with no way back. `from` tells that screen which list to
+	// return to, since these cards appear on three of them.
+	const from = pathname?.startsWith("/saved")
+		? "saved"
+		: pathname?.startsWith("/home")
+			? "home"
+			: "discover";
+	const href = `/discover/${c.id}?from=${from}` as Route;
 	const compact = variant === "compact";
+	const status = STATUS_BADGE[c.status] ?? STATUS_BADGE.live;
 
 	function toggleSave() {
 		const next = !saved;
@@ -113,19 +149,27 @@ export function DonorCaseCard({
 					{c.cover ? (
 						<img src={c.cover} alt="" className="size-full object-cover" />
 					) : (
-						<>
-							<span className={cn("absolute top-3 left-4", style.fg)}>
-								<Icon className="size-6" aria-hidden="true" />
-							</span>
-							<span
-								className={cn("absolute right-4 bottom-2 opacity-25", style.fg)}
-							>
-								<Icon className="size-20" aria-hidden="true" />
-							</span>
-						</>
+						<span
+							className={cn("absolute right-4 bottom-2 opacity-25", style.fg)}
+						>
+							<Icon className="size-20" aria-hidden="true" />
+						</span>
 					)}
 				</div>
 			</Link>
+			{/* Status badge + optional "new update" tag */}
+			<div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-1.5">
+				<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-surface/90 px-2.5 py-1 font-mono font-semibold text-[10px] text-ink uppercase tracking-[0.06em] backdrop-blur-sm">
+					<span className={cn("size-1.5 rounded-full", status.dot)} />
+					{status.label}
+				</span>
+				{hasNewUpdate && (
+					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-gold-bright px-2.5 py-1 font-mono font-semibold text-[10px] text-gold-bright-ink uppercase tracking-[0.06em] shadow-[var(--shadow-rest)]">
+						<Megaphone className="size-3" aria-hidden="true" />
+						New update
+					</span>
+				)}
+			</div>
 			<button
 				type="button"
 				onClick={toggleSave}
@@ -156,10 +200,52 @@ export function DonorCaseCard({
 					</h3>
 				</Link>
 				{variant === "full" && (
-					<p className="mt-1 text-[12.5px] text-muted-foreground">
-						{c.owner.split(" ")[0]}
-						{c.attorney ? ` · with ${c.attorney}` : " · seeking counsel"}
-					</p>
+					<div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
+						{/* Plaintiff — the person raising the case */}
+						<div className="flex items-center gap-2">
+							<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-green-soft font-bold text-[10px] text-green-deep">
+								{initials(c.owner)}
+							</span>
+							<div className="min-w-0 leading-tight">
+								<p className="truncate font-bold text-[12.5px] text-ink">
+									{c.owner}
+								</p>
+								<p className="font-mono text-[9.5px] text-muted-foreground uppercase tracking-[0.07em]">
+									Plaintiff
+								</p>
+							</div>
+						</div>
+						{/* Attorney — their lawyer */}
+						{c.attorney ? (
+							<div className="flex items-center gap-2">
+								<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brass-wash font-bold text-[10px] text-brass-deep">
+									{initials(c.attorney)}
+								</span>
+								<div className="min-w-0 leading-tight">
+									<p className="truncate font-bold text-[12.5px] text-ink">
+										{c.attorney}
+									</p>
+									<p className="font-mono text-[9.5px] text-muted-foreground uppercase tracking-[0.07em]">
+										Attorney
+									</p>
+								</div>
+							</div>
+						) : (
+							<div className="flex items-center gap-2">
+								<span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-line-strong border-dashed text-muted-foreground">
+									<Scale className="size-3.5" aria-hidden="true" />
+								</span>
+								<div className="leading-tight">
+									<p className="font-semibold text-[12.5px] text-muted-foreground">
+										Not yet chosen
+									</p>
+									<p className="font-mono text-[9.5px] text-muted-foreground uppercase tracking-[0.07em]">
+										Attorney
+									</p>
+								</div>
+							</div>
+						)}
+					</div>
 				)}
 
 				<div className={compact ? "mt-2.5" : "mt-3"}>

@@ -56,6 +56,8 @@ export function BrowseControls() {
 			if (value) sp.set(key, value);
 			else sp.delete(key);
 		}
+		// Any filter/search change resets pagination to the first page.
+		sp.delete("page");
 		const qs = sp.toString();
 		router.push((qs ? `${pathname}?${qs}` : pathname) as Route);
 	}

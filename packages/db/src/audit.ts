@@ -10,6 +10,8 @@ export const AUDIT_ACTIONS = [
 	"user.blocked",
 	"user.unblocked",
 	"user.role_changed",
+	"attorney.verified",
+	"attorney.verification_cleared",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

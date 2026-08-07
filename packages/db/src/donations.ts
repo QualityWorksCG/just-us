@@ -361,11 +361,35 @@ export async function donorSupportForCase(input: {
 	};
 }
 
-/** A donor's donations, newest first, with the case + owner name for display. */
-export async function listDonations(donorId: string) {
+/**
+ * A donor's giving on one case — total and most recent date — for the "Your
+ * support" panel. Null when they haven't donated (payments aren't wired yet, so
+ * that's the honest common case).
+ */
+export async function getCaseDonationSummary(
+	donorId: string,
+	caseId: string,
+): Promise<{ totalCents: number; latestAt: Date } | null> {
+	const agg = await prisma.donation.aggregate({
+		where: { donorId, caseId },
+		_sum: { amountCents: true },
+		_max: { createdAt: true },
+		_count: { _all: true },
+	});
+	if (agg._count._all === 0 || !agg._max.createdAt) return null;
+	return {
+		totalCents: agg._sum.amountCents ?? 0,
+		latestAt: agg._max.createdAt,
+	};
+}
+
+/** A donor's donations, newest first, with the case + owner name for display.
+ *  Pass `take` to cap the list. */
+export async function listDonations(donorId: string, take?: number) {
 	return prisma.donation.findMany({
 		where: { donorId, case: { deletedAt: null } },
 		orderBy: { createdAt: "desc" },
+		take,
 		include: { case: { include: { owner: { select: { name: true } } } } },
 	});
 }
