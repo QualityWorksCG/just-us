@@ -31,6 +31,18 @@ export {
 	STRIPE_US_CARD_PRICING,
 } from "./fees";
 
+/**
+ * The SDK's own types, re-exported so a caller can name a `Stripe.Event` without
+ * importing the SDK itself.
+ *
+ * This package is the only place that depends on `stripe`, and it stays that way:
+ * a webhook route that reached for `import type Stripe from "stripe"` resolved
+ * locally through Bun's hoisting but failed on the build machine, because the app
+ * never declared the dependency it was using. Re-exporting keeps the SDK behind
+ * this boundary, where the dependency is declared.
+ */
+export type { Stripe };
+
 /** Thrown when a donation path is reached without Stripe configured. */
 export class PaymentsNotConfiguredError extends Error {
 	constructor(message: string) {

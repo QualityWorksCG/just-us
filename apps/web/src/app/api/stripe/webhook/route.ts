@@ -4,8 +4,7 @@ import {
 	markDonationSucceeded,
 } from "@just-us/db/donations";
 import { env } from "@just-us/env/server";
-import { isPaymentsConfigured, stripe } from "@just-us/payments";
-import type Stripe from "stripe";
+import { isPaymentsConfigured, type Stripe, stripe } from "@just-us/payments";
 
 /**
  * The donation ledger webhook.
