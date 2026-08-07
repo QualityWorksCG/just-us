@@ -18,10 +18,13 @@ import {
 import { cn } from "@just-us/ui/lib/utils";
 import { LogOut } from "lucide-react";
 import type { Route } from "next";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 import { Brandmark } from "@/components/brandmark";
+import { AssistantLauncher } from "@/components/chat/assistant-launcher";
 import {
 	type BellNotification,
 	NotificationBell,
@@ -53,6 +56,16 @@ const CONTENT_COLUMN = "w-full px-6 sm:px-10 lg:px-12";
  * contents (the size-9 bell vs. the 30px brandmark) pull the borders apart.
  */
 const CHROME_BAR_HEIGHT = "h-16";
+
+/**
+ * The assistant column drags in the AI SDK and a markdown renderer, so it is
+ * fetched on first open rather than shipped with every app screen.
+ */
+const AssistantPanel = dynamic(
+	() =>
+		import("@/components/chat/assistant-panel").then((m) => m.AssistantPanel),
+	{ ssr: false },
+);
 
 function initials(name: string) {
 	return (
@@ -95,6 +108,32 @@ export function AppShell({
 	const nav = getRoleNav(role);
 	const items = visibleNavItems(role, flags);
 
+	// The assistant column is a sibling of the page, so its state lives here
+	// rather than in the header button. Kept in plain client state: this shell is
+	// the layout for every app screen, so the column — and the conversation
+	// inside it — already survives navigation without a cookie.
+	const [assistantOpen, setAssistantOpen] = useState(false);
+	// Sticky: once loaded the column stays mounted so the thread outlives a close.
+	const [assistantMounted, setAssistantMounted] = useState(false);
+	// The launcher is gone while the column is open, so it cannot watch for the
+	// close that should hand focus back to it. This is that signal, read on the
+	// mount the close puts it through.
+	const [restoreLauncherFocus, setRestoreLauncherFocus] = useState(false);
+
+	function setAssistant(next: boolean) {
+		setAssistantOpen(next);
+		if (!next) setRestoreLauncherFocus(true);
+	}
+
+	// The nav drops to its icon rail for as long as the assistant is open: the
+	// screens size their columns off the viewport, not off the space they actually
+	// get, so the ~13rem the rail gives back is what keeps page content from
+	// running under the assistant. The user's own choice is remembered rather than
+	// overwritten — closing the assistant restores it, and the cookie only moves
+	// when they use the trigger themselves.
+	const [navOpen, setNavOpen] = useState(defaultOpen);
+	const assistantShown = flags.aiAssistant && assistantOpen;
+
 	// The screen this URL belongs to — its title is the page heading in the bar
 	// below, and its slug marks the active nav entry. Resolved from the registry
 	// rather than by parsing the URL: screens sit at the top level and a couple of
@@ -113,7 +152,15 @@ export function AppShell({
 	}
 
 	return (
-		<SidebarProvider defaultOpen={defaultOpen}>
+		// `min-w-0` is load-bearing: the shell is a grid item in the root layout, so
+		// without it the track grows to the row's min-content and the whole app —
+		// assistant column included — is pushed off the right edge instead of the
+		// page reflowing into the space that's left.
+		<SidebarProvider
+			open={assistantShown ? false : navOpen}
+			onOpenChange={setNavOpen}
+			className="min-w-0"
+		>
 			{/*
 				`collapsible="icon"` keeps an icon rail when collapsed rather than hiding
 				the nav outright; on mobile the same markup renders in a sheet, which is
@@ -281,6 +328,25 @@ export function AppShell({
 										: "New notifications will show up here."
 							}
 						/>
+						{/* The assistant sits beside the bell when its flag is on; with the
+						    flag off there is no entry point to the assistant anywhere in the
+						    app. While the column is open the launcher is dropped entirely —
+						    the panel's own header is right beside it, so the button would
+						    only repeat it.
+
+						    The flag-off branch used to hold this slot with a decorative,
+						    aria-hidden bell. The NotificationBell above is the real thing, so
+						    the placeholder is gone rather than sitting next to its own
+						    replacement. */}
+						{flags.aiAssistant && !assistantOpen && (
+							<AssistantLauncher
+								restoreFocus={restoreLauncherFocus}
+								onOpen={() => {
+									setAssistantMounted(true);
+									setAssistant(true);
+								}}
+							/>
+						)}
 					</div>
 				</header>
 
@@ -294,6 +360,21 @@ export function AppShell({
 					{children}
 				</main>
 			</div>
+
+			{/*
+				Outside the column above, so the assistant is a third flex child of the
+				shell rather than something floating over the page: opening it narrows
+				the header and <main> together, which is the whole point of the column
+				and also keeps CONTENT_COLUMN doing its job — the two stay aligned
+				because they still share one shrinking parent.
+			*/}
+			{flags.aiAssistant && assistantMounted && (
+				<AssistantPanel
+					open={assistantOpen}
+					onOpenChange={setAssistant}
+					role={role}
+				/>
+			)}
 		</SidebarProvider>
 	);
 }
