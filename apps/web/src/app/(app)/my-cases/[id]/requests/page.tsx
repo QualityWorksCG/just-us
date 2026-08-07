@@ -1,11 +1,19 @@
 import { getOwnedCase } from "@just-us/db/cases";
 import {
+	getCaseMatch,
 	listCaseInterests,
 	markCaseInterestsViewed,
 } from "@just-us/db/requests";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { Check, Clock, Search, ShieldCheck } from "lucide-react";
+import {
+	ArrowRight,
+	Check,
+	Clock,
+	Handshake,
+	Search,
+	ShieldCheck,
+} from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -15,6 +23,17 @@ import { BackLink } from "@/components/dashboard/back-link";
 import { requireRole } from "@/lib/auth-server";
 
 const STEPS = ["Published", "Interest received", "You choose", "Live"] as const;
+
+function initials(name: string) {
+	return (
+		name
+			.trim()
+			.split(/\s+/)
+			.slice(0, 2)
+			.map((p) => p[0]?.toUpperCase() ?? "")
+			.join("") || "—"
+	);
+}
 
 export default async function CaseRequestsPage({
 	params,
@@ -27,6 +46,122 @@ export default async function CaseRequestsPage({
 	if (!c || c.deletedAt) notFound();
 	// The inbox only makes sense while the case is out to attorneys.
 	if (c.status !== "seeking") redirect(`/my-cases/${id}` as Route);
+
+	// An attorney was already chosen (the match exists) but the case isn't live
+	// yet — the plaintiff accepted, then left the publish wizard, often because
+	// something errored. The accepted request is no longer "open", so the inbox
+	// below would fall back to "choose an attorney" and read as if the choice were
+	// undone. Instead, show who they picked and a direct way to finish — the
+	// accept is never lost to an error partway through going live.
+	const match = await getCaseMatch(id, session.user.id);
+	if (match) {
+		const attorneyName = c.attorneyName?.trim() || "your attorney";
+		return (
+			<div className="flex w-full flex-col gap-6">
+				<div>
+					<BackLink
+						href={"/my-cases" as Route}
+						label="Back to my cases"
+						className="mb-3"
+					/>
+					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1 font-mono font-semibold text-[11px] text-green-deep uppercase tracking-[0.06em]">
+						<span className="size-1.5 rounded-full bg-success" />
+						Attorney chosen
+					</span>
+					<h2 className="mt-3 font-extrabold text-[clamp(1.75rem,3.4vw,2.375rem)] text-ink tracking-[-0.03em]">
+						You've chosen {attorneyName}
+					</h2>
+					<p className="mt-2 max-w-[58ch] text-[14.5px] text-ink-soft leading-relaxed">
+						Your attorney is set for “{c.title || "your case"}”. Finish agreeing
+						the fee and publish to take your campaign live. This choice is saved
+						— if something went wrong while publishing, you won't have to choose
+						again.
+					</p>
+				</div>
+
+				{/* Progress stepper — the choice is made; publishing is what's left. */}
+				<ol className="flex items-center gap-2 overflow-x-auto pb-1">
+					{STEPS.map((label, i) => {
+						const done = i < 3;
+						const active = i === 3;
+						return (
+							<li key={label} className="flex flex-1 items-center gap-2">
+								<span
+									className={cn(
+										"flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]",
+										done && "bg-success text-white",
+										active && "border-2 border-brass text-brass-deep",
+										!done &&
+											!active &&
+											"border border-line-strong text-muted-foreground",
+									)}
+								>
+									{done ? (
+										<Check className="size-3" aria-hidden="true" />
+									) : null}
+								</span>
+								<span
+									className={cn(
+										"whitespace-nowrap text-[12.5px]",
+										done || active
+											? "font-semibold text-ink"
+											: "text-muted-foreground",
+									)}
+								>
+									{label}
+								</span>
+								{i < STEPS.length - 1 && (
+									<span className="h-px flex-1 bg-border" />
+								)}
+							</li>
+						);
+					})}
+				</ol>
+
+				<div className="flex flex-col gap-5 rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">
+					<div className="flex items-center gap-3">
+						<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[14px] text-white">
+							{initials(attorneyName)}
+						</span>
+						<div className="min-w-0">
+							<p className="font-bold text-[15px] text-ink">{attorneyName}</p>
+							<p className="font-mono text-[10.5px] text-muted-foreground uppercase tracking-[0.07em]">
+								Your chosen attorney
+							</p>
+						</div>
+					</div>
+					<div className="flex flex-wrap items-center gap-3 border-border border-t pt-5">
+						<Link
+							href={`/cases/new?draft=${id}` as Route}
+							className={cn(buttonVariants({ size: "lg" }), "px-5")}
+						>
+							<Handshake data-icon="inline-start" aria-hidden="true" />
+							Continue — agree the fee & publish
+							<ArrowRight data-icon="inline-end" aria-hidden="true" />
+						</Link>
+						<Link
+							href={"/my-cases" as Route}
+							className={cn(
+								buttonVariants({ variant: "outline", size: "lg" }),
+								"px-5",
+							)}
+						>
+							Back to my cases
+						</Link>
+					</div>
+				</div>
+
+				<div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-border bg-surface/60 px-5 py-3.5 text-[12.5px] text-ink-soft leading-relaxed">
+					<ShieldCheck
+						className="mt-0.5 size-4 shrink-0 text-brass-deep"
+						aria-hidden="true"
+					/>
+					Nothing is final until you publish. Your case only goes live — and
+					starts raising — once you've agreed the fee and hit publish.
+				</div>
+			</div>
+		);
+	}
 
 	// Opening the inbox is the moment the plaintiff has genuinely seen what's in
 	// it, so it's where `pending` becomes `viewed` (JUS-25). The count comes back

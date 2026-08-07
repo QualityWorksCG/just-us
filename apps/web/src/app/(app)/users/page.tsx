@@ -22,6 +22,7 @@ import {
 import { InvitationRowActions } from "@/components/dashboard/invitation-row-actions";
 import { InviteAdminDialog } from "@/components/dashboard/invite-admin-dialog";
 import { UserFilters } from "@/components/dashboard/user-filters";
+import { verificationBadge } from "@/components/dashboard/verification-badge";
 import { requireAdministrator } from "@/lib/auth-server";
 
 const PAGE_SIZE = 10;
@@ -81,26 +82,36 @@ const PILL =
  * Verification is always shown; a block or a lock is shown alongside it. Blocked
  * (administrator-initiated) and locked (failed sign-ins) are separate states, so
  * they get separate pills and a blocked account never reads as merely locked.
+ *
+ * For an attorney the primary pill is their **bar-standing** badge, not email
+ * verification: a lawyer with a verified email but an unreviewed bar record must
+ * not read as "Verified" here, since verification is what lets them represent
+ * cases (JUS-13). Every other role shows email verification as before.
  */
 function statusPills(u: {
+	role: string;
 	emailVerified: boolean;
+	attorneyProfile: { verificationStatus: string } | null;
 	banned: boolean | null;
 	banExpires: Date | null;
 	lockedUntil: Date | null;
 }) {
-	const pills = [
-		u.emailVerified
-			? {
-					text: "Verified",
-					cls: "bg-green-soft text-green-deep",
-					dot: "bg-success",
-				}
-			: {
-					text: "Unverified",
-					cls: "bg-surface-2 text-ink-soft",
-					dot: "bg-ink-soft",
-				},
-	];
+	const pills =
+		u.role === "attorney"
+			? [verificationBadge(u.attorneyProfile?.verificationStatus)]
+			: [
+					u.emailVerified
+						? {
+								text: "Verified",
+								cls: "bg-green-soft text-green-deep",
+								dot: "bg-success",
+							}
+						: {
+								text: "Unverified",
+								cls: "bg-surface-2 text-ink-soft",
+								dot: "bg-ink-soft",
+							},
+				];
 	if (isBlocked(u)) {
 		pills.push({
 			text: "Blocked",

@@ -1,4 +1,9 @@
 import { getPublicCase } from "@just-us/db/cases";
+import {
+	getFollowUpdatesSeenAt,
+	isCaseFollowing,
+	markCaseUpdatesSeenByFollower,
+} from "@just-us/db/follows";
 import { isCaseSaved } from "@just-us/db/saves";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
@@ -45,7 +50,16 @@ export default async function InAppCasePage({
 	const c = await getPublicCase(id);
 	if (!c) notFound();
 
-	const initialSaved = await isCaseSaved(session.user.id, id);
+	// Read the follower's last-seen time BEFORE marking, so updates newer than the
+	// previous visit still highlight now; then clear this case from their bell.
+	const [initialSaved, initialFollowing, followSeenAt] = await Promise.all([
+		isCaseSaved(session.user.id, id),
+		isCaseFollowing(session.user.id, id),
+		getFollowUpdatesSeenAt(session.user.id, id),
+	]);
+	await markCaseUpdatesSeenByFollower(session.user.id, id);
+	// A donor is never the case's own team, so they can always follow.
+	const canFollow = session.user.id !== c.ownerId;
 	const back = BACK_TO[from ?? ""] ?? BACK_TO.discover;
 
 	return (
@@ -60,6 +74,10 @@ export default async function InAppCasePage({
 				headingLevel="h2"
 				canSave
 				initialSaved={initialSaved}
+				canFollow={canFollow}
+				initialFollowing={initialFollowing}
+				updatesHref={`/discover/${id}/updates` as Route}
+				updatesHighlightSince={followSeenAt}
 			/>
 		</div>
 	);

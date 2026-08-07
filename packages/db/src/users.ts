@@ -76,6 +76,9 @@ export async function listUsers(
 			lockedUntil: true,
 			createdAt: true,
 			lastSignInAt: true,
+			// Bar-standing badge for attorney rows — the status the admin table shows
+			// for a lawyer, distinct from `emailVerified`. Null for other roles.
+			attorneyProfile: { select: { verificationStatus: true } },
 		},
 	});
 }
@@ -128,6 +131,11 @@ export async function getUserWithCases(id: string) {
 	return prisma.user.findUnique({
 		where: { id },
 		include: {
+			// Bar-standing badge for an attorney account, so the admin detail screen
+			// can show it and verify from there (JUS-13). Null for every other role.
+			attorneyProfile: {
+				select: { verificationStatus: true, verifiedAt: true },
+			},
 			cases: {
 				where: { deletedAt: null },
 				orderBy: { createdAt: "desc" },

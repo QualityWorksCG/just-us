@@ -76,11 +76,11 @@ export function QueueCaseDetailView({
 						<Tag className="size-3.5" aria-hidden="true" />
 						{item.category || "Case"}
 					</span>
-					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-border px-2.5 py-0.5 text-[12px] text-ink-soft">
+					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-green-soft px-2.5 py-0.5 font-semibold text-[12px] text-green-deep">
 						<MapPin className="size-3.5" aria-hidden="true" />
 						{item.state || "—"}
 					</span>
-					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-border px-2.5 py-0.5 text-[12px] text-muted-foreground">
+					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-surface-2 px-2.5 py-0.5 font-semibold text-[12px] text-ink-soft">
 						<CalendarClock className="size-3.5" aria-hidden="true" />
 						{waitingFor(item.publishedAt, item.createdAt)}
 					</span>

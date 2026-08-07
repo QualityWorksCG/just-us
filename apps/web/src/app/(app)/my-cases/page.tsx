@@ -1,3 +1,4 @@
+import { caseIdsWithUnseenUpdates } from "@just-us/db/case-updates";
 import {
 	type CaseFilter,
 	caseCounts,
@@ -12,17 +13,17 @@ import {
 	ArrowRight,
 	FolderOpen,
 	ImageIcon,
+	Megaphone,
 	Plus,
 	UsersRound,
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 
+import { AttorneyCases } from "@/components/dashboard/attorney-cases";
 import { DeleteDraftButton } from "@/components/dashboard/delete-draft-button";
 import { RestoreCaseButton } from "@/components/dashboard/restore-case-button";
-import { ScreenPlaceholder } from "@/components/dashboard/screen-placeholder";
 import { requireRole } from "@/lib/auth-server";
-import { findScreen } from "@/lib/dashboard-nav";
 
 const PAGE_SIZE = 6;
 
@@ -91,14 +92,7 @@ export default async function MyCasesPage({
 	// attorney's link hit a plaintiff-only page and bounced them to their home.
 	const { session, role } = await requireRole("plaintiff", "attorney");
 	if (role === "attorney") {
-		const screen = findScreen("attorney", "cases");
-		return (
-			<ScreenPlaceholder
-				sub={
-					screen?.sub ?? "Cases matched to you — detail, evidence, and funding."
-				}
-			/>
-		);
+		return <AttorneyCases attorneyId={session.user.id} />;
 	}
 
 	const sp = await searchParams;
@@ -118,6 +112,9 @@ export default async function MyCasesPage({
 	// Expressions of interest per case, so a "seeking" card says how many
 	// attorneys have come forward rather than just that it's out there (JUS-25).
 	const interests = await interestCountsByCase(session.user.id);
+	// Cases with an attorney update the owner hasn't opened yet — tagged on the
+	// card so a new update is visible without drilling in (JUS-33).
+	const casesWithNewUpdate = await caseIdsWithUnseenUpdates(session.user.id);
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -221,6 +218,7 @@ export default async function MyCasesPage({
 								: isSeeking
 									? { text: "Seeking", dot: "bg-brass-deep" }
 									: { text: "Draft", dot: "bg-ink-soft" };
+						const hasNewUpdate = !isDeleted && casesWithNewUpdate.has(c.id);
 
 						return (
 							<div
@@ -230,8 +228,10 @@ export default async function MyCasesPage({
 									isDeleted && "opacity-75",
 								)}
 							>
-								{/* Cover */}
-								<div className="relative aspect-[16/9] bg-surface-2">
+								{/* Cover — a fixed, compact height (not the image's own aspect),
+								    so every card stays the same, sensible height regardless of the
+								    uploaded photo's proportions. */}
+								<div className="relative h-40 overflow-hidden bg-surface-2">
 									{c.coverImageUrl ? (
 										// biome-ignore lint/performance/noImgElement: user-uploaded Blob covers aren't static assets
 										<img
@@ -251,6 +251,12 @@ export default async function MyCasesPage({
 										<span className={cn("size-1.5 rounded-full", badge.dot)} />
 										{badge.text}
 									</span>
+									{hasNewUpdate && (
+										<span className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-gold-bright px-2.5 py-1 font-mono font-semibold text-[10px] text-gold-bright-ink uppercase tracking-[0.06em] shadow-[var(--shadow-rest)]">
+											<Megaphone className="size-3" aria-hidden="true" />
+											New update
+										</span>
+									)}
 								</div>
 
 								{/* Body */}

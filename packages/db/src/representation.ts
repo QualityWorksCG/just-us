@@ -342,7 +342,87 @@ export async function listMyInterests(attorneyId: string) {
 }
 
 /**
- * The cases an attorney is representing, newest match first.
+ * The cases an attorney is matched to — the "My cases" list on the attorney side
+ * and the surface they post progress updates from (JUS-33).
+ *
+ * Keyed on `Match`, so a case appears the moment the plaintiff takes this
+ * attorney forward and regardless of its funding status. Newest match first.
+ */
+export async function listMatchedCases(attorneyId: string) {
+	const matches = await prisma.match.findMany({
+		where: { attorneyId },
+		orderBy: { createdAt: "desc" },
+		select: {
+			case: {
+				select: {
+					id: true,
+					title: true,
+					category: true,
+					location: true,
+					status: true,
+					coverImageUrl: true,
+					raisedCents: true,
+					goalCents: true,
+					donorsCount: true,
+					owner: { select: { name: true } },
+					_count: { select: { updates: true } },
+				},
+			},
+		},
+	});
+	return matches.map((m) => ({
+		id: m.case.id,
+		title: m.case.title,
+		category: m.case.category,
+		location: m.case.location,
+		status: m.case.status,
+		coverImageUrl: m.case.coverImageUrl,
+		raisedCents: m.case.raisedCents,
+		goalCents: m.case.goalCents,
+		donorsCount: m.case.donorsCount,
+		plaintiffName: m.case.owner.name,
+		updatesCount: m.case._count.updates,
+	}));
+}
+
+/**
+ * One case an attorney is matched to, or null. Looking it up through the match
+ * (not by id alone) is the same guard `postCaseUpdate` applies: an attorney only
+ * ever reaches the case they actually represent.
+ */
+export async function getMatchedCase(caseId: string, attorneyId: string) {
+	const match = await prisma.match.findFirst({
+		where: { caseId, attorneyId },
+		select: {
+			case: {
+				select: {
+					id: true,
+					title: true,
+					category: true,
+					location: true,
+					status: true,
+					summary: true,
+					story: true,
+					coverImageUrl: true,
+					images: true,
+					raisedCents: true,
+					goalCents: true,
+					donorsCount: true,
+					viewsCount: true,
+					publishedAt: true,
+					attorneyName: true,
+					owner: { select: { name: true } },
+				},
+			},
+		},
+	});
+	return match?.case ?? null;
+}
+
+/**
+ * The same matches, shaped for the assistant's tool layer (JUS-68) rather than
+ * the dashboard: it needs the match itself — id, origin, when it happened — not
+ * just the case, and it caps the list via `take`.
  *
  * Scoped to the asking attorney, and unlike the queue it carries the funding
  * figures: `queueWhere` withholds them from an attorney who is only browsing,

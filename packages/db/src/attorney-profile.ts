@@ -3,6 +3,7 @@ import type {
 	FeeApproach,
 	VerificationStatus,
 } from "../prisma/generated/enums";
+import { writeAudit } from "./audit";
 import prisma from "./index";
 
 /**
@@ -156,6 +157,92 @@ export async function recordVerification(
 		});
 		return created;
 	});
+}
+
+export type AdminVerificationResult =
+	| { ok: true; status: VerificationStatus }
+	| { ok: false; reason: "not_attorney" };
+
+/**
+ * An administrator's manual bar-standing decision (JUS-13).
+ *
+ * The automatic check (`recordVerification`) is the usual path; this is the
+ * override the model's own docs promise — "an administrator can override any
+ * result". It writes the same two coupled rows every check does — an
+ * `AttorneyVerification` for the evidence trail and the `AttorneyProfile` badge
+ * cache — plus an audit entry, all in one transaction, so the badge, its history,
+ * and who changed it can never drift apart.
+ *
+ * The verification row is stamped `overriddenBy`/`triggeredBy` with the admin and
+ * `model: "admin-override"`, so a manual decision is always distinguishable from
+ * one the model reached. A profile row is created if the attorney never saved one
+ * — the badge is the gate for representing cases, and an attorney shouldn't have
+ * to fill in a directory profile before an administrator can vouch for them.
+ */
+export async function adminSetVerification(
+	userId: string,
+	adminId: string,
+	status: "verified" | "unverified",
+	note?: string,
+): Promise<AdminVerificationResult> {
+	const user = await prisma.user.findUnique({
+		where: { id: userId },
+		select: { role: true, name: true, jurisdiction: true },
+	});
+	if (user?.role !== "attorney") {
+		return { ok: false, reason: "not_attorney" };
+	}
+
+	const verified = status === "verified";
+
+	await prisma.$transaction(async (tx) => {
+		const profile = await tx.attorneyProfile.upsert({
+			where: { userId },
+			// No bio to review on a bare row, so `approved` matches the "no bio =
+			// approved" rule saveAttorneyProfile uses, keeping it out of moderation.
+			create: {
+				userId,
+				verificationStatus: status,
+				bioStatus: "approved",
+				...(verified ? { verifiedAt: new Date() } : {}),
+			},
+			update: {
+				verificationStatus: status,
+				...(verified ? { verifiedAt: new Date() } : {}),
+			},
+			select: { id: true },
+		});
+
+		await tx.attorneyVerification.create({
+			data: {
+				profileId: profile.id,
+				status,
+				confidence: 0,
+				isLicensedAttorney: verified ? true : null,
+				inGoodStanding: verified ? true : null,
+				summary: verified
+					? "Bar standing marked verified by an administrator."
+					: "Verification cleared by an administrator.",
+				sources: [],
+				checkedName: user.name,
+				checkedJurisdiction: user.jurisdiction,
+				model: "admin-override",
+				triggeredBy: adminId,
+				overriddenBy: adminId,
+				...(note ? { overriddenReason: note } : {}),
+			},
+		});
+
+		await writeAudit(tx, {
+			actorId: adminId,
+			action: verified ? "attorney.verified" : "attorney.verification_cleared",
+			targetType: "user",
+			targetId: userId,
+			...(note ? { reason: note } : {}),
+		});
+	});
+
+	return { ok: true, status };
 }
 
 /**

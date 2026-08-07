@@ -1,6 +1,8 @@
 "use server";
 
+import { adminSetVerification } from "@just-us/db/attorney-profile";
 import { blockUser, unblockUser } from "@just-us/db/users";
+import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -82,6 +84,54 @@ export async function blockUserAction(
 		};
 	}
 
+	revalidatePath("/users");
+	return { ok: true };
+}
+
+const verifySchema = z
+	.object({
+		userId: z.string().min(1, "Choose an attorney to verify."),
+		verified: z.boolean(),
+		note: z.string().trim().max(300).optional(),
+	})
+	.strict();
+
+export type SetVerificationInput = z.infer<typeof verifySchema>;
+
+/**
+ * Manually set an attorney's bar-standing badge (JUS-13). Administrator-only,
+ * re-checked here because a server action is a public endpoint. The evidence
+ * row, the badge, and the audit entry are written together in the data layer.
+ */
+export async function setAttorneyVerificationAction(
+	input: SetVerificationInput,
+): Promise<BlockUserActionResult> {
+	const guard = await guardAdministrator();
+	if (!guard.ok) return guard;
+
+	const parsed = verifySchema.safeParse(input);
+	if (!parsed.success) {
+		return { ok: false, error: "Couldn't update verification." };
+	}
+
+	try {
+		const res = await adminSetVerification(
+			parsed.data.userId,
+			guard.userId,
+			parsed.data.verified ? "verified" : "unverified",
+			parsed.data.note,
+		);
+		if (!res.ok) {
+			return { ok: false, error: "That account isn't an attorney." };
+		}
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't update verification. Please try again.",
+		};
+	}
+
+	revalidatePath(`/users/${parsed.data.userId}` as Route);
 	revalidatePath("/users");
 	return { ok: true };
 }

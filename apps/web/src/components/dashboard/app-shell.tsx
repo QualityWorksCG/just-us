@@ -16,7 +16,7 @@ import {
 	SidebarTrigger,
 } from "@just-us/ui/components/sidebar";
 import { cn } from "@just-us/ui/lib/utils";
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import type { Route } from "next";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -25,6 +25,10 @@ import { useState } from "react";
 
 import { Brandmark } from "@/components/brandmark";
 import { AssistantLauncher } from "@/components/chat/assistant-launcher";
+import {
+	type BellNotification,
+	NotificationBell,
+} from "@/components/dashboard/notification-bell";
 import { authClient } from "@/lib/auth-client";
 import {
 	findScreenByPath,
@@ -82,6 +86,7 @@ export function AppShell({
 	defaultOpen,
 	flags,
 	messageUnreadCount = 0,
+	notifications = [],
 	children,
 }: {
 	role: Role;
@@ -95,6 +100,8 @@ export function AppShell({
 	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
 	flags: FlagState;
 	messageUnreadCount?: number;
+	/** Unseen attorney requests for the header bell — plaintiffs only, else empty. */
+	notifications?: BellNotification[];
 	children: React.ReactNode;
 }) {
 	const pathname = usePathname();
@@ -310,28 +317,35 @@ export function AppShell({
 						<h1 className="flex-1 truncate font-extrabold text-[19px] text-ink tracking-[-0.02em]">
 							{current?.title}
 						</h1>
-						{/* The assistant takes this slot when its flag is on; with the flag
-						    off the bar keeps the decorative bell and there is no entry
-						    point to the assistant anywhere in the app. While the column is
-						    open the launcher is dropped entirely — the panel's own header
-						    is right beside it, so the button would only repeat it. */}
-						{flags.aiAssistant ? (
-							!assistantOpen && (
-								<AssistantLauncher
-									restoreFocus={restoreLauncherFocus}
-									onOpen={() => {
-										setAssistantMounted(true);
-										setAssistant(true);
-									}}
-								/>
-							)
-						) : (
-							<span
-								className="flex size-9 items-center justify-center rounded-full border border-border text-ink-soft"
-								aria-hidden="true"
-							>
-								<Bell className="size-[17px]" />
-							</span>
+						<NotificationBell
+							items={notifications}
+							poll={role === "plaintiff" || role === "donor"}
+							emptyHint={
+								role === "plaintiff"
+									? "Attorney requests and case updates will show up here."
+									: role === "donor"
+										? "Updates on cases you follow will show up here."
+										: "New notifications will show up here."
+							}
+						/>
+						{/* The assistant sits beside the bell when its flag is on; with the
+						    flag off there is no entry point to the assistant anywhere in the
+						    app. While the column is open the launcher is dropped entirely —
+						    the panel's own header is right beside it, so the button would
+						    only repeat it.
+
+						    The flag-off branch used to hold this slot with a decorative,
+						    aria-hidden bell. The NotificationBell above is the real thing, so
+						    the placeholder is gone rather than sitting next to its own
+						    replacement. */}
+						{flags.aiAssistant && !assistantOpen && (
+							<AssistantLauncher
+								restoreFocus={restoreLauncherFocus}
+								onOpen={() => {
+									setAssistantMounted(true);
+									setAssistant(true);
+								}}
+							/>
 						)}
 					</div>
 				</header>
