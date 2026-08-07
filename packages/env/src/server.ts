@@ -6,14 +6,30 @@ import { config as loadEnv } from "dotenv";
 import { z } from "zod";
 
 // Monorepo: prefer apps/web/.env when cwd isn't the Next app root.
-for (const candidate of [
-	resolve(process.cwd(), ".env"),
-	resolve(process.cwd(), "apps/web/.env"),
-	resolve(process.cwd(), "../../apps/web/.env"),
-]) {
-	if (existsSync(candidate)) {
-		loadEnv({ path: candidate, quiet: true });
-		break;
+//
+// Only a plain-Node consumer needs this — a script run from the repo root, where
+// nothing else loads the file. Inside Next the walk is redundant twice over: the
+// framework has already loaded apps/web/.env, and on Vercel the platform injects
+// the environment directly.
+//
+// The guard is what keeps it that way, and it is load-bearing for the *build*, not
+// the runtime. A path rooted at `process.cwd()` is unbounded to Turbopack's static
+// analysis, so tracing this module — which every server route importing `env`
+// pulls in — concluded the entire repository was a dependency of those routes and
+// put it in their NFT list ("Encountered unexpected file in NFT list", with
+// next.config.ts as the give-away). Turbopack inlines NEXT_RUNTIME, so gating on
+// it removes the `fs` calls from bundled server code outright rather than leaving
+// them to be traced.
+if (!process.env.NEXT_RUNTIME) {
+	for (const candidate of [
+		resolve(process.cwd(), ".env"),
+		resolve(process.cwd(), "apps/web/.env"),
+		resolve(process.cwd(), "../../apps/web/.env"),
+	]) {
+		if (existsSync(candidate)) {
+			loadEnv({ path: candidate, quiet: true });
+			break;
+		}
 	}
 }
 
