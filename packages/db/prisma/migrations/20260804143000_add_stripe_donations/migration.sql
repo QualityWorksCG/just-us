@@ -4,11 +4,21 @@
 -- SHADOW_DATABASE_URL, and `migrate dev` without a shadow database reports drift
 -- and offers to reset, which drops data.
 --
--- NOTE: `donation.stripeCheckoutSessionId` is added NOT NULL with no default.
--- That is only valid because `donation` is empty (0 rows when this was written) —
--- donations were never wired up. If any row exists when this runs, Postgres will
--- reject it, and the fix is to backfill or drop those rows first, not to relax the
--- constraint: it is what makes webhook redelivery idempotent.
+-- NOTE: `donation.stripeCheckoutSessionId` ends up NOT NULL, but it is added
+-- nullable and backfilled first. Adding it NOT NULL outright only worked against
+-- an empty table, and `donation` is not reliably empty: it had rows on dev, and
+-- every database branched from dev inherited them. The single-statement version
+-- failed with 23502 on dev and again on the preview database branched from it.
+--
+-- The constraint itself is not negotiable — it is what makes webhook redelivery
+-- idempotent (see `markDonationSucceeded`) — so it is reached in three steps
+-- instead of relaxed. Pre-existing rows predate payments entirely, so they have no
+-- real Checkout session to point at; `legacy_<id>` is a unique placeholder that
+-- satisfies the constraint and the unique index below, and cannot collide with a
+-- real Stripe session id (those are prefixed `cs_`).
+--
+-- The steps are idempotent in the sense that matters here: run against a fresh
+-- database the UPDATE simply matches nothing.
 
 -- CreateEnum
 CREATE TYPE "DonationStatus" AS ENUM ('pending', 'succeeded', 'failed', 'refunded');
@@ -20,10 +30,17 @@ ADD COLUMN     "netCents" INTEGER NOT NULL DEFAULT 0,
 ADD COLUMN     "refundedAt" TIMESTAMP(3),
 ADD COLUMN     "status" "DonationStatus" NOT NULL DEFAULT 'pending',
 ADD COLUMN     "stripeAccountId" TEXT,
-ADD COLUMN     "stripeCheckoutSessionId" TEXT NOT NULL,
+ADD COLUMN     "stripeCheckoutSessionId" TEXT,
 ADD COLUMN     "stripePaymentIntentId" TEXT,
 ADD COLUMN     "succeededAt" TIMESTAMP(3),
 ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+-- Backfill, then constrain. Both statements are no-ops on an empty table.
+UPDATE "donation"
+SET "stripeCheckoutSessionId" = 'legacy_' || "id"
+WHERE "stripeCheckoutSessionId" IS NULL;
+
+ALTER TABLE "donation" ALTER COLUMN "stripeCheckoutSessionId" SET NOT NULL;
 
 -- CreateTable
 CREATE TABLE "attorney_payout_account" (
