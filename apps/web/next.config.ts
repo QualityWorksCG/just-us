@@ -1,15 +1,10 @@
 import "@just-us/env/web";
-import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
 	typedRoutes: true,
 	reactCompiler: true,
-	// Trace from the workspace root, not apps/web. Bun installs into a single
-	// store at the repo root (`node_modules/.bun/...`) and links packages from
-	// there, so a tracing root inside the app cannot see the files it needs.
-	outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
-	// Ship libvips with the routes that use `sharp`.
+	// Ship libvips with the route that uses `sharp`.
 	//
 	// Tracing follows `require()`, and that is enough to find `sharp` itself and
 	// its platform binary — but the binary reaches libvips through `dlopen`, which
@@ -18,16 +13,23 @@ const nextConfig: NextConfig = {
 	// fails at runtime with ERR_DLOPEN_FAILED the first time it touches an image.
 	// The failure only appears once deployed: locally the file is simply there.
 	//
-	// The glob points into Bun's store rather than at `node_modules/@img`, because
-	// the latter is a directory of symlinks and it is the real files that have to
-	// be copied. Platform packages that do not exist on the build machine match
-	// nothing, so this stays correct on Linux CI and on a developer's Mac alike.
+	// Three things about this glob are load-bearing:
 	//
-	// Relative to *this app*, not to `outputFileTracingRoot` above — hence the
-	// `../..`. The two are independent: the root decides where traced paths are
-	// anchored, these globs are resolved from the project directory.
+	//   - It points into Bun's store rather than at `node_modules/@img`, whose
+	//     entries are symlinks, because the *real* files have to be copied.
+	//   - It stops at `lib/`. Matching a package root would include the symlinked
+	//     directory itself, and Vercel rejects the deployment outright for that
+	//     ("invalid deployment package… files in symlinked directories").
+	//   - It names `sharp-libvips-*` specifically. The sibling `sharp-<platform>`
+	//     packages are already traced through `require()`; libvips is the only gap.
+	//
+	// Paths are relative to this app, not to the tracing root Next infers for the
+	// workspace. Platform packages absent from the build machine match nothing, so
+	// this is correct on Linux CI and on a developer's Mac alike.
 	outputFileTracingIncludes: {
-		"/settings": ["../../node_modules/.bun/@img+*/node_modules/@img/**/*"],
+		"/settings": [
+			"../../node_modules/.bun/@img+sharp-libvips-*/node_modules/@img/*/lib/**/*",
+		],
 	},
 	// Avatar files are normalized server-side before they reach private storage.
 	// The product limit is 2 MB; leave a small margin for multipart form data.
