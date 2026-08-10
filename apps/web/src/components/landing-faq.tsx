@@ -10,7 +10,7 @@ const faqs = [
 	},
 	{
 		q: "Where does my money actually go?",
-		a: "Straight into a case-specific account the matched attorney opens through Stripe Connect. JustUs never takes custody — our own balance never receives a donated dollar. A 5% platform fee is deducted and shown to the cent before you confirm.",
+		a: "Straight to the law firm representing the case — into a Stripe Connect account the firm opens for that case alone, named on the case page before you give. Nothing is pooled: another of the firm's cases can't draw on it. The plaintiff never receives it; the firm applies it to the legal fee under its state bar's trust rules. JustUs never takes custody: our own balance never receives a donated dollar. A 5% platform fee is deducted and shown to the cent before you confirm.",
 	},
 	{
 		q: "What happens if a case doesn't reach its goal?",

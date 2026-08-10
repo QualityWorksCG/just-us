@@ -129,6 +129,12 @@ function describeDatabase(url) {
 // Name the database about to be migrated. A preview build that prints the dev
 // host is the DB_DEDICATED misconfiguration described above, and reading it here
 // is far cheaper than discovering it from a poisoned `_prisma_migrations`.
+//
+// This prints DATABASE_URL's own host, which identifies the database but is not
+// the endpoint the migration connects on: prisma.config.ts rewrites the pooled
+// host to Neon's direct one, because migrations cannot hold their advisory lock
+// through a pooler (P1002 — see the note there). Prisma's own `Datasource "db":
+// … at <host>` line below is the authority on where it actually connected.
 console.log(
 	`[db] migrate deploy → ${describeDatabase(process.env.DATABASE_URL)}`,
 );

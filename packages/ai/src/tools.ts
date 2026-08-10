@@ -69,6 +69,8 @@ function nextStepForStatus(status: string): string {
 			return "Finish the wizard and publish. A draft is private to you until you do.";
 		case "seeking":
 			return "Published out to attorneys. They can put themselves forward; you choose who takes it on from the interested-attorneys list on the case, then agree the fee.";
+		case "pending_payout":
+			return "Finished and sent to your attorney, but not public yet. Donations are paid into a Stripe account your attorney opens for this case, and it goes live once that account can receive — so the wait is on them, not on you. Their name and email are on the case's payout step if it needs chasing; you press publish when it clears.";
 		case "live":
 			return "Funding now. Share the case link — the goal is the fee you agreed and nothing beyond it is raised.";
 		case "closed":

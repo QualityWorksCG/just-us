@@ -1,7 +1,11 @@
+import {
+	followedCaseIdsWithUnseenUpdates,
+	listFollowedCases,
+} from "@just-us/db/follows";
 import { listSavedCases } from "@just-us/db/saves";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { Bookmark } from "lucide-react";
+import { Bell, Bookmark } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 
@@ -9,24 +13,91 @@ import { toDonorCase } from "@/components/dashboard/donor-case";
 import { DonorCaseCard } from "@/components/dashboard/donor-case-card";
 import { requireRole } from "@/lib/auth-server";
 
-export default async function SavedPage() {
+const TABS = [
+	{ key: "saved", label: "Saved" },
+	{ key: "following", label: "Following" },
+] as const;
+
+type Tab = (typeof TABS)[number]["key"];
+
+export default async function SavedPage({
+	searchParams,
+}: {
+	searchParams: Promise<{ tab?: string }>;
+}) {
 	const { session } = await requireRole("donor");
-	const cases = await listSavedCases(session.user.id);
+	const tab: Tab =
+		(await searchParams)?.tab === "following" ? "following" : "saved";
+
+	const [saved, followed, unseen] = await Promise.all([
+		listSavedCases(session.user.id),
+		listFollowedCases(session.user.id),
+		followedCaseIdsWithUnseenUpdates(session.user.id),
+	]);
+
+	const cases = tab === "following" ? followed : saved;
 
 	return (
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				Cases you've saved to come back to.
+				{tab === "following"
+					? "Cases you're following — you'll see every new update here and in your bell."
+					: "Cases you've saved to come back to."}
 			</p>
+
+			{/* Tabs */}
+			<div className="flex flex-wrap gap-2">
+				{TABS.map((t) => {
+					const active = t.key === tab;
+					const count = t.key === "following" ? followed.length : saved.length;
+					return (
+						<Link
+							key={t.key}
+							href={
+								(t.key === "saved" ? "/saved" : "/saved?tab=following") as Route
+							}
+							aria-current={active ? "page" : undefined}
+							className={cn(
+								"inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-4 py-2 font-semibold text-[13px] transition-colors",
+								active
+									? "border-ink bg-ink text-paper"
+									: "border-border bg-surface text-ink-soft hover:border-brass-deep hover:text-ink",
+							)}
+						>
+							{t.label}
+							<span
+								className={cn(
+									"inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 font-bold text-[11px]",
+									active
+										? "bg-paper/20 text-paper"
+										: "bg-surface-2 text-ink-soft",
+								)}
+							>
+								{count}
+							</span>
+						</Link>
+					);
+				})}
+			</div>
 
 			{cases.length === 0 ? (
 				<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-6 py-16 text-center">
 					<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
-						<Bookmark className="size-6" aria-hidden="true" />
+						{tab === "following" ? (
+							<Bell className="size-6" aria-hidden="true" />
+						) : (
+							<Bookmark className="size-6" aria-hidden="true" />
+						)}
 					</span>
-					<p className="font-bold text-[16px] text-ink">Nothing saved yet</p>
+					<p className="font-bold text-[16px] text-ink">
+						{tab === "following"
+							? "Not following any cases yet"
+							: "Nothing saved yet"}
+					</p>
 					<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
-						Save cases while you browse to keep them handy here.
+						{tab === "following"
+							? "Follow a case while you browse to get its updates here and in your bell."
+							: "Save cases while you browse to keep them handy here."}
 					</p>
 					<Link
 						href={"/discover" as Route}
@@ -38,7 +109,12 @@ export default async function SavedPage() {
 			) : (
 				<div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
 					{cases.map((c) => (
-						<DonorCaseCard key={c.id} c={toDonorCase(c)} initialSaved />
+						<DonorCaseCard
+							key={c.id}
+							c={toDonorCase(c)}
+							initialSaved={tab === "saved"}
+							hasNewUpdate={tab === "following" && unseen.has(c.id)}
+						/>
 					))}
 				</div>
 			)}

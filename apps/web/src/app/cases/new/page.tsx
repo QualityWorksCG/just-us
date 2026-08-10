@@ -1,4 +1,6 @@
 import { getOwnedCase } from "@just-us/db/cases";
+import { getCasePayoutOptions } from "@just-us/db/payouts";
+import { getCaseMatch } from "@just-us/db/requests";
 
 import { CaseWizard, type WizardInitial } from "@/components/cases/case-wizard";
 import { requireOnboarded, requireRole } from "@/lib/auth-server";
@@ -15,6 +17,21 @@ export default async function NewCasePage({
 
 	const draftId = (await searchParams)?.draft;
 	const source = draftId ? await getOwnedCase(draftId, session.user.id) : null;
+
+	// An attorney matched through the request/accept flow is settled — the wizard
+	// shows them as confirmed rather than asking to invite one again.
+	//
+	// The payout readiness comes down with it so the payout step is right on first
+	// paint. A plaintiff resuming a case that has been sitting with their attorney
+	// is most often here to find out whether that attorney is done, and making
+	// them press "Check again" to learn it would be a poor answer to the question
+	// they arrived with.
+	const [attorneyConfirmed, payout] = source
+		? await Promise.all([
+				getCaseMatch(source.id, session.user.id).then(Boolean),
+				getCasePayoutOptions(source.id, session.user.id),
+			])
+		: [false, null];
 
 	const initial: WizardInitial | null = source
 		? {
@@ -44,6 +61,9 @@ export default async function NewCasePage({
 					: [],
 				coverImageUrl: source.coverImageUrl,
 				images: source.images ?? [],
+				attorneyConfirmed,
+				status: source.status,
+				payout,
 			}
 		: null;
 

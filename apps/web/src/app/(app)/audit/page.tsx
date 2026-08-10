@@ -20,6 +20,8 @@ const ACTION_LABELS: Record<string, string> = {
 	"user.blocked": "User blocked",
 	"user.unblocked": "User unblocked",
 	"user.role_changed": "Role changed",
+	"attorney.verified": "Attorney verified",
+	"attorney.verification_cleared": "Attorney verification cleared",
 };
 
 // `action` is a plain column, so an entry written by an older or newer build can
@@ -32,7 +34,11 @@ function actionLabel(action: string) {
 }
 
 function actionDot(action: string) {
-	if (action === "invite.accepted" || action === "user.unblocked") {
+	if (
+		action === "invite.accepted" ||
+		action === "user.unblocked" ||
+		action === "attorney.verified"
+	) {
 		return "bg-success";
 	}
 	if (action === "user.blocked") return "bg-danger";

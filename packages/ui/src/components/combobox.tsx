@@ -19,16 +19,13 @@ function Combobox(props: ComboboxPrimitive.Root.Props<string>) {
 
 /** The typing surface. Doubles as the closed-state display, so it shows the
  *  current selection when the popup isn't open. */
-function ComboboxInput({
-	className,
-	...props
-}: ComboboxPrimitive.Input.Props) {
+function ComboboxInput({ className, ...props }: ComboboxPrimitive.Input.Props) {
 	return (
 		<div className="relative">
 			<ComboboxPrimitive.Input
 				data-slot="combobox-input"
 				className={cn(
-					"flex h-9 w-full items-center rounded-[var(--radius-control)] border border-input bg-surface py-1 pr-8 pl-3 text-xs text-ink outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20",
+					"flex h-9 w-full items-center rounded-[var(--radius-control)] border border-input bg-surface py-1 pr-8 pl-3 text-ink text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20",
 					className,
 				)}
 				{...props}
@@ -86,14 +83,14 @@ function ComboboxList(props: ComboboxPrimitive.List.Props) {
 
 /** Shown when the typed text matches nothing — without it the popup just
  *  collapses to an empty box and reads as broken. */
-function ComboboxEmpty({
-	className,
-	...props
-}: ComboboxPrimitive.Empty.Props) {
+function ComboboxEmpty({ className, ...props }: ComboboxPrimitive.Empty.Props) {
 	return (
 		<ComboboxPrimitive.Empty
 			data-slot="combobox-empty"
-			className={cn("px-2 py-3 text-center text-muted-foreground text-xs", className)}
+			className={cn(
+				"px-2 py-3 text-center text-muted-foreground text-xs",
+				className,
+			)}
 			{...props}
 		/>
 	);

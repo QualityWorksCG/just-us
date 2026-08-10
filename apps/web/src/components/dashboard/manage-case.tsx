@@ -20,14 +20,11 @@ import {
 	ImageIcon,
 	Link2,
 	type LucideIcon,
-	Mail,
 	Megaphone,
-	MessageCircle,
 	Plus,
 	Rocket,
 	Save,
 	Scale,
-	Send,
 	Share2,
 	Sparkles,
 	Target,
@@ -36,15 +33,19 @@ import {
 	Upload,
 	X,
 } from "lucide-react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-
 import {
 	deleteOwnedCaseAction,
 	recordShareAction,
 	updateCaseDetailsAction,
 } from "@/app/cases/actions";
+import {
+	type CaseUpdateItem,
+	CaseUpdates,
+} from "@/components/cases/case-updates";
 
 import { CASE_CATEGORIES } from "@/lib/case-categories";
 
@@ -158,7 +159,20 @@ function Metric({
 	);
 }
 
-export function ManageCase({ data }: { data: ManageCaseData }) {
+export function ManageCase({
+	data,
+	updates = [],
+	updatesHighlightSince,
+	viewerId,
+}: {
+	data: ManageCaseData;
+	/** The case's progress updates, newest first (JUS-33). */
+	updates?: CaseUpdateItem[];
+	/** Highlight updates newer than this (the owner's last-seen time). */
+	updatesHighlightSince?: Date | string | null;
+	/** The signed-in plaintiff (owner) — for attributing their own posts. */
+	viewerId: string;
+}) {
 	const router = useRouter();
 	const ids = {
 		title: useId(),
@@ -188,6 +202,9 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 
 	const isLive = data.status === "live";
 	const isSeeking = data.status === "seeking";
+	// Finished and private, waiting on the firm's payout account. Everything the
+	// plaintiff owns is done, so it must not be described as an unfinished draft.
+	const isPending = data.status === "pending_payout";
 	const goal = data.goalCents / 100;
 	const raised = data.raisedCents / 100;
 	const pct = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
@@ -312,22 +329,21 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 
 			{tab === "overview" ? (
 				<div className="flex flex-col gap-6">
-					{/* Hero goal panel */}
-					{/* Gold, but not a flat slab of it. `bg-gold-bright` (#ebc15e) at full
-					    saturation is fine on a chip or an icon tile; across a panel this size
-					    it shouted. Mixing it toward `--brass-wash` — 72% at the top corner to
-					    92% at the bottom — keeps the panel unmistakably gold while the slight
-					    gradient stops it reading as one hard block of colour. */}
-					<section className="relative overflow-hidden rounded-[var(--radius-card-lg)] border border-brass/25 bg-gradient-to-br from-[color-mix(in_oklch,var(--gold-bright)_72%,var(--brass-wash))] to-[color-mix(in_oklch,var(--gold-bright)_92%,var(--brass-wash))] p-6 shadow-[var(--shadow-rest)] sm:p-8">
+					{/* Hero goal panel — a clean white card. A full-width gold slab read as
+					    overpowering; the gold now lives only in the accents (the chip, the
+					    ring, the progress fill) against a neutral surface. */}
+					<section className="relative overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)] sm:p-8">
 						<div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
 							<div className="min-w-0">
-								<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-surface/80 px-2.5 py-1 font-mono font-semibold text-[10px] text-brass-deep uppercase tracking-[0.1em]">
+								<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-brass-wash px-2.5 py-1 font-mono font-semibold text-[10px] text-brass-deep uppercase tracking-[0.1em]">
 									<TrendingUp className="size-3" aria-hidden="true" />
 									{isLive
 										? "Raising now"
 										: isSeeking
 											? "Out to attorneys"
-											: "Draft — not live yet"}
+											: isPending
+												? "Ready — awaiting your firm"
+												: "Draft — not live yet"}
 								</span>
 								<div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
 									<span className="font-extrabold text-[44px] text-ink tabular-nums leading-none tracking-[-0.03em]">
@@ -349,7 +365,7 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 								</div>
 								{goal > 0 && (
 									<div className="mt-4 max-w-[560px]">
-										<div className="h-3 overflow-hidden rounded-full bg-surface/70">
+										<div className="h-3 overflow-hidden rounded-full bg-surface-2">
 											<div
 												className="h-full rounded-full bg-gradient-to-r from-brass to-success transition-all"
 												style={{ width: `${Math.max(3, pct)}%` }}
@@ -367,10 +383,10 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 							<div
 								className="relative flex size-[132px] shrink-0 items-center justify-center rounded-full"
 								style={{
-									background: `conic-gradient(var(--success) ${pct * 3.6}deg, color-mix(in oklch, var(--surface) 80%, var(--gold-bright)) 0)`,
+									background: `conic-gradient(var(--success) ${pct * 3.6}deg, var(--surface-2) 0)`,
 								}}
 							>
-								<div className="flex size-[104px] flex-col items-center justify-center rounded-full bg-surface text-center shadow-[var(--shadow-rest)]">
+								<div className="flex size-[104px] flex-col items-center justify-center rounded-full border border-border bg-surface text-center">
 									<Rocket
 										className="mb-1 size-5 text-brass-deep"
 										aria-hidden="true"
@@ -414,6 +430,29 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 						/>
 					</div>
 
+					{/* Case updates — the same progress the attorney broadcasts to
+					    backers, shown to the owner on their overview (JUS-33). */}
+					<section>
+						<h2 className="mb-3 flex items-center gap-2 font-bold text-[15px] text-ink">
+							Case updates
+							{updates.length > 0 && (
+								<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
+									{updates.length}
+								</span>
+							)}
+						</h2>
+						<CaseUpdates
+							updates={updates}
+							viewerId={viewerId}
+							viewerRole="plaintiff"
+							caseId={data.id}
+							emptyHint="No updates yet — your attorney will post progress here as your case moves."
+							limit={2}
+							viewAllHref={`/my-cases/${data.id}/updates` as Route}
+							highlightSince={updatesHighlightSince}
+						/>
+					</section>
+
 					{/* Share / rally panel */}
 					<section className="relative overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-gradient-to-br from-brass-wash/50 via-surface to-green-soft/40 p-6 shadow-[var(--shadow-rest)]">
 						<div className="flex items-center gap-2.5">
@@ -439,27 +478,9 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 								<Link2 className="size-4" aria-hidden="true" />
 								Copy link
 							</button>
-							{[
-								{ icon: Send, label: "Share on X" },
-								{ icon: Share2, label: "Share on Facebook" },
-								{ icon: MessageCircle, label: "Share on WhatsApp" },
-								{ icon: Mail, label: "Share by email" },
-							].map((s, i) => (
-								<button
-									key={s.label}
-									type="button"
-									aria-label={s.label}
-									onClick={() => shareCase("Share link copied!")}
-									className={cn(
-										"flex size-11 items-center justify-center rounded-full transition-colors",
-										i % 2 === 0
-											? "bg-brass-wash text-brass-deep hover:bg-gold-bright hover:text-gold-bright-ink"
-											: "bg-green-soft text-green-deep hover:bg-success hover:text-white",
-									)}
-								>
-									<s.icon className="size-4" aria-hidden="true" />
-								</button>
-							))}
+							<p className="text-[12.5px] text-muted-foreground">
+								Copy your case link and share it anywhere.
+							</p>
 						</div>
 					</section>
 
@@ -468,7 +489,9 @@ export function ManageCase({ data }: { data: ManageCaseData }) {
 						<Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 						{isLive
 							? "You're live and building momentum — keep sharing updates so backers stay invested in your journey to justice."
-							: "Fill out your story and add photos in Edit & settings — cases with a clear story and cover image raise far more."}
+							: isPending
+								? "Your case is finished and waiting only on your attorney's payout account. Use the time to line up who you'll share it with the day it goes live."
+								: "Fill out your story and add photos in Edit & settings — cases with a clear story and cover image raise far more."}
 					</div>
 				</div>
 			) : (

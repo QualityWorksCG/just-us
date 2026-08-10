@@ -1,28 +1,31 @@
+import { caseIdsWithUnseenUpdates } from "@just-us/db/case-updates";
 import {
 	type CaseFilter,
 	caseCounts,
 	countOwnedCases,
 	listOwnedCases,
 } from "@just-us/db/cases";
+import { listAttorneyCases } from "@just-us/db/representation";
 import { interestCountsByCase } from "@just-us/db/requests";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	ArrowLeft,
 	ArrowRight,
+	Clock,
 	FolderOpen,
 	ImageIcon,
+	Megaphone,
 	Plus,
 	UsersRound,
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 
+import { AttorneyCases } from "@/components/dashboard/attorney-cases";
 import { DeleteDraftButton } from "@/components/dashboard/delete-draft-button";
 import { RestoreCaseButton } from "@/components/dashboard/restore-case-button";
-import { ScreenPlaceholder } from "@/components/dashboard/screen-placeholder";
 import { requireRole } from "@/lib/auth-server";
-import { findScreen } from "@/lib/dashboard-nav";
 
 const PAGE_SIZE = 6;
 
@@ -31,6 +34,9 @@ const TABS: { key: CaseFilter; label: string }[] = [
 	{ key: "active", label: "Active" },
 	{ key: "draft", label: "Draft" },
 	{ key: "seeking", label: "Seeking" },
+	// Finished and sent, held back until the firm's payout account can receive.
+	// Its own tab because these are the cases with someone to chase.
+	{ key: "pending", label: "Awaiting firm" },
 	{ key: "deleted", label: "Deleted" },
 ];
 
@@ -76,6 +82,7 @@ function isFilter(v: string | undefined): v is CaseFilter {
 		v === "active" ||
 		v === "draft" ||
 		v === "seeking" ||
+		v === "pending" ||
 		v === "deleted"
 	);
 }
@@ -86,16 +93,18 @@ export default async function MyCasesPage({
 	searchParams: Promise<{ page?: string; filter?: string }>;
 }) {
 	// Both roles have a "My cases" nav entry pointing here, and they mean different
-	// things: the plaintiff's own cases below, the attorney's matched cases (not
-	// built yet) as their screen's placeholder. Before this route was flattened the
-	// attorney's link hit a plaintiff-only page and bounced them to their home.
+	// things: the plaintiff's own cases below, and the cases an attorney is acting
+	// on. Before this route was flattened the attorney's link hit a plaintiff-only
+	// page and bounced them to their home.
 	const { session, role } = await requireRole("plaintiff", "attorney");
 	if (role === "attorney") {
-		const screen = findScreen("attorney", "cases");
 		return (
-			<ScreenPlaceholder
-				sub={
-					screen?.sub ?? "Cases matched to you — detail, evidence, and funding."
+			<AttorneyCases
+				cases={
+					await listAttorneyCases({
+						userId: session.user.id,
+						email: session.user.email,
+					})
 				}
 			/>
 		);
@@ -118,6 +127,9 @@ export default async function MyCasesPage({
 	// Expressions of interest per case, so a "seeking" card says how many
 	// attorneys have come forward rather than just that it's out there (JUS-25).
 	const interests = await interestCountsByCase(session.user.id);
+	// Cases with an attorney update the owner hasn't opened yet — tagged on the
+	// card so a new update is visible without drilling in (JUS-33).
+	const casesWithNewUpdate = await caseIdsWithUnseenUpdates(session.user.id);
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -210,6 +222,11 @@ export default async function MyCasesPage({
 						const isDeleted = !!c.deletedAt;
 						const isLive = !isDeleted && c.status === "live";
 						const isSeeking = !isDeleted && c.status === "seeking";
+						// Finished and sent, waiting on the firm's payout account. Not a
+						// draft: there is nothing left for the plaintiff to fill in, so
+						// offering "Continue draft" would send them looking for work that
+						// isn't theirs.
+						const isPending = !isDeleted && c.status === "pending_payout";
 						const readiness = readinessOf(c);
 						const meta = [c.category, c.location].filter(Boolean).join(" · ");
 						const resume = `/cases/new?draft=${c.id}` as Route;
@@ -220,7 +237,10 @@ export default async function MyCasesPage({
 								? { text: "Live", dot: "bg-success" }
 								: isSeeking
 									? { text: "Seeking", dot: "bg-brass-deep" }
-									: { text: "Draft", dot: "bg-ink-soft" };
+									: isPending
+										? { text: "Awaiting firm", dot: "bg-gold-bright" }
+										: { text: "Draft", dot: "bg-ink-soft" };
+						const hasNewUpdate = !isDeleted && casesWithNewUpdate.has(c.id);
 
 						return (
 							<div
@@ -230,8 +250,10 @@ export default async function MyCasesPage({
 									isDeleted && "opacity-75",
 								)}
 							>
-								{/* Cover */}
-								<div className="relative aspect-[16/9] bg-surface-2">
+								{/* Cover — a fixed, compact height (not the image's own aspect),
+								    so every card stays the same, sensible height regardless of the
+								    uploaded photo's proportions. */}
+								<div className="relative h-40 overflow-hidden bg-surface-2">
 									{c.coverImageUrl ? (
 										// biome-ignore lint/performance/noImgElement: user-uploaded Blob covers aren't static assets
 										<img
@@ -251,6 +273,12 @@ export default async function MyCasesPage({
 										<span className={cn("size-1.5 rounded-full", badge.dot)} />
 										{badge.text}
 									</span>
+									{hasNewUpdate && (
+										<span className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-gold-bright px-2.5 py-1 font-mono font-semibold text-[10px] text-gold-bright-ink uppercase tracking-[0.06em] shadow-[var(--shadow-rest)]">
+											<Megaphone className="size-3" aria-hidden="true" />
+											New update
+										</span>
+									)}
 								</div>
 
 								{/* Body */}
@@ -280,6 +308,16 @@ export default async function MyCasesPage({
 												{(interests[c.id]?.open ?? 0) > 0
 													? `${interests[c.id]?.open} ${interests[c.id]?.open === 1 ? "attorney" : "attorneys"} interested`
 													: "Out to attorneys"}
+											</p>
+										) : isPending ? (
+											<p className="inline-flex items-start gap-1.5 text-[13px] text-ink-soft">
+												<Clock
+													className="mt-0.5 size-4 shrink-0 text-gold-bright-ink"
+													aria-hidden="true"
+												/>
+												Ready to publish once{" "}
+												{c.attorneyName ?? "your attorney"} finishes payout
+												setup.
 											</p>
 										) : isDeleted ? (
 											<p className="text-[13px] text-muted-foreground">
@@ -315,6 +353,16 @@ export default async function MyCasesPage({
 												{(interests[c.id]?.unseen ?? 0) > 0
 													? `Review ${interests[c.id]?.unseen} new`
 													: "Review interest"}
+												<ArrowRight className="size-3.5" aria-hidden="true" />
+											</Link>
+										) : isPending ? (
+											// Back into the wizard, which lands on the review step and
+											// carries the payout step's account status behind it.
+											<Link
+												href={resume}
+												className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-brass-deep hover:underline"
+											>
+												Check &amp; publish
 												<ArrowRight className="size-3.5" aria-hidden="true" />
 											</Link>
 										) : (

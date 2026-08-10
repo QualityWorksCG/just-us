@@ -56,20 +56,27 @@ model User {
   representationInterests AttorneyRequest[]
   matches                 Match[]
 
+  // Stripe Connect destinations for donations — the firm's operating account, one
+  // per case this attorney represents, so no two cases share a balance. Only
+  // attorneys onboard these; a plaintiff's cases pay out to the firm representing
+  // them. Some plaintiff rows still carry a single account from before that pivot,
+  // which nothing routes to. See PayoutAccount.
+  payoutAccounts PayoutAccount[]
+
   // Administration (JUS-67): invitations this user sent, and their audit trail.
   sentAdminInvitations AdminInvitation[] @relation("AdminInvitationInviter")
   auditEntries         AuditLog[]        @relation("AuditLogActor")
 
   // JUS-66 private messaging. Conversations are always one plaintiff and one
   // attorney; these named relations keep that invariant explicit in the schema.
-  plaintiffConversations Conversation[] @relation("ConversationPlaintiff")
-  attorneyConversations  Conversation[] @relation("ConversationAttorney")
-  sentMessages           Message[]      @relation("MessageAuthor")
-  messageEmailDeliveries MessageEmailDelivery[]
-  messagePreference      MessageNotificationPreference?
-  conversationSettings   ConversationNotificationSetting[]
-  reportedConversations  ConversationReport[] @relation("ConversationReportReporter")
-  resolvedConversationReports ConversationReport[] @relation("ConversationReportResolver")
+  plaintiffConversations      Conversation[]                    @relation("ConversationPlaintiff")
+  attorneyConversations       Conversation[]                    @relation("ConversationAttorney")
+  sentMessages                Message[]                         @relation("MessageAuthor")
+  messageEmailDeliveries      MessageEmailDelivery[]
+  messagePreference           MessageNotificationPreference?
+  conversationSettings        ConversationNotificationSetting[]
+  reportedConversations       ConversationReport[]              @relation("ConversationReportReporter")
+  resolvedConversationReports ConversationReport[]              @relation("ConversationReportResolver")
 
   // Assistant conversations. Model spend has no back-relation here on purpose —
   // see AiUsage.

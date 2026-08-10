@@ -1,12 +1,27 @@
 // Litigation case a plaintiff creates and raises the attorney fee for. Created
 // via the case-creation wizard.
-//   draft   — in progress, private to the owner
-//   seeking — published to attorneys (no attorney yet), open to requests
-//   live    — funding publicly, attorney + fee set
-//   closed  — resolved / no longer funding
+//   draft          — in progress, private to the owner
+//   seeking        — published to attorneys (no attorney yet), open to requests
+//   pending_payout — finished and committed, waiting on the firm's Stripe account
+//   live           — funding publicly, attorney + fee set
+//   closed         — resolved / no longer funding
+//
+// `pending_payout` exists because a case must never be public before it can take
+// a donation. Every other ingredient — story, goal, attorney, agreed fee — is the
+// plaintiff's to supply, but the account donations land in is opened by their
+// *attorney*, per case, through Stripe's hosted flow. Without this state the
+// plaintiff's only options were to publish a campaign that visibly cannot accept
+// money (a progress bar and a goal, and a donate panel that refuses), or to sit
+// in `draft` — which the attorney cannot see, and so can never clear.
+//
+// It is the case as the plaintiff finished it, held back from the public and
+// shown to the firm. `publishedAt` is stamped on entry, matching `seeking`: both
+// mean "the plaintiff committed this", not "the public can see it". The
+// transition out is the plaintiff's own act — see `goLiveCase`.
 enum CaseStatus {
   draft
   seeking
+  pending_payout
   live
   closed
 }
@@ -41,8 +56,37 @@ model Case {
   attorneyEmail    String?
   attorneyPhone    String?
   goalCents        Int
-  // How the plaintiff receives raised funds (e.g. bank transfer, debit card).
+  // Wizard field: the *method* funds arrive by (e.g. bank transfer, debit card).
+  // **Vestigial.** It described a payout the plaintiff would receive, and they no
+  // longer receive one — the firm does, and Stripe collects the firm's method during
+  // onboarding. The wizard still defaults and writes it, so the column stays rather
+  // than breaking publish; nothing reads it.
   payoutType       String?
+
+  // ── Payout routing ────────────────────────────────────────────────────────
+  // Who this case pays out to, and the account it is bound to. The **matched
+  // attorney's firm operating account**: the firm receives, and the attorney moves
+  // the funds into their IOLTA/trust account under their own bar's rules. See
+  // `PayoutRecipient` for why some existing rows still read `plaintiff`.
+  //
+  // `payoutAccountId` is **bound**, not resolved. It would be shorter to walk
+  // `match.attorney.payoutAccount` at charge time, but binding freezes the
+  // destination, so nothing that happens to the case later — a re-match, a change
+  // of counsel — can redirect money donors gave on the basis of a stated recipient.
+  //
+  // Both null while a case is draft/seeking, which is also when there is no `match`
+  // to bind to. Accepting donations requires both set, and the bound account's
+  // `transfersEnabled` true — that is the donation gate.
+  payoutRecipient PayoutRecipient?
+  payoutAccount   PayoutAccount?   @relation("CasePayoutDestination", fields: [payoutAccountId], references: [id], onDelete: Restrict)
+  payoutAccountId String?
+
+  // The Stripe account opened *for this case* — one per case, so a firm running three
+  // cases holds three, and one case's donations, refunds and balance never touch
+  // another's. Present from the moment onboarding starts, which is before the case is
+  // bound; `payoutAccount` above is the destination donations actually route to. See
+  // `PayoutAccount.caseId` for why both exist.
+  payoutAccountForCase PayoutAccount? @relation("PayoutAccountCase")
 
   // Live funding progress.
   raisedCents Int @default(0)
@@ -56,25 +100,89 @@ model Case {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   publishedAt DateTime?
+  // When the owner (plaintiff) last looked at this case's attorney updates. Drives
+  // the "new update" notification: updates newer than this are unseen. Null means
+  // they've never opened the case since an update landed. (JUS-33)
+  ownerUpdatesSeenAt DateTime?
   // Soft delete — set when the plaintiff removes a case. Rows are kept so they
   // can appear in the "Deleted" filter and be restored, not hard-deleted.
   deletedAt   DateTime?
 
   // Attorneys who have expressed interest in representing this case (the
   // "seeking" inbox).
-  requests AttorneyRequest[]
+  requests  AttorneyRequest[]
   // Donor bookmarks and donations against this case.
   saves     SavedCase[]
   donations Donation[]
 
   // The attorney representing this case, once one is matched. Its absence is
   // what puts a `seeking` case in the attorney queue — see listSeekingQueue.
-  match Match?
+  match         Match?
   conversations Conversation[]
+  // Broadcast progress updates the matched attorney posts, read by every backer.
+  updates CaseUpdate[]
+  // Users following the case for its updates (JUS-33).
+  follows CaseFollow[]
 
   @@index([ownerId])
   @@index([status])
+  // Reverse lookup: every case routing into one account. Postgres does not index
+  // foreign keys on its own, and this is the reconciliation query — "what is this
+  // account receiving, and for which cases".
+  @@index([payoutAccountId])
   @@map("case")
+}
+
+// A broadcast progress update posted to a case, read by every donor backing it
+// (JUS-33). One-to-many, chronological, immutable.
+//
+// `authorId` is the poster's User id, kept as a plain id (like `SavedCase.userId`
+// and `Donation.donorId`) rather than a relation, so this story adds no
+// back-relation to the auth `User` model. Who may write a row is enforced at the
+// data-layer boundary: `postCaseUpdate` refuses unless the author is the case's
+// owner (the plaintiff) or the attorney matched to it — the two people running
+// the case. The author's role for display is derived by comparing `authorId` to
+// the case's `ownerId`.
+model CaseUpdate {
+  id     String @id @default(cuid())
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId String
+
+  authorId String
+
+  body      String
+  // Optional category chosen when posting (e.g. "court_date", "settlement") —
+  // rendered as a labelled pill. Null when the author didn't categorise it.
+  tag       String?
+  // Uploaded images/files attached to the update: `[{ url, name, contentType }]`.
+  // Files live in Blob storage; only their metadata is kept here.
+  attachments Json?
+  createdAt DateTime  @default(now())
+  // Set when the author revises an update, so readers see it was edited. Only
+  // the author can edit, and only body/tag change — never authorship or time.
+  editedAt  DateTime?
+
+  @@index([caseId, createdAt])
+  @@map("case_update")
+}
+
+// A user following a case to get its updates without (necessarily) donating.
+// Distinct from `SavedCase` (a donor's private bookmark) and from donations:
+// following is a public "notify me" that the plaintiff's update audience counts.
+// `userId` is a plain id, matching the SavedCase/Donation convention.
+model CaseFollow {
+  id        String   @id @default(cuid())
+  userId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId    String
+  createdAt DateTime @default(now())
+  // When this follower last looked at the case's updates. Updates newer than this
+  // are "new" to them — drives their bell + the card tag. Null until first view.
+  updatesSeenAt DateTime?
+
+  @@unique([userId, caseId])
+  @@index([caseId])
+  @@map("case_follow")
 }
 
 // A donor bookmarking a case to come back to. `userId` is the donor's User id
@@ -91,18 +199,77 @@ model SavedCase {
   @@map("saved_case")
 }
 
-// A donation a donor made to a case. No payments are wired yet, so rows are
-// created only once that exists; the donor screens read from here (empty for now).
+// A donation a donor made to a case — the ledger behind `Case.raisedCents` and
+// every donor-facing screen.
+//
+// A row is created `pending` when the Checkout Session is created, and moved to
+// `succeeded` by the `checkout.session.completed` webhook. Creating it up front
+// rather than on the webhook means a completed payment always has a row to land
+// on, so a payment can never succeed at Stripe with nothing recorded here.
+//
+// `raisedCents` / `donorsCount` on Case are a cache of this table, and must be
+// written in the same transaction as the status change — otherwise the public
+// progress bar and the ledger drift, and the bar is the number donors trust.
+//
+// The money split is stored, not recomputed: `feeCents` and `netCents` are what
+// was actually charged and transferred. Recomputing them later from
+// STRIPE_PLATFORM_FEE_BPS would silently rewrite history the first time the rate
+// changes, and a receipt has to stay true to the transaction it describes.
 model Donation {
-  id          String   @id @default(cuid())
-  donorId     String
-  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  caseId      String
+  id String @id @default(cuid())
+
+  /// The donor's account, when they had one. **Null for guest donations** —
+  /// giving does not require an account, because requiring one turns a moment of
+  /// generosity into a signup form. A guest is identified by `donorEmail` instead,
+  /// and their donations are attached to an account later if they make one; see
+  /// `claimGuestDonations`.
+  donorId String?
+
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId String
+
+  // What the donor was charged, the platform fee taken from it, and what reached
+  // the firm's connected account. amountCents = feeCents + netCents.
   amountCents Int
-  createdAt   DateTime @default(now())
+  feeCents    Int @default(0)
+  netCents    Int @default(0)
+
+  status DonationStatus @default(pending)
+
+  // The Checkout Session this donation was created for. **The idempotency key**:
+  // Stripe delivers checkout.session.completed more than once, and this unique
+  // constraint is what stops a redelivery double-counting the gift. Required, not
+  // optional — a donation with no session did not come from a payment.
+  stripeCheckoutSessionId String  @unique
+  // Known only once the session completes. Carries the refund and dispute events.
+  stripePaymentIntentId   String? @unique
+  // Which connected account the money landed in, denormalised so a receipt stays
+  // truthful even if the case is later re-matched to a different attorney.
+  stripeAccountId         String?
+
+  // Collected by Checkout. The receipt address, and for a guest donation the
+  // *only* identity we hold — which is what makes `donorsCount` and later
+  // account-claiming possible without an account existing at the time.
+  donorEmail String?
+  /// As given at Checkout. Lets a guest's receipt and any future thank-you be
+  /// addressed to a person rather than an email address.
+  donorName  String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  // When the money was actually captured / returned, as distinct from when the
+  // row was created. "How long did this sit pending" stays answerable.
+  succeededAt DateTime?
+  refundedAt  DateTime?
 
   @@index([donorId])
+  // Guest donations are found by email — both for `donorsCount` and for attaching
+  // them to an account the donor makes later.
+  @@index([donorEmail])
   @@index([caseId])
+  // Reconciliation reads: pending rows older than an hour are abandoned
+  // checkouts, and that sweep is the only query that scans by status.
+  @@index([status])
   @@map("donation")
 }
 

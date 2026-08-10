@@ -19,8 +19,10 @@ import { requireRole } from "@/lib/auth-server";
  */
 export default async function InAppAttorneyProfilePage({
 	params,
+	searchParams,
 }: {
 	params: Promise<{ id: string }>;
+	searchParams: Promise<{ fromCase?: string }>;
 }) {
 	await requireRole("plaintiff");
 	const { id } = await params;
@@ -30,11 +32,24 @@ export default async function InAppAttorneyProfilePage({
 	// unverified profile isn't discoverable from in here either.
 	if (!attorney) notFound();
 
+	// When opened from a case's attorney requests (`?fromCase=<id>`), "back" has to
+	// return to that case, not the attorney directory the profile normally lives
+	// in — otherwise a plaintiff mid-decision is dropped onto Find an attorney and
+	// loses the case they were choosing for. The id is validated so a hand-crafted
+	// value can't turn the back link into anything but a `/my-cases/<id>/requests`
+	// path we build ourselves.
+	const { fromCase } = await searchParams;
+	const fromValidCase = fromCase && /^[a-zA-Z0-9_-]+$/.test(fromCase);
+	const backHref = (
+		fromValidCase ? `/my-cases/${fromCase}/requests` : "/find-attorney"
+	) as Route;
+	const backLabel = fromValidCase ? "Back to case" : "Back to attorneys";
+
 	return (
 		<AttorneyProfileView
 			attorney={attorney}
-			backHref={"/find-attorney" as Route}
-			backLabel="Back to attorneys"
+			backHref={backHref}
+			backLabel={backLabel}
 			// The shell's header bar is this page's h1.
 			headingLevel="h2"
 			messagingEnabled

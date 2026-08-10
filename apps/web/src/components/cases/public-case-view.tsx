@@ -4,7 +4,6 @@ import {
 	Eye,
 	Heart,
 	Lock,
-	Megaphone,
 	Scale,
 	ShieldCheck,
 	TrendingUp,
@@ -12,8 +11,13 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 
+import { CaseGallery } from "@/components/cases/case-gallery";
+import { CaseUpdates } from "@/components/cases/case-updates";
 import { DetailBackLink } from "@/components/detail-back-link";
-import { PublicCaseActions } from "@/components/public-case-actions";
+import {
+	type DonateConfig,
+	PublicCaseActions,
+} from "@/components/public-case-actions";
 
 /**
  * One live case, as a donor reads it.
@@ -57,10 +61,31 @@ export function PublicCaseView({
 	backHref,
 	backLabel,
 	headingLevel = "h1",
+	donate,
+	fundsNote,
 	canSave = false,
 	initialSaved = false,
+	canFollow = false,
+	initialFollowing = false,
+	updatesHref,
+	updatesHighlightSince,
 }: {
 	c: PublicCase;
+	/** Whether and how this case can take money, resolved server-side from its
+	 *  bound payout account. Required rather than optional: every route that shows
+	 *  a case has to answer the donate question the same way, and a default here
+	 *  would let a route quietly render a donate card it never checked. */
+	donate: DonateConfig;
+	/**
+	 * Who this case's donations are paid to, in the words the donor reads.
+	 *
+	 * Passed in rather than written here, because it is derived per case from
+	 * `Case.payoutRecipient` — terms §4 commits to stating the recipient for *this*
+	 * case, and cases bound before payouts moved to firm accounts still pay the
+	 * plaintiff. A single sentence hardcoded in this component was wrong for every
+	 * attorney-recipient case, telling those donors the money went to the plaintiff.
+	 */
+	fundsNote: string;
 	/** Where "back" goes — the list this case was opened from. */
 	backHref: Route;
 	backLabel: string;
@@ -69,6 +94,13 @@ export function PublicCaseView({
 	/** True only for a signed-in donor — the role that can save a case. */
 	canSave?: boolean;
 	initialSaved?: boolean;
+	/** True for a signed-in user who isn't the case's own team. */
+	canFollow?: boolean;
+	initialFollowing?: boolean;
+	/** The case's full updates page — capping the inline list links out to it. */
+	updatesHref?: Route;
+	/** Highlight updates newer than this (a follower's last-seen time). */
+	updatesHighlightSince?: Date | string | null;
 }) {
 	const Heading = headingLevel;
 
@@ -225,8 +257,11 @@ export function PublicCaseView({
 							<PublicCaseActions
 								caseId={c.id}
 								sharePath={`/cases/${c.id}`}
+								config={donate}
 								canSave={canSave}
 								initialSaved={initialSaved}
+								canFollow={canFollow}
+								initialFollowing={initialFollowing}
 							/>
 						</div>
 					</div>
@@ -272,8 +307,7 @@ export function PublicCaseView({
 								className="mt-0.5 size-4 shrink-0 text-brass-deep"
 								aria-hidden="true"
 							/>
-							Funds go to {ownerFirst}'s account — {ownerFirst} pays the
-							attorney directly.
+							{fundsNote}
 						</span>
 						<span className="flex items-start gap-2">
 							<Eye
@@ -308,32 +342,55 @@ export function PublicCaseView({
 						</div>
 					</section>
 
-					{/* Gallery */}
+					{/* Gallery — small thumbnails; click one to view it full size. */}
 					{c.images.length > 0 && (
 						<section>
 							<h2 className="mb-3 font-bold text-[18px] text-ink">Photos</h2>
-							<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-								{c.images.map((url) => (
-									<img
-										key={url}
-										src={url}
-										alt=""
-										className="aspect-square w-full rounded-[var(--radius-card-sm)] border border-border object-cover"
-									/>
-								))}
-							</div>
+							<CaseGallery images={c.images} />
 						</section>
 					)}
 
-					{/* Case updates — no updates model yet, honest empty state */}
+					{/* Case updates — the matched attorney's broadcast progress (JUS-33) */}
 					<section>
-						<h2 className="mb-3 font-bold text-[18px] text-ink">
+						<h2 className="mb-3 flex items-center gap-2 font-bold text-[18px] text-ink">
 							Case updates
+							{c.updates.length > 0 && (
+								<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
+									{c.updates.length}
+								</span>
+							)}
 						</h2>
-						<div className="flex items-center gap-2.5 rounded-[var(--radius-card)] border border-border border-dashed bg-surface/60 px-4 py-4 text-[13.5px] text-muted-foreground">
-							<Megaphone className="size-4 shrink-0" aria-hidden="true" />
-							No updates yet — {ownerFirst}'s attorney will post progress here.
-						</div>
+						<CaseUpdates
+							updates={c.updates.map((u) => {
+								const isOwner = u.authorId === c.ownerId;
+								return {
+									id: u.id,
+									body: u.body,
+									createdAt: u.createdAt,
+									editedAt: u.editedAt,
+									authorId: u.authorId,
+									tag: u.tag,
+									attachments: Array.isArray(u.attachments)
+										? (u.attachments as {
+												url: string;
+												name: string;
+												contentType: string;
+											}[])
+										: [],
+									authorRole: isOwner
+										? ("plaintiff" as const)
+										: ("attorney" as const),
+									authorName: isOwner ? owner : (c.attorneyName ?? "Attorney"),
+								};
+							})}
+							viewerId=""
+							viewerRole="donor"
+							caseId={c.id}
+							limit={2}
+							viewAllHref={updatesHref}
+							highlightSince={updatesHighlightSince}
+							emptyHint={`No updates yet — ${ownerFirst}'s attorney will post progress here.`}
+						/>
 					</section>
 
 					{/* Represented by */}

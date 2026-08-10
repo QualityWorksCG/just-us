@@ -1,7 +1,7 @@
 import { isBlocked, isLocked } from "@just-us/auth/user-status";
 import { getUserWithCases } from "@just-us/db/users";
 import { cn } from "@just-us/ui/lib/utils";
-import { ArrowRight, FolderOpen, HandCoins } from "lucide-react";
+import { ArrowRight, BadgeCheck, FolderOpen, HandCoins } from "lucide-react";
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,6 +10,8 @@ import type { ReactNode } from "react";
 import { BackLink } from "@/components/dashboard/back-link";
 import { BlockUserDialog } from "@/components/dashboard/block-user-dialog";
 import { UnblockUserButton } from "@/components/dashboard/unblock-user-button";
+import { verificationBadge } from "@/components/dashboard/verification-badge";
+import { VerifyAttorneyControl } from "@/components/dashboard/verify-attorney-control";
 import { requireAdministrator } from "@/lib/auth-server";
 
 const dayFmt = new Intl.DateTimeFormat("en-GB", {
@@ -44,26 +46,36 @@ const HEAD =
  * Verification is always shown; a block or a lock is shown alongside it. Blocked
  * (administrator-initiated) and locked (failed sign-ins) are separate states, so
  * they get separate pills and a blocked account never reads as merely locked.
+ *
+ * For an attorney the badge is their **bar standing**, matching the card below
+ * and the users table — a verified email must never read as "Verified" here when
+ * the bar record still needs review (JUS-13). Other roles show email
+ * verification.
  */
 function statusPills(u: {
+	role: string;
 	emailVerified: boolean;
+	attorneyProfile: { verificationStatus: string } | null;
 	banned: boolean | null;
 	banExpires: Date | null;
 	lockedUntil: Date | null;
 }) {
-	const pills = [
-		u.emailVerified
-			? {
-					text: "Verified",
-					cls: "bg-green-soft text-green-deep",
-					dot: "bg-success",
-				}
-			: {
-					text: "Unverified",
-					cls: "bg-surface-2 text-ink-soft",
-					dot: "bg-ink-soft",
-				},
-	];
+	const pills =
+		u.role === "attorney"
+			? [verificationBadge(u.attorneyProfile?.verificationStatus)]
+			: [
+					u.emailVerified
+						? {
+								text: "Verified",
+								cls: "bg-green-soft text-green-deep",
+								dot: "bg-success",
+							}
+						: {
+								text: "Unverified",
+								cls: "bg-surface-2 text-ink-soft",
+								dot: "bg-ink-soft",
+							},
+				];
 	if (isBlocked(u)) {
 		pills.push({
 			text: "Blocked",
@@ -160,9 +172,9 @@ export default async function UserDetailPage({
 					<Fact label="Jurisdiction">
 						<p className="text-[13.5px] text-ink">{u.jurisdiction || "—"}</p>
 					</Fact>
-					<Fact label="Verification">
+					<Fact label="Email">
 						<p className="text-[13.5px] text-ink">
-							{u.emailVerified ? "Email verified" : "Not verified"}
+							{u.emailVerified ? "Verified" : "Not verified"}
 						</p>
 					</Fact>
 					<Fact label="Joined">
@@ -216,6 +228,49 @@ export default async function UserDetailPage({
 					)}
 				</div>
 			</div>
+
+			{/* Attorney bar verification — the switch that lets an attorney
+			    represent cases and express interest (JUS-13). */}
+			{u.role === "attorney" &&
+				(() => {
+					const status = u.attorneyProfile?.verificationStatus ?? "unverified";
+					const isVerified = status === "verified";
+					const badge = verificationBadge(status);
+					return (
+						<div className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+							<div className="flex flex-wrap items-start justify-between gap-4">
+								<div className="min-w-0">
+									<h2 className="flex items-center gap-2 font-bold text-[15px] text-ink">
+										<BadgeCheck
+											className="size-4 text-brass-deep"
+											aria-hidden="true"
+										/>
+										Bar-standing verification
+									</h2>
+									<p className="mt-1 max-w-[52ch] text-[13px] text-muted-foreground leading-relaxed">
+										{isVerified
+											? "This attorney is verified — they can represent cases and express interest. Clearing it removes that access."
+											: "Only a verified attorney can represent cases or express interest. Mark them verified once their bar standing is confirmed."}
+									</p>
+									<div className="mt-3 flex flex-wrap items-center gap-2">
+										<span className={cn(PILL, badge.cls)}>
+											<span
+												className={cn("size-1.5 rounded-full", badge.dot)}
+											/>
+											{badge.text}
+										</span>
+										{isVerified && u.attorneyProfile?.verifiedAt && (
+											<span className="text-[12.5px] text-muted-foreground">
+												since {stamp(u.attorneyProfile.verifiedAt)}
+											</span>
+										)}
+									</div>
+								</div>
+								<VerifyAttorneyControl userId={u.id} verified={isVerified} />
+							</div>
+						</div>
+					);
+				})()}
 
 			{/* Cases */}
 			<div className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">

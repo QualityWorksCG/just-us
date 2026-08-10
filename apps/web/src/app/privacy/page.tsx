@@ -109,9 +109,10 @@ export default function PrivacyPage() {
 				<h2>4. Payments and funds</h2>
 				<p>
 					Donations are processed by a third-party payment processor and route
-					directly to a case-specific account held by the retained attorney.
-					JustUs never takes custody of donated funds and does not receive or
-					store your payment credentials.
+					directly to an account held by the case's designated recipient — the
+					plaintiff who created it, as stated on the case page. JustUs never
+					takes custody of donated funds and does not receive or store your
+					payment credentials.
 				</p>
 			</section>
 

@@ -24,18 +24,18 @@ import {
 	FileText,
 	Handshake,
 	ImageIcon,
+	Landmark,
 	Link2,
 	Lock,
 	Mail,
 	Megaphone,
-	MessageCircle,
 	Pencil,
 	Plus,
+	RefreshCw,
 	Rocket,
 	Scale,
 	Search,
 	Send,
-	Share2,
 	Sparkles,
 	Upload,
 	UserPlus,
@@ -47,8 +47,11 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { goLiveAction } from "@/app/(app)/my-cases/[id]/payout-actions";
 import {
-	createCaseAction,
+	type CasePayoutReadiness,
+	casePayoutReadinessAction,
+	commitCaseAction,
 	deleteCaseAction,
 	publishForAttorneysAction,
 	saveCaseDraftAction,
@@ -57,8 +60,15 @@ import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
 import { CASE_CATEGORIES } from "@/lib/case-categories";
 
-/** A piece of evidence: an uploaded file (has `size`) or a link (has `url`). */
-export type EvidenceItem = { name: string; size?: number; url?: string };
+/** A piece of evidence: a document the plaintiff uploaded, or a link they pasted.
+ *  Both carry a `url` — a file's is where it is stored, a link's is the address
+ *  itself — so `kind` is what tells them apart rather than the shape. */
+export type EvidenceItem = {
+	name: string;
+	size?: number;
+	url?: string;
+	kind?: "file" | "link";
+};
 
 export type WizardInitial = {
 	id: string;
@@ -79,6 +89,17 @@ export type WizardInitial = {
 	evidence: EvidenceItem[];
 	coverImageUrl: string | null;
 	images: string[];
+	/** True when an attorney has already been matched to this case through the
+	 *  request/accept flow. The attorney is settled — the representation step shows
+	 *  them as confirmed rather than asking to invite one again. */
+	attorneyConfirmed?: boolean;
+	/** The case's status, so a resumed case knows whether it is still a private
+	 *  draft or already committed and waiting on its firm. */
+	status?: string;
+	/** How far the firm's payout setup has got, when the case is far enough along
+	 *  to have one. Seeded from the server so the payout step is right on first
+	 *  paint rather than after a round-trip. */
+	payout?: CasePayoutReadiness | null;
 };
 
 type View = "wizard" | "preview" | "success" | "published-attorneys";
@@ -97,10 +118,11 @@ const STEPS = [
 	{ n: 2, label: "The basics" },
 	{ n: 3, label: "Representation" },
 	{ n: 4, label: "Attorney & fee" },
-	{ n: 5, label: "Review & publish" },
+	{ n: 5, label: "Payout setup" },
+	{ n: 6, label: "Review & publish" },
 ] as const;
 
-const LAST_STEP = 5;
+const LAST_STEP = 6;
 
 const CATEGORIES = CASE_CATEGORIES;
 
@@ -162,12 +184,15 @@ export function CaseWizard({
 	const draftState = initial?.location;
 	const seedState = knownState(draftState) ? draftState : "";
 
-	// Resume the furthest step the saved draft supports.
+	// Resume the furthest step the saved draft supports. A case already committed
+	// to its attorney skips to the review — the payout step behind it is a wait,
+	// not an input, and it is summarised there anyway.
 	const seedStep = (() => {
 		if (!initial?.story) return 1;
 		if (!initial.title || !initial.location) return 2;
 		if (!initial.attorney) return 3;
 		if (!initial.goalCents) return 4;
+		if (initial.status === "pending_payout") return 6;
 		return 5;
 	})();
 	const attorneyState = knownState(initial?.attorney?.location)
@@ -209,8 +234,15 @@ export function CaseWizard({
 	const [moreImages, setMoreImages] = useState<string[]>(initial?.images ?? []);
 	const [uploadingCover, setUploadingCover] = useState(false);
 	const [uploadingMore, setUploadingMore] = useState(false);
+	const [uploadingEvidence, setUploadingEvidence] = useState(false);
 
 	// Step 3 — representation (do you have an attorney?)
+	// A matched attorney (accepted from a request) is already settled: the step
+	// shows them as confirmed instead of the invite form, unless the plaintiff
+	// chooses to change attorney, which drops back into the normal selection.
+	const [attorneyConfirmed, setAttorneyConfirmed] = useState(
+		initial?.attorneyConfirmed ?? false,
+	);
 	const [repChoice, setRepChoice] = useState<"have" | "find" | null>(
 		initial?.attorney ? "have" : null,
 	);
@@ -235,6 +267,22 @@ export function CaseWizard({
 			? initial.payoutType
 			: PAYOUT_TYPES[0];
 	const [publishing, setPublishing] = useState(false);
+
+	// Step 5 — the firm's payout account for this case.
+	//
+	// The only step whose outcome the plaintiff does not control. Donations are
+	// paid to an account their *attorney* opens per case through Stripe, and the
+	// case cannot go public until it can receive — so this step commits the case
+	// to the attorney and then reports on someone else's progress.
+	const [payout, setPayout] = useState<CasePayoutReadiness | null>(
+		initial?.payout ?? null,
+	);
+	const [committed, setCommitted] = useState(
+		initial?.status === "pending_payout",
+	);
+	const [committing, setCommitting] = useState(false);
+	const [checking, setChecking] = useState(false);
+	const payoutReady = !!payout?.attorney?.transfersEnabled;
 
 	const coverInput = useRef<HTMLInputElement>(null);
 	const moreInput = useRef<HTMLInputElement>(null);
@@ -263,6 +311,9 @@ export function CaseWizard({
 			if (!attorney) return toast.error("Add your attorney first.");
 			if (!goal) return toast.error("Enter the agreed fee.");
 		}
+		if (step === 5 && !committed) {
+			return toast.error("Send the case to your attorney first.");
+		}
 		setStep((s) => Math.min(LAST_STEP, s + 1));
 		window.scrollTo({ top: 0 });
 	}
@@ -274,6 +325,14 @@ export function CaseWizard({
 		}
 		setStep((s) => Math.max(1, s - 1));
 		window.scrollTo({ top: 0 });
+	}
+
+	// Drop a confirmed (matched) attorney back into the normal selection so the
+	// plaintiff can pick a different one. The existing details stay pre-filled in
+	// case they only meant to tweak them.
+	function changeAttorney() {
+		setAttorneyConfirmed(false);
+		setRepChoice("have");
 	}
 
 	// Step 3, "Yes, I have an attorney" → record them and move to the fee.
@@ -326,34 +385,57 @@ export function CaseWizard({
 		}
 	}
 
-	async function publish() {
+	/**
+	 * Everything that must be true before the case leaves the plaintiff's hands.
+	 * Sends them back to the step that owns whatever is missing rather than
+	 * reporting it where they are standing.
+	 */
+	function missingEssential(): boolean {
 		if (story.trim().length < 20) {
 			toast.error("Add your story before publishing.");
 			setView("wizard");
 			setStep(1);
-			return;
+			return true;
 		}
 		if (!title.trim() || !state || !coverUrl) {
 			toast.error("Add a title, state, and cover image before publishing.");
 			setView("wizard");
 			setStep(2);
-			return;
+			return true;
 		}
 		if (!attorney) {
 			toast.error("Add your attorney first.");
 			setView("wizard");
 			setStep(3);
-			return;
+			return true;
 		}
 		if (!goal) {
 			toast.error("Set the agreed fee first.");
 			setView("wizard");
 			setStep(4);
-			return;
+			return true;
 		}
+		return false;
+	}
 
-		setPublishing(true);
-		const result = await createCaseAction({
+	/**
+	 * Step 5 — hand the finished case to the attorney so they can open its payout
+	 * account. Saves it as `pending_payout`: private, and for the first time
+	 * visible to them (drafts are not, which is why this is a distinct act rather
+	 * than another autosave).
+	 *
+	 * Re-run every time the plaintiff leaves this step forward, not just the
+	 * first. Once a case is committed the wizard is editing a row that already
+	 * exists, so a trip back to change the fee or the story would otherwise be
+	 * reviewed and published from stale data. `publishCase` updates in place, so
+	 * repeating it is a save, not a second case.
+	 */
+	async function commitToAttorney() {
+		if (missingEssential()) return;
+
+		const advance = committed;
+		setCommitting(true);
+		const result = await commitCaseAction({
 			id: caseId ?? undefined,
 			title: title.trim(),
 			category,
@@ -362,25 +444,89 @@ export function CaseWizard({
 			story: story.trim(),
 			goalCents: Math.round(goal * 100),
 			payoutType,
-			attorney,
+			// biome-ignore lint/style/noNonNullAssertion: missingEssential returned false
+			attorney: attorney!,
 			evidence,
 			coverImageUrl: coverUrl,
 			images: moreImages,
 		});
+		setCommitting(false);
+		if (!result.ok) {
+			toast.error(result.error);
+			return;
+		}
+		setCaseId(result.caseId);
+		setPayout(result.payout);
+		setCommitted(true);
+		if (advance) {
+			setStep(6);
+			window.scrollTo({ top: 0 });
+			return;
+		}
+		if (result.payout.attorney?.transfersEnabled) {
+			toast.success(
+				`${result.payout.attorney.firmName ?? result.payout.attorney.name} is ready to receive. You can publish.`,
+			);
+		} else {
+			toast.success(
+				`Sent to ${attorneyName}. We'll email you when they're set.`,
+			);
+		}
+	}
+
+	/** Step 5 — re-read the firm's Stripe progress. It finishes elsewhere, so
+	 *  nothing in this browser would otherwise tell the plaintiff. */
+	async function checkPayout() {
+		if (!caseId) return;
+		setChecking(true);
+		const result = await casePayoutReadinessAction(caseId);
+		setChecking(false);
+		if (!result.ok) {
+			toast.error(result.error);
+			return;
+		}
+		setPayout(result.payout);
+		if (result.payout.attorney?.transfersEnabled) {
+			toast.success("Your attorney is set up. You can publish now.");
+		} else {
+			toast.info("Not yet — nothing has changed on their side.");
+		}
+	}
+
+	/**
+	 * Step 6 — take the case public.
+	 *
+	 * The case is already saved; this is the `pending_payout` → `live` transition,
+	 * which binds the destination and publishes in one server-side act. The button
+	 * is disabled unless the firm can receive, and `goLiveCase` re-checks that from
+	 * the case row regardless — the disabled button is a courtesy, not the rule.
+	 */
+	async function publish() {
+		if (!caseId) {
+			toast.error("Save your case first.");
+			setStep(5);
+			return;
+		}
+		setPublishing(true);
+		const result = await goLiveAction({ caseId });
 		if (result.ok) {
-			setCaseId(result.caseId);
 			setView("success");
 			window.scrollTo({ top: 0 });
 		} else {
 			toast.error(result.error);
 			setPublishing(false);
+			// Every refusal left is about the firm's account, and step 5 is the only
+			// screen that explains it and offers a way to re-check.
+			await checkPayout();
+			setStep(5);
 		}
 	}
 
-	// Persist whatever's filled in as a draft, then head to the dashboard.
-	async function saveAndExit() {
-		setSaving(true);
-		const res = await saveCaseDraftAction({
+	/** Whatever is filled in so far, in the shape the draft action takes. Shared by
+	 *  every path that leaves the wizard, so none of them can persist less than
+	 *  another. */
+	function draftPayload() {
+		return {
 			id: caseId ?? undefined,
 			title: title.trim() || undefined,
 			category,
@@ -393,7 +539,13 @@ export function CaseWizard({
 			evidence,
 			coverImageUrl: coverUrl,
 			images: moreImages,
-		});
+		};
+	}
+
+	// Persist whatever's filled in as a draft, then head to the dashboard.
+	async function saveAndExit() {
+		setSaving(true);
+		const res = await saveCaseDraftAction(draftPayload());
 		if (res.ok) {
 			toast.success("Progress saved — pick up where you left off anytime.");
 			window.location.assign("/home");
@@ -401,6 +553,27 @@ export function CaseWizard({
 			toast.error(res.error);
 			setSaving(false);
 		}
+	}
+
+	/**
+	 * Step 3, "Search and reach out yourself" — leave the wizard for the attorney
+	 * directory.
+	 *
+	 * Saves first, and that is the whole reason this is not a plain link.
+	 * Everything typed so far lives in component state, so navigating away
+	 * unsaved would lose the story they just wrote — and this is the one branch of
+	 * the wizard that deliberately sends them somewhere else. The draft id rides
+	 * along in the URL so the directory can offer a way back into it.
+	 */
+	async function browseDirectory() {
+		setSaving(true);
+		const res = await saveCaseDraftAction(draftPayload());
+		if (!res.ok) {
+			toast.error(res.error);
+			setSaving(false);
+			return;
+		}
+		window.location.assign(`/find-attorney?draft=${res.caseId}`);
 	}
 
 	// Abandon the wizard without saving. If a draft was already persisted (a fresh
@@ -483,12 +656,50 @@ export function CaseWizard({
 			setUploadingMore(false);
 		}
 	}
-	function onPickEvidence(e: React.ChangeEvent<HTMLInputElement>) {
-		const files = Array.from(e.target.files ?? []).map((f) => ({
-			name: f.name,
-			size: f.size,
-		}));
-		setEvidence((p) => [...p, ...files]);
+	/**
+	 * Evidence is uploaded, not just noted.
+	 *
+	 * It used to record a name and a byte count and drop the file on the floor,
+	 * which produced a case whose evidence nobody — not the plaintiff, not their
+	 * attorney — could ever open. The upload goes to the same Blob route as the
+	 * images, tagged so the server applies the document limits rather than the
+	 * image ones.
+	 *
+	 * Each file is added on its own as it lands, so one refusal (too big, wrong
+	 * type) doesn't discard the others that succeeded.
+	 */
+	async function onPickEvidence(e: React.ChangeEvent<HTMLInputElement>) {
+		const files = Array.from(e.target.files ?? []);
+		if (!files.length) return;
+		// Clear the input so re-picking the same file after a failure still fires.
+		e.target.value = "";
+		setUploadingEvidence(true);
+		try {
+			await Promise.all(
+				files.map(async (file) => {
+					try {
+						const blob = await upload(file.name, file, {
+							access: "public",
+							handleUploadUrl: "/api/cases/upload",
+							clientPayload: "evidence",
+						});
+						setEvidence((p) => [
+							...p,
+							{
+								name: file.name,
+								size: file.size,
+								url: blob.url,
+								kind: "file",
+							},
+						]);
+					} catch {
+						toast.error(`Couldn't upload ${file.name}. Please try again.`);
+					}
+				}),
+			);
+		} finally {
+			setUploadingEvidence(false);
+		}
 	}
 
 	function addLink() {
@@ -502,16 +713,27 @@ export function CaseWizard({
 				toast.error("That link is already added.");
 				return;
 			}
-			setEvidence((p) => [...p, { name: parsed.hostname, url: parsed.href }]);
+			setEvidence((p) => [
+				...p,
+				{ name: parsed.hostname, url: parsed.href, kind: "link" },
+			]);
 			setLinkUrl("");
 		} catch {
 			toast.error("Enter a valid link (e.g. https://…).");
 		}
 	}
 
+	// The public page for the case just published. `/cases` (the directory) was
+	// being copied instead — a link to the browse page, not the campaign, so
+	// backers landed on a list rather than the case they were sent.
+	function caseShareUrl() {
+		if (typeof window === "undefined" || !caseId) return "";
+		return `${window.location.origin}/cases/${caseId}`;
+	}
+
 	function copyLink() {
-		const url =
-			typeof window !== "undefined" ? `${window.location.origin}/cases` : "";
+		const url = caseShareUrl();
+		if (!url) return;
 		navigator.clipboard?.writeText(url);
 		toast.success("Link copied to clipboard.");
 	}
@@ -692,22 +914,6 @@ export function CaseWizard({
 							<Link2 className="size-4" aria-hidden="true" />
 							Copy link
 						</button>
-						{[
-							{ icon: Send, label: "Share on X" },
-							{ icon: Share2, label: "Share on Facebook" },
-							{ icon: MessageCircle, label: "Share on WhatsApp" },
-							{ icon: Mail, label: "Share by email" },
-						].map((s) => (
-							<button
-								key={s.label}
-								type="button"
-								aria-label={s.label}
-								onClick={() => toast.success("Sharing link copied.")}
-								className="flex size-11 items-center justify-center rounded-full border border-border bg-surface text-ink-soft transition-colors hover:border-line-strong hover:text-ink"
-							>
-								<s.icon className="size-4" aria-hidden="true" />
-							</button>
-						))}
 					</div>
 
 					<div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -767,10 +973,21 @@ export function CaseWizard({
 							size="sm"
 							className="h-9 px-3.5"
 							onClick={publish}
-							disabled={publishing}
+							// Same gate as the review step's button — the preview is a second
+							// door onto the same act, and it must not be an open one.
+							disabled={publishing || !payoutReady}
+							title={
+								payoutReady
+									? undefined
+									: `Waiting on ${attorneyName}'s payout account`
+							}
 						>
 							<Rocket data-icon="inline-start" aria-hidden="true" />
-							{publishing ? "Publishing…" : "Publish case"}
+							{publishing
+								? "Publishing…"
+								: payoutReady
+									? "Publish case"
+									: "Waiting on your attorney"}
 						</Button>
 					</div>
 				</div>
@@ -898,7 +1115,7 @@ export function CaseWizard({
 									className="size-4 shrink-0 text-brass-deep"
 									aria-hidden="true"
 								/>
-								Funds land in your account — you pay your attorney
+								Funds go straight to your attorney's firm
 							</li>
 							<li className="flex items-center gap-2.5 text-[13px] text-ink-soft">
 								<Eye
@@ -1437,14 +1654,17 @@ export function CaseWizard({
 										<button
 											type="button"
 											onClick={() => evidenceInput.current?.click()}
-											className="flex w-full flex-col items-center gap-1.5 rounded-[var(--radius-card-lg)] border border-line-strong border-dashed bg-surface px-6 py-8 text-center transition-colors hover:border-brass hover:border-solid hover:ring-1 hover:ring-brass"
+											disabled={uploadingEvidence}
+											className="flex w-full flex-col items-center gap-1.5 rounded-[var(--radius-card-lg)] border border-line-strong border-dashed bg-surface px-6 py-8 text-center transition-colors hover:border-brass hover:border-solid hover:ring-1 hover:ring-brass disabled:opacity-60"
 										>
 											<Upload
 												className="size-5 text-brass-deep"
 												aria-hidden="true"
 											/>
 											<span className="font-bold text-[14px] text-ink">
-												Drag files here, or browse
+												{uploadingEvidence
+													? "Uploading…"
+													: "Drag files here, or browse"}
 											</span>
 											<span className="text-[12.5px] text-muted-foreground">
 												PDF, JPG, PNG · up to 25MB each
@@ -1483,55 +1703,76 @@ export function CaseWizard({
 											</Button>
 										</div>
 
-										{evidence.map((f, i) => (
-											<div
-												key={`${f.url ?? f.name}-${i}`}
-												className="mt-2.5 flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-surface px-3.5 py-2.5"
-											>
-												{f.url ? (
-													<>
-														<Link2
-															className="size-4 shrink-0 text-brass-deep"
-															aria-hidden="true"
-														/>
-														<a
-															href={f.url}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="flex-1 truncate text-[13.5px] text-brass-deep hover:underline"
-														>
-															{f.name}
-														</a>
-														<span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.06em]">
-															Link
-														</span>
-													</>
-												) : (
-													<>
-														<FileText
-															className="size-4 shrink-0 text-brass-deep"
-															aria-hidden="true"
-														/>
-														<span className="flex-1 truncate text-[13.5px] text-ink">
-															{f.name}
-														</span>
-														<span className="text-[12px] text-muted-foreground tabular-nums">
-															{f.size != null ? formatSize(f.size) : ""}
-														</span>
-													</>
-												)}
-												<button
-													type="button"
-													aria-label="Remove evidence"
-													onClick={() =>
-														setEvidence((p) => p.filter((_, idx) => idx !== i))
-													}
-													className="text-muted-foreground hover:text-ink"
+										{evidence.map((f, i) => {
+											// A pasted address opens where it points; an uploaded
+											// document opens from where it was stored. Both are the
+											// plaintiff's own, on the plaintiff's own screen — the
+											// authorized route is for the people who read the case
+											// later, and there is no case id to address here yet.
+											const isLink = f.kind === "link" || (!!f.url && !f.size);
+											return (
+												<div
+													key={`${f.url ?? f.name}-${i}`}
+													className="mt-2.5 flex items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-surface px-3.5 py-2.5"
 												>
-													<X className="size-4" aria-hidden="true" />
-												</button>
-											</div>
-										))}
+													{isLink ? (
+														<>
+															<Link2
+																className="size-4 shrink-0 text-brass-deep"
+																aria-hidden="true"
+															/>
+															<a
+																href={f.url}
+																target="_blank"
+																rel="noopener noreferrer"
+																className="flex-1 truncate text-[13.5px] text-brass-deep hover:underline"
+															>
+																{f.name}
+															</a>
+															<span className="font-mono text-[10px] text-muted-foreground uppercase tracking-[0.06em]">
+																Link
+															</span>
+														</>
+													) : (
+														<>
+															<FileText
+																className="size-4 shrink-0 text-brass-deep"
+																aria-hidden="true"
+															/>
+															{f.url ? (
+																<a
+																	href={f.url}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	className="flex-1 truncate text-[13.5px] text-brass-deep hover:underline"
+																>
+																	{f.name}
+																</a>
+															) : (
+																<span className="flex-1 truncate text-[13.5px] text-ink">
+																	{f.name}
+																</span>
+															)}
+															<span className="text-[12px] text-muted-foreground tabular-nums">
+																{f.size != null ? formatSize(f.size) : ""}
+															</span>
+														</>
+													)}
+													<button
+														type="button"
+														aria-label="Remove evidence"
+														onClick={() =>
+															setEvidence((p) =>
+																p.filter((_, idx) => idx !== i),
+															)
+														}
+														className="text-muted-foreground hover:text-ink"
+													>
+														<X className="size-4" aria-hidden="true" />
+													</button>
+												</div>
+											);
+										})}
 									</div>
 
 									<p className="flex gap-2.5 rounded-[var(--radius-card-sm)] bg-green-soft px-4 py-3 text-[13px] text-green-deep leading-relaxed">
@@ -1546,7 +1787,51 @@ export function CaseWizard({
 							</>
 						)}
 
-						{step === 3 && (
+						{step === 3 && attorneyConfirmed && attorney ? (
+							<>
+								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
+									Your attorney
+								</h1>
+								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
+									You've already chosen {attorney.name} and they accepted your
+									case — there's nothing to invite or send again. Continue to
+									review the rest, or change your attorney.
+								</p>
+
+								<div className="mt-8 flex items-center gap-4 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+									<span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[14px] text-white">
+										{attorney.name
+											.split(/\s+/)
+											.slice(0, 2)
+											.map((p) => p[0]?.toUpperCase() ?? "")
+											.join("")}
+									</span>
+									<div className="min-w-0 flex-1">
+										<p className="font-bold text-[16px] text-ink">
+											{attorney.name}
+										</p>
+										<p className="text-[13px] text-muted-foreground">
+											{[attorney.area, attorney.location, attorney.firm]
+												.filter(Boolean)
+												.join(" · ") || "Representing you"}
+										</p>
+									</div>
+									<span className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1.5 font-semibold text-[12px] text-green-deep">
+										<CircleCheck className="size-3.5" aria-hidden="true" />
+										Representing you
+									</span>
+								</div>
+
+								<button
+									type="button"
+									onClick={changeAttorney}
+									className="mt-4 inline-flex items-center gap-1.5 font-semibold text-[13.5px] text-brass-deep transition-colors hover:text-brass"
+								>
+									<Search className="size-4" aria-hidden="true" />
+									Choose a different attorney
+								</button>
+							</>
+						) : step === 3 ? (
 							<>
 								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
 									Do you have an attorney?
@@ -1789,11 +2074,10 @@ export function CaseWizard({
 													type="button"
 													variant="outline"
 													className="w-full"
-													onClick={() =>
-														toast.success("The directory is coming soon.")
-													}
+													onClick={browseDirectory}
+													disabled={saving}
 												>
-													Search the directory
+													{saving ? "Saving…" : "Search the directory"}
 													<ArrowRight
 														data-icon="inline-end"
 														aria-hidden="true"
@@ -1813,7 +2097,7 @@ export function CaseWizard({
 									</>
 								)}
 							</>
-						)}
+						) : null}
 
 						{step === 4 && (
 							<>
@@ -1892,8 +2176,8 @@ export function CaseWizard({
 											Your funding goal is {money(goal)}
 										</p>
 										<p className="text-ink-soft">
-											The most that's ever raised — it lands in your account,
-											then you pay your attorney.
+											The most that's ever raised — it's paid to your attorney's
+											firm and applied to this fee.
 										</p>
 									</div>
 								</div>
@@ -1901,6 +2185,53 @@ export function CaseWizard({
 						)}
 
 						{step === 5 && (
+							<>
+								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
+									Where the money lands
+								</h1>
+								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
+									Donations are paid to {attorneyName}'s firm, into a Stripe
+									account opened for this case alone — never into a JustUs
+									balance, and never mixed with another client's funds. They
+									open it; you publish once it can receive.
+								</p>
+
+								<p className="mt-7 mb-2.5 font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
+									Payout account
+								</p>
+
+								<PayoutStep
+									committed={committed}
+									payout={payout}
+									attorneyName={attorneyName}
+									attorneyFirm={attorney?.firm ?? null}
+									attorneyEmail={attorney?.email ?? null}
+									checking={checking}
+									onCheck={checkPayout}
+								/>
+
+								{/* The one thing a plaintiff will not guess: nothing is public
+								    yet, and that is deliberate rather than a delay. */}
+								<div className="mt-6 flex max-w-[520px] gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
+									<Lock
+										className="mt-0.5 size-4 shrink-0 text-brass-deep"
+										aria-hidden="true"
+									/>
+									<div className="text-[13px] leading-relaxed">
+										<p className="font-bold text-ink">
+											Your case stays private until then
+										</p>
+										<p className="text-ink-soft">
+											Nobody can see it, share it or give to it while this is
+											outstanding. That's on purpose — a campaign that can't
+											take a donation costs you the first people you tell.
+										</p>
+									</div>
+								</div>
+							</>
+						)}
+
+						{step === 6 && (
 							<>
 								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
 									Ready to go live?
@@ -1956,29 +2287,70 @@ export function CaseWizard({
 									Preview full campaign
 								</Button>
 
-								<div className="mt-6 rounded-[var(--radius-card-lg)] bg-green-soft p-5">
-									<p className="mb-3 font-mono font-semibold text-[11px] text-green-deep uppercase tracking-[0.1em]">
-										Ready to publish
+								{/* The checklist is honest about the one item that can still be
+								    outstanding, rather than showing five green ticks next to a
+								    button that refuses. */}
+								<div
+									className={cn(
+										"mt-6 rounded-[var(--radius-card-lg)] p-5",
+										payoutReady ? "bg-green-soft" : "bg-surface-2",
+									)}
+								>
+									<p
+										className={cn(
+											"mb-3 font-mono font-semibold text-[11px] uppercase tracking-[0.1em]",
+											payoutReady ? "text-green-deep" : "text-muted-foreground",
+										)}
+									>
+										{payoutReady ? "Ready to publish" : "Almost ready"}
 									</p>
 									<ul className="flex flex-col gap-2.5">
 										{[
-											"Title & one-line summary",
-											"Your story",
-											`Evidence attached (${evidence.length} item${evidence.length === 1 ? "" : "s"})`,
-											"Attorney chosen · fee agreed",
+											{ label: "Title & one-line summary", done: true },
+											{ label: "Your story", done: true },
+											{
+												label: `Evidence attached (${evidence.length} item${evidence.length === 1 ? "" : "s"})`,
+												done: true,
+											},
+											{ label: "Attorney chosen · fee agreed", done: true },
+											{
+												label: payoutReady
+													? `Payout account ready · ${payout?.attorney?.firmName ?? attorneyName}`
+													: `Payout account — waiting on ${attorneyName}`,
+												done: payoutReady,
+											},
 										].map((item) => (
 											<li
-												key={item}
-												className="flex items-center gap-2.5 text-[13.5px] text-green-deep"
+												key={item.label}
+												className={cn(
+													"flex items-center gap-2.5 text-[13.5px]",
+													item.done ? "text-green-deep" : "text-ink-soft",
+												)}
 											>
-												<CircleCheck
-													className="size-4 shrink-0 text-success"
-													aria-hidden="true"
-												/>
-												{item}
+												{item.done ? (
+													<CircleCheck
+														className="size-4 shrink-0 text-success"
+														aria-hidden="true"
+													/>
+												) : (
+													<Clock
+														className="size-4 shrink-0 text-muted-foreground"
+														aria-hidden="true"
+													/>
+												)}
+												{item.label}
 											</li>
 										))}
 									</ul>
+									{!payoutReady && (
+										<button
+											type="button"
+											onClick={() => setStep(5)}
+											className="mt-3.5 font-semibold text-[13px] text-brass-deep underline underline-offset-2"
+										>
+											See what's outstanding
+										</button>
+									)}
 								</div>
 							</>
 						)}
@@ -1992,16 +2364,56 @@ export function CaseWizard({
 							<ArrowLeft data-icon="inline-start" aria-hidden="true" />
 							Back
 						</Button>
-						{step === 5 ? (
+						{step === 6 ? (
 							<Button
 								type="button"
 								size="lg"
 								className="px-6"
 								onClick={publish}
-								disabled={publishing}
+								// Gated on the firm being able to receive. `goLiveCase`
+								// enforces this server-side from the case row; disabling here
+								// is so the plaintiff is not invited to press it.
+								disabled={publishing || !payoutReady}
+								title={
+									payoutReady
+										? undefined
+										: `Waiting on ${attorneyName}'s payout account`
+								}
 							>
 								<Rocket data-icon="inline-start" aria-hidden="true" />
-								{publishing ? "Publishing…" : "Publish & go live"}
+								{publishing
+									? "Publishing…"
+									: payoutReady
+										? "Publish & go live"
+										: "Waiting on your attorney"}
+							</Button>
+						) : step === 5 ? (
+							// One control, whether or not the case has been sent yet: it
+							// saves and then either reports back here or moves on. Advancing
+							// without saving would review a stale copy of the case.
+							<Button
+								type="button"
+								size="lg"
+								className="px-6"
+								onClick={commitToAttorney}
+								disabled={committing}
+							>
+								{committed ? (
+									<>
+										{committing ? "Saving…" : "Continue"}
+										<ArrowRight data-icon="inline-end" aria-hidden="true" />
+									</>
+								) : (
+									<>
+										<Send data-icon="inline-start" aria-hidden="true" />
+										{committing ? "Sending…" : `Send to ${attorneyName}`}
+									</>
+								)}
+							</Button>
+						) : step === 3 && attorneyConfirmed ? (
+							<Button type="button" size="lg" className="px-6" onClick={next}>
+								Continue
+								<ArrowRight data-icon="inline-end" aria-hidden="true" />
 							</Button>
 						) : step === 3 && repChoice === "have" ? (
 							<Button
@@ -2039,6 +2451,209 @@ export function CaseWizard({
 					</div>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+/**
+ * The wizard's payout step: one card reporting how far the firm's Stripe setup
+ * for this case has got, and a way to re-ask.
+ *
+ * Four states, and each names the person the plaintiff is waiting on. That is the
+ * whole design brief — this is the only step whose outcome someone else controls,
+ * and a screen that says "pending" without saying *who* leaves them with nothing
+ * to do. Chasing their attorney is the one action available, so the address is
+ * always in reach.
+ *
+ * `transfersEnabled` is the only flag that counts as ready. A submitted form that
+ * Stripe is still reviewing is shown as its own state rather than folded into
+ * ready, because publishing on it would put up a campaign that cannot receive.
+ */
+function PayoutStep({
+	committed,
+	payout,
+	attorneyName,
+	attorneyFirm,
+	attorneyEmail,
+	checking,
+	onCheck,
+}: {
+	committed: boolean;
+	payout: CasePayoutReadiness | null;
+	attorneyName: string;
+	attorneyFirm: string | null;
+	attorneyEmail: string | null;
+	checking: boolean;
+	onCheck: () => void;
+}) {
+	const linked = payout?.attorney ?? null;
+	const recipient = linked
+		? (linked.firmName ?? linked.name)
+		: attorneyFirm || attorneyName;
+	const email = linked?.email ?? attorneyEmail;
+
+	// Before the case is sent, there is no account to report on — only what will
+	// be asked of whom.
+	if (!committed) {
+		return (
+			<div className="max-w-[560px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+				<div className="flex items-start gap-3">
+					<span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
+						<Landmark className="size-3" aria-hidden="true" />
+					</span>
+					<div className="min-w-0 flex-1">
+						<p className="font-semibold text-[14px] text-ink">{recipient}</p>
+						<p className="mt-1 text-[12.5px] text-ink-soft leading-relaxed">
+							Sending your case hands it to {attorneyName} so they can open its
+							payout account with Stripe — their firm's details, their bank
+							account, a few minutes of their time. Nothing is asked of you.
+						</p>
+						{email && (
+							<p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+								<Mail className="size-3.5 shrink-0" aria-hidden="true" />
+								{email}
+							</p>
+						)}
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	// Sent, but the address on the case belongs to no attorney account. The one
+	// state the plaintiff can actually fix, so it says how.
+	if (!linked) {
+		return (
+			<div className="max-w-[560px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+				<div className="flex items-start gap-3">
+					<span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted-foreground">
+						<UserPlus className="size-3" aria-hidden="true" />
+					</span>
+					<div className="min-w-0 flex-1">
+						<p className="font-semibold text-[14px] text-ink">
+							No attorney account at that address yet
+						</p>
+						<p className="mt-1 text-[12.5px] text-ink-soft leading-relaxed">
+							{payout?.designatedEmail
+								? `Your case names ${payout.designatedEmail}, but nobody has signed up as an attorney on JustUs with it. Ask them to — that's what links your case to their firm's payout account.`
+								: `Add ${attorneyName}'s email to your case so we can link it to their firm's payout account.`}
+						</p>
+					</div>
+				</div>
+				<CheckAgain checking={checking} onCheck={onCheck} />
+			</div>
+		);
+	}
+
+	const ready = linked.transfersEnabled;
+	const stage = ready
+		? "ready"
+		: linked.detailsSubmitted
+			? "in_review"
+			: linked.hasAccount
+				? "started"
+				: "unstarted";
+
+	const copy: Record<string, { title: string; body: string }> = {
+		ready: {
+			title: "Ready to receive",
+			body: `${recipient} can accept this case's donations. Publish whenever you're ready.`,
+		},
+		in_review: {
+			title: "Stripe is verifying their details",
+			body: `${attorneyName} finished the form. Stripe reviews the firm's details before releasing the account — usually quick, occasionally a day or two. Nothing for either of you to do.`,
+		},
+		started: {
+			title: "Setup started, not finished",
+			body: `${attorneyName} opened the account for this case but hasn't completed it. They finish it on the case itself, in their own JustUs account.`,
+		},
+		unstarted: {
+			title: "Waiting on your attorney",
+			body: `${attorneyName} hasn't opened this case's payout account yet. Each case gets its own, so they may well be set up on their other matters and still owe this one.`,
+		},
+	};
+	const { title, body } = copy[stage] ?? copy.unstarted;
+
+	return (
+		<div
+			className={cn(
+				"max-w-[560px] rounded-[var(--radius-card-lg)] p-5",
+				ready
+					? "bg-green-soft"
+					: "border border-border bg-surface shadow-[var(--shadow-rest)]",
+			)}
+		>
+			<div className="flex items-start gap-3">
+				<span
+					className={cn(
+						"mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full",
+						ready ? "bg-success text-white" : "bg-brass-wash text-brass-deep",
+					)}
+				>
+					{ready ? (
+						<Check className="size-3" aria-hidden="true" />
+					) : (
+						<Clock className="size-3" aria-hidden="true" />
+					)}
+				</span>
+				<div className="min-w-0 flex-1">
+					<p
+						className={cn(
+							"font-semibold text-[14px]",
+							ready ? "text-green-deep" : "text-ink",
+						)}
+					>
+						{title}
+					</p>
+					<p
+						className={cn(
+							"mt-1 text-[12.5px] leading-relaxed",
+							ready ? "text-green-deep" : "text-ink-soft",
+						)}
+					>
+						{body}
+					</p>
+					<p className="mt-2 text-[12.5px] text-muted-foreground leading-relaxed">
+						{recipient}
+						{linked.barNumber ? ` · Bar #${linked.barNumber}` : ""}
+					</p>
+					{!ready && email && (
+						<p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+							<Mail className="size-3.5 shrink-0" aria-hidden="true" />
+							{email} — the address to nudge
+						</p>
+					)}
+				</div>
+			</div>
+			{!ready && <CheckAgain checking={checking} onCheck={onCheck} />}
+		</div>
+	);
+}
+
+/** Their Stripe onboarding finishes elsewhere, so nothing in this browser would
+ *  otherwise tell the plaintiff it had. */
+function CheckAgain({
+	checking,
+	onCheck,
+}: {
+	checking: boolean;
+	onCheck: () => void;
+}) {
+	return (
+		<div className="mt-4 flex flex-wrap items-center gap-3">
+			<Button
+				type="button"
+				variant="outline"
+				size="sm"
+				onClick={onCheck}
+				disabled={checking}
+			>
+				<RefreshCw data-icon="inline-start" aria-hidden="true" />
+				{checking ? "Checking…" : "Check again"}
+			</Button>
+			<span className="text-[12.5px] text-muted-foreground">
+				We'll email you the moment they're set — you don't have to wait here.
+			</span>
 		</div>
 	);
 }
