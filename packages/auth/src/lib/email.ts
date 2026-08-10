@@ -1,6 +1,7 @@
 import AdminInviteEmail, {
 	adminInviteSubject,
 } from "@just-us/email/admin-invite";
+import CaseInviteEmail, { caseInviteSubject } from "@just-us/email/case-invite";
 import MagicLinkEmail, { magicLinkSubject } from "@just-us/email/magic-link";
 import NewMessageEmail, { newMessageSubject } from "@just-us/email/new-message";
 import ResetPasswordEmail, {
@@ -25,6 +26,15 @@ type SendArgs = {
 async function send({ to, subject, react }: SendArgs) {
 	console.log(`[email] send → to=${to} subject="${subject}"`);
 	if (!resend) {
+		// Skipping the send is a local-development convenience, and only that. A
+		// deployed build with no key would report every invitation, verification and
+		// reset as sent while nothing left the building — and callers that create a
+		// record on the strength of a successful send (a case invitation holds its
+		// case out of the attorney queue for a week) would act on a lie. Fail where
+		// it can be seen instead.
+		if (env.NODE_ENV === "production") {
+			throw new Error("Failed to send email: RESEND_API_KEY is not configured");
+		}
 		console.log(
 			"[email:dev] RESEND_API_KEY not set — email skipped. Set it to send real mail.",
 		);
@@ -92,6 +102,35 @@ export function sendAdminInviteEmail(params: {
 		react: AdminInviteEmail({
 			url: params.url,
 			inviterName: params.inviterName,
+		}),
+	});
+}
+
+/** Invitation to the attorney a plaintiff named on their own case. `hasAccount`
+ * picks the copy: sign in and confirm, or create an attorney account first.
+ * Both variants land on the same tokenised invite URL. */
+export function sendCaseInviteEmail(params: {
+	to: string;
+	inviteUrl: string;
+	caseTitle: string;
+	plaintiffName: string;
+	attorneyName: string;
+	hasAccount: boolean;
+	expiresInDays: number;
+}) {
+	return send({
+		to: params.to,
+		subject: caseInviteSubject({
+			hasAccount: params.hasAccount,
+			caseTitle: params.caseTitle,
+		}),
+		react: CaseInviteEmail({
+			inviteUrl: params.inviteUrl,
+			caseTitle: params.caseTitle,
+			plaintiffName: params.plaintiffName,
+			attorneyName: params.attorneyName,
+			hasAccount: params.hasAccount,
+			expiresInDays: params.expiresInDays,
 		}),
 	});
 }

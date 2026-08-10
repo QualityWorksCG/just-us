@@ -1,3 +1,4 @@
+import { pendingInvitationsForCases } from "@just-us/db/case-invitations";
 import { caseIdsWithUnseenUpdates } from "@just-us/db/case-updates";
 import {
 	type CaseFilter,
@@ -15,6 +16,7 @@ import {
 	Clock,
 	FolderOpen,
 	ImageIcon,
+	MailCheck,
 	Megaphone,
 	Plus,
 	UsersRound,
@@ -39,6 +41,12 @@ const TABS: { key: CaseFilter; label: string }[] = [
 	{ key: "pending", label: "Awaiting firm" },
 	{ key: "deleted", label: "Deleted" },
 ];
+
+// Formatted on the server so every viewer reads the same date.
+const dayFmt = new Intl.DateTimeFormat("en-US", {
+	day: "numeric",
+	month: "short",
+});
 
 function money(n: number) {
 	return new Intl.NumberFormat("en-US", {
@@ -130,6 +138,12 @@ export default async function MyCasesPage({
 	// Cases with an attorney update the owner hasn't opened yet — tagged on the
 	// card so a new update is visible without drilling in (JUS-33).
 	const casesWithNewUpdate = await caseIdsWithUnseenUpdates(session.user.id);
+	// A `seeking` case whose named attorney hasn't answered is not in front of any
+	// attorney at all, so it must not be reported as though it were. Only the cases
+	// on this page are asked about.
+	const pendingInvites = await pendingInvitationsForCases(
+		cases.filter((c) => c.status === "seeking").map((c) => c.id),
+	);
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -230,16 +244,20 @@ export default async function MyCasesPage({
 						const readiness = readinessOf(c);
 						const meta = [c.category, c.location].filter(Boolean).join(" · ");
 						const resume = `/cases/new?draft=${c.id}` as Route;
+						// Waiting on one named attorney, not on the queue.
+						const invite = isSeeking ? pendingInvites.get(c.id) : undefined;
 
 						const badge = isDeleted
 							? { text: "Deleted", dot: "bg-danger" }
 							: isLive
 								? { text: "Live", dot: "bg-success" }
-								: isSeeking
-									? { text: "Seeking", dot: "bg-brass-deep" }
-									: isPending
-										? { text: "Awaiting firm", dot: "bg-gold-bright" }
-										: { text: "Draft", dot: "bg-ink-soft" };
+								: invite
+									? { text: "Invitation sent", dot: "bg-gold-bright" }
+									: isSeeking
+										? { text: "Seeking", dot: "bg-brass-deep" }
+										: isPending
+											? { text: "Awaiting firm", dot: "bg-gold-bright" }
+											: { text: "Draft", dot: "bg-ink-soft" };
 						const hasNewUpdate = !isDeleted && casesWithNewUpdate.has(c.id);
 
 						return (
@@ -299,6 +317,22 @@ export default async function MyCasesPage({
 													donors
 												</p>
 											</>
+										) : invite ? (
+											<p className="inline-flex items-start gap-1.5 text-[13px] text-ink-soft">
+												<MailCheck
+													className="mt-0.5 size-4 shrink-0 text-gold-bright-ink"
+													aria-hidden="true"
+												/>
+												<span>
+													Waiting on{" "}
+													<span className="break-all font-medium text-ink">
+														{invite.email}
+													</span>{" "}
+													to confirm. If they don't answer by{" "}
+													{dayFmt.format(invite.expiresAt)}, other attorneys see
+													it.
+												</span>
+											</p>
 										) : isSeeking ? (
 											<p className="inline-flex items-center gap-1.5 text-[13px] text-ink-soft">
 												<UsersRound
@@ -343,6 +377,18 @@ export default async function MyCasesPage({
 												className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-brass-deep hover:underline"
 											>
 												Manage campaign
+												<ArrowRight className="size-3.5" aria-hidden="true" />
+											</Link>
+										) : invite ? (
+											// No expressions of interest can arrive while an invitation
+											// is open, so the requests inbox would be an empty room.
+											// The wizard is where the invitation itself is managed —
+											// resend it, or send it to a different address.
+											<Link
+												href={resume}
+												className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-brass-deep hover:underline"
+											>
+												Manage invitation
 												<ArrowRight className="size-3.5" aria-hidden="true" />
 											</Link>
 										) : isSeeking ? (

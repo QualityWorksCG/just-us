@@ -22,6 +22,11 @@ const ACTION_LABELS: Record<string, string> = {
 	"user.role_changed": "Role changed",
 	"attorney.verified": "Attorney verified",
 	"attorney.verification_cleared": "Attorney verification cleared",
+	"case_invite.created": "Case invitation sent",
+	"case_invite.resent": "Case invitation resent",
+	"case_invite.revoked": "Case invitation withdrawn",
+	"case_invite.confirmed": "Case invitation confirmed",
+	"case_invite.declined": "Case invitation declined",
 };
 
 // `action` is a plain column, so an entry written by an older or newer build can
@@ -37,12 +42,15 @@ function actionDot(action: string) {
 	if (
 		action === "invite.accepted" ||
 		action === "user.unblocked" ||
-		action === "attorney.verified"
+		action === "attorney.verified" ||
+		action === "case_invite.confirmed"
 	) {
 		return "bg-success";
 	}
 	if (action === "user.blocked") return "bg-danger";
-	if (action.startsWith("invite.")) return "bg-brass-deep";
+	if (action.startsWith("invite.") || action.startsWith("case_invite.")) {
+		return "bg-brass-deep";
+	}
 	return "bg-ink-soft";
 }
 
@@ -160,12 +168,30 @@ export default async function AuditLogPage({
 								</Cell>
 
 								<Cell label="Actor">
-									<p className="truncate font-semibold text-[13.5px] text-ink">
-										{e.actor.name}
-									</p>
-									<p className="truncate text-[11.5px] text-muted-foreground">
-										{e.actor.email}
-									</p>
+									{/* Null where the act genuinely had no account behind it —
+									    an invited attorney declining from the emailed link. Said
+									    plainly rather than attributed to whoever was nearest. */}
+									{e.actor ? (
+										<>
+											<p className="truncate font-semibold text-[13.5px] text-ink">
+												{e.actor.name}
+											</p>
+											<p className="truncate text-[11.5px] text-muted-foreground">
+												{e.actor.email}
+											</p>
+										</>
+									) : (
+										<>
+											<p className="truncate font-semibold text-[13.5px] text-ink-soft">
+												Not signed in
+											</p>
+											{invitedEmail && (
+												<p className="truncate text-[11.5px] text-muted-foreground">
+													{invitedEmail}
+												</p>
+											)}
+										</>
+									)}
 								</Cell>
 
 								<Cell label="Action">
@@ -193,7 +219,8 @@ export default async function AuditLogPage({
 										>
 											{e.targetId}
 										</Link>
-									) : e.targetType === "invitation" ? (
+									) : e.targetType === "invitation" ||
+										e.targetType === "case_invitation" ? (
 										<p
 											className={cn(
 												"break-all",

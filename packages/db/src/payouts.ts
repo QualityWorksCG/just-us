@@ -1,3 +1,5 @@
+import type { CaseStatus } from "../prisma/generated/enums";
+import { designatedAttorneyWhere } from "./cases";
 import prisma from "./index";
 
 /**
@@ -119,9 +121,12 @@ export async function attorneyPayoutReadiness(input: {
 			status: { in: ["pending_payout", "live"] },
 			deletedAt: null,
 			// Both routes an attorney can be on a case — see `representingAttorney`.
+			// The email route carries its own conditions (`designatedAttorneyWhere`);
+			// its status allow-list intersects with the one above rather than widening
+			// it, so a `closed` case still can't be counted as work outstanding.
 			OR: [
 				{ match: { attorneyId: input.userId } },
-				{ attorneyEmail: { equals: input.email, mode: "insensitive" } },
+				designatedAttorneyWhere(input.email),
 			],
 		},
 		select: {
@@ -365,6 +370,7 @@ function accountHeldBy(account: CaseAccount, attorneyId: string): CaseAccount {
  * confirms, because a mistyped address is the one way this points at the wrong firm.
  */
 async function representingAttorney(k: {
+	status: CaseStatus;
 	attorneyEmail: string | null;
 	match: { attorney: RepresentingAttorney } | null;
 }): Promise<{
@@ -372,6 +378,11 @@ async function representingAttorney(k: {
 	via: "match" | "invited_email";
 } | null> {
 	if (k.match) return { attorney: k.match.attorney, via: "match" };
+	// A case that is still `draft` or `seeking` has not been committed to anybody.
+	// Since the invitation flow a `seeking` case can carry the typed address while
+	// the attorney it names has yet to answer, and resolving them here would name a
+	// firm on the plaintiff's payout screen that has agreed to nothing.
+	if (k.status === "draft" || k.status === "seeking") return null;
 	const email = k.attorneyEmail?.trim();
 	if (!email) return null;
 	const attorney = await prisma.user.findFirst({
@@ -407,7 +418,11 @@ export async function attorneyRepresentedCase(input: {
 			deletedAt: null,
 			OR: [
 				{ match: { attorneyId: input.userId } },
-				{ attorneyEmail: { equals: input.email, mode: "insensitive" } },
+				// A typed address alone is not authority to open a Stripe account against
+				// someone's case — see `designatedAttorneyWhere`. An attorney invited to a
+				// `seeking` case reaches this only after confirming, which writes the
+				// match the branch above reads.
+				designatedAttorneyWhere(input.email),
 			],
 		},
 		select: { id: true, title: true, status: true },
