@@ -50,6 +50,7 @@ export function CaseUpdatesBoard({
 	viewerFirstName,
 	backHref,
 	backLabel,
+	caseHref,
 	headingLevel = "h1",
 	highlightSince,
 	following,
@@ -68,6 +69,10 @@ export function CaseUpdatesBoard({
 	viewerFirstName: string | null;
 	backHref: Route;
 	backLabel: string;
+	/** This case's own page — where "Back this case" sends the reader, since the
+	 *  donate panel with the fee breakdown lives there. Separate from `backHref`:
+	 *  they happen to match today, but one is navigation and one is the donate path. */
+	caseHref: string;
 	headingLevel?: "h1" | "h2";
 	highlightSince?: Date | string | null;
 	following: boolean;
@@ -158,6 +163,7 @@ export function CaseUpdatesBoard({
 						<div className="mt-4 flex flex-col gap-2.5">
 							<BackCaseButton
 								label={hasDonated ? "Give again" : "Back this case"}
+								caseHref={caseHref}
 							/>
 							<ShareCaseButton sharePath={`/cases/${caseId}`} />
 						</div>

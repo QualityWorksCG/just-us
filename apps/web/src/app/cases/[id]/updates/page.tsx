@@ -58,6 +58,7 @@ export default async function PublicCaseUpdatesPage({
 					viewerFirstName={session?.user?.name?.split(/\s+/)[0] ?? null}
 					backHref={`/cases/${id}` as Route}
 					backLabel="Back to case"
+					caseHref={`/cases/${id}`}
 					following={following}
 					canFollow={!!viewerId && viewerId !== c.ownerId}
 					donation={donation}
