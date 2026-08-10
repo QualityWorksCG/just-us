@@ -195,7 +195,7 @@ export async function syncPayoutAccount(input: {
 		payoutsEnabled: input.payoutsEnabled,
 		syncedAt: new Date(),
 	};
-	return prisma.payoutAccount.upsert({
+	const account = await prisma.payoutAccount.upsert({
 		where: { caseId: input.caseId },
 		create: {
 			userId: input.userId,
@@ -205,6 +205,11 @@ export async function syncPayoutAccount(input: {
 		},
 		update: capabilities,
 	});
+	// An account that can now receive settles a live case that never got bound. See
+	// `bindReadyLiveCase` — without this the attorney finishes setup, their panel
+	// reads "Active", and the case still refuses every donation.
+	if (input.transfersEnabled) await bindReadyLiveCase(input.caseId);
+	return account;
 }
 
 /**
@@ -229,7 +234,7 @@ export async function applyAccountUpdate(input: {
 		select: { id: true },
 	});
 	if (!existing) return null;
-	return prisma.payoutAccount.update({
+	const account = await prisma.payoutAccount.update({
 		where: { id: existing.id },
 		data: {
 			detailsSubmitted: input.detailsSubmitted,
@@ -238,6 +243,14 @@ export async function applyAccountUpdate(input: {
 			syncedAt: new Date(),
 		},
 	});
+	// The moment Stripe clears an account is the moment its live case can finally
+	// take money — the webhook is the only thing watching, so it does the binding.
+	// `caseId` is nullable for accounts opened before payouts were per-case; those
+	// belong to no case and have nothing to bind.
+	if (account.transfersEnabled && account.caseId) {
+		await bindReadyLiveCase(account.caseId);
+	}
+	return account;
 }
 
 /**
@@ -566,6 +579,63 @@ export async function bindCasePayout(input: {
 		firmName: attorney.firmName?.trim() || null,
 		attorneyName: attorney.name,
 	};
+}
+
+/**
+ * Bind a **live but unbound** case to the account that is now able to receive.
+ *
+ * A live case with no `payoutAccountId` refuses every donation (`resolvePayoutDestination`
+ * returns `unbound`), and until now the only cure was the plaintiff pressing "Send
+ * donations to …" on their own payout panel. That left a state nobody could read their
+ * way out of: the attorney's panel says "Active", the case says "not accepting donations
+ * yet", and neither screen names the one click that joins them. Cases published before
+ * per-case payouts existed are all in exactly that state.
+ *
+ * Safe, because it takes no decision away from anyone:
+ *
+ *  - **Live only.** Publishing is the plaintiff's press and always stays theirs — for a
+ *    `pending_payout` case, binding *is* publishing (see `goLiveCase`), so this must
+ *    never touch one. A live case has already been published: its owner has decided it
+ *    is open, and this only makes that true.
+ *  - **Unbound only.** The invariant is "don't move the destination after donors were
+ *    shown one". An unbound case has shown no donor a recipient, which is the same
+ *    reasoning `bindCasePayout` already relies on.
+ *  - **No choice to make.** The destination is derived from the case's own attorney
+ *    link, exactly as in `resolveBindTarget` — neither an account nor an attorney is a
+ *    parameter here, so there is no input that could point a case at another firm.
+ *
+ * Idempotent, and returns whether it bound so callers can log or refresh. The status and
+ * null-account guards are repeated in the `updateMany` so two concurrent calls cannot
+ * both write.
+ */
+export async function bindReadyLiveCase(caseId: string): Promise<boolean> {
+	const k = await prisma.case.findFirst({
+		where: {
+			id: caseId,
+			status: "live",
+			payoutAccountId: null,
+			deletedAt: null,
+		},
+		select: REPRESENTING_SELECT,
+	});
+	if (!k) return false;
+
+	const representing = await representingAttorney(k);
+	if (!representing) return false;
+	const account = accountHeldBy(
+		k.payoutAccountForCase,
+		representing.attorney.id,
+	);
+	// `transfersEnabled` and nothing weaker: it is Stripe's own answer to "may this
+	// account receive", cached by the webhook. Binding on a submitted-but-unverified
+	// account would open a donate button whose charge then fails.
+	if (!account?.transfersEnabled) return false;
+
+	const res = await prisma.case.updateMany({
+		where: { id: k.id, status: "live", payoutAccountId: null },
+		data: { payoutRecipient: "attorney", payoutAccountId: account.id },
+	});
+	return res.count > 0;
 }
 
 /**

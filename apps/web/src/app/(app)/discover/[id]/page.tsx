@@ -5,7 +5,10 @@ import {
 	isCaseFollowing,
 	markCaseUpdatesSeenByFollower,
 } from "@just-us/db/follows";
-import { resolvePayoutDestination } from "@just-us/db/payouts";
+import {
+	bindReadyLiveCase,
+	resolvePayoutDestination,
+} from "@just-us/db/payouts";
 import { isCaseSaved } from "@just-us/db/saves";
 import {
 	donationPresets,
@@ -75,6 +78,10 @@ export default async function InAppCasePage({
 	// one it would offer — same case, same answer.
 	const owner = c.owner?.name ?? "A plaintiff";
 	const ownerFirst = owner.split(" ")[0];
+	// Bind a live case whose firm's account has since cleared, before the gate below
+	// is read — otherwise a donor browsing in-app is refused by a case that is in
+	// fact ready. No-ops unless the case is live and unbound.
+	await bindReadyLiveCase(c.id);
 	const [destination, mySupport] = await Promise.all([
 		resolvePayoutDestination(c.id),
 		donorSupportForCase({
