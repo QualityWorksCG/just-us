@@ -105,6 +105,12 @@ function sameDonorWhere(donation: {
  *
  * `donorsCount` counts *donors*, not donations, so it only increments when this
  * donor has no other succeeded donation to this case.
+ *
+ * Returns the donation's id alongside `applied` so the caller can act on the
+ * transition — the acknowledgement email hangs off exactly this signal. `applied`
+ * is true for the one delivery that actually moved the row, which is what makes
+ * "one email per donation" fall out of the same guard that makes "one increment
+ * per donation" true.
  */
 export async function markDonationSucceeded(input: {
 	stripeCheckoutSessionId: string;
@@ -112,7 +118,7 @@ export async function markDonationSucceeded(input: {
 	donorEmail: string | null;
 	/** Collected by Checkout. For a guest, the only name we will ever have. */
 	donorName?: string | null;
-}): Promise<{ applied: boolean }> {
+}): Promise<{ applied: boolean; donationId: string | null }> {
 	return prisma.$transaction(async (tx) => {
 		const donation = await tx.donation.findUnique({
 			where: { stripeCheckoutSessionId: input.stripeCheckoutSessionId },
@@ -125,7 +131,7 @@ export async function markDonationSucceeded(input: {
 			},
 		});
 		// No row means this session was not created by us — nothing to apply.
-		if (!donation) return { applied: false };
+		if (!donation) return { applied: false, donationId: null };
 
 		const claimed = await tx.donation.updateMany({
 			where: { id: donation.id, status: "pending" },
@@ -138,7 +144,7 @@ export async function markDonationSucceeded(input: {
 			},
 		});
 		// Already applied by an earlier delivery of the same event.
-		if (claimed.count === 0) return { applied: false };
+		if (claimed.count === 0) return { applied: false, donationId: donation.id };
 
 		// Use the email the webhook just supplied, if any — for a guest it is the
 		// only identifier, and it did not exist when the row was created.
@@ -164,7 +170,92 @@ export async function markDonationSucceeded(input: {
 				...(priorFromDonor === 0 ? { donorsCount: { increment: 1 } } : {}),
 			},
 		});
-		return { applied: true };
+		return { applied: true, donationId: donation.id };
+	});
+}
+
+/**
+ * Everything the acknowledgement email needs, in one read.
+ *
+ * The plaintiff's name and note are read *live* from the case rather than copied
+ * onto the donation, so a note edited before the email goes out sends as edited —
+ * the plaintiff's current words are the ones they mean.
+ *
+ * Only a `succeeded` donation is returned. Acknowledging a gift that has not been
+ * captured would thank someone for money that may never arrive.
+ */
+export async function getDonationForAcknowledgement(donationId: string) {
+	return prisma.donation.findFirst({
+		where: { id: donationId, status: "succeeded" },
+		select: {
+			id: true,
+			amountCents: true,
+			donorEmail: true,
+			donorName: true,
+			case: {
+				select: {
+					id: true,
+					title: true,
+					thankYouNote: true,
+					owner: { select: { name: true } },
+				},
+			},
+		},
+	});
+}
+
+/**
+ * Claim the right to send one donation's acknowledgement.
+ *
+ * The insert *is* the lock. Whoever creates the row sends; everyone else gets null
+ * back and does nothing, because the unique constraint on `donationId` rejects the
+ * second insert. That covers the two ways a duplicate would otherwise arise — a
+ * Stripe redelivery, and `donation-sync` reconciling the same session while the
+ * webhook is in flight — without a read-then-write window between them.
+ *
+ * Reserved *before* the provider call, never after: a process that dies between
+ * sending and recording must not leave the next delivery free to send again. The
+ * cost of that ordering is that a crash mid-send yields a donation whose row says
+ * `sent` when it may not have been — the right trade, since a donor receiving no
+ * thank-you is a gap, and one receiving two is a mistake they can see.
+ */
+export async function reserveDonationAcknowledgement(input: {
+	donationId: string;
+	recipientEmail: string | null;
+	status: "sent" | "skipped" | "failed";
+	reason?: string;
+}): Promise<{ id: string } | null> {
+	try {
+		return await prisma.donationAcknowledgement.create({
+			data: input,
+			select: { id: true },
+		});
+	} catch {
+		// Unique violation: someone else already holds this donation's send.
+		return null;
+	}
+}
+
+/** Stamp the reserved row once the provider has accepted the email. */
+export async function markDonationAcknowledgementSent(donationId: string) {
+	return prisma.donationAcknowledgement.update({
+		where: { donationId },
+		data: { status: "sent", sentAt: new Date(), reason: null },
+	});
+}
+
+/**
+ * Record that the provider rejected it. Terminal by design — the reservation is
+ * still held, so nothing retries and re-sends behind our back. A failed row is a
+ * work-list entry for a human, not a queue.
+ */
+export async function markDonationAcknowledgementFailed(
+	donationId: string,
+	reason = "provider_error",
+) {
+	return prisma.donationAcknowledgement.update({
+		where: { donationId },
+		data: { status: "failed", sentAt: null, reason },
 	});
 }
 

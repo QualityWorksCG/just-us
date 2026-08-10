@@ -4,6 +4,33 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
 	typedRoutes: true,
 	reactCompiler: true,
+	// Ship libvips with the route that uses `sharp`.
+	//
+	// Tracing follows `require()`, and that is enough to find `sharp` itself and
+	// its platform binary — but the binary reaches libvips through `dlopen`, which
+	// no static trace can see. So `@img/sharp-linux-x64/sharp.node` lands in the
+	// bundle and the `libvips-cpp.so` it links against does not, and the route
+	// fails at runtime with ERR_DLOPEN_FAILED the first time it touches an image.
+	// The failure only appears once deployed: locally the file is simply there.
+	//
+	// Three things about this glob are load-bearing:
+	//
+	//   - It points into Bun's store rather than at `node_modules/@img`, whose
+	//     entries are symlinks, because the *real* files have to be copied.
+	//   - It stops at `lib/`. Matching a package root would include the symlinked
+	//     directory itself, and Vercel rejects the deployment outright for that
+	//     ("invalid deployment package… files in symlinked directories").
+	//   - It names `sharp-libvips-*` specifically. The sibling `sharp-<platform>`
+	//     packages are already traced through `require()`; libvips is the only gap.
+	//
+	// Paths are relative to this app, not to the tracing root Next infers for the
+	// workspace. Platform packages absent from the build machine match nothing, so
+	// this is correct on Linux CI and on a developer's Mac alike.
+	outputFileTracingIncludes: {
+		"/settings": [
+			"../../node_modules/.bun/@img+sharp-libvips-*/node_modules/@img/*/lib/**/*",
+		],
+	},
 	// Avatar files are normalized server-side before they reach private storage.
 	// The product limit is 2 MB; leave a small margin for multipart form data.
 	experimental: {

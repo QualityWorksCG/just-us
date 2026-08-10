@@ -5,6 +5,7 @@ import {
 } from "@just-us/db/donations";
 import { env } from "@just-us/env/server";
 import { isPaymentsConfigured, type Stripe, stripe } from "@just-us/payments";
+import { sendDonationAcknowledgement } from "@/lib/donation-acknowledgement";
 
 /**
  * The donation ledger webhook.
@@ -58,7 +59,7 @@ export async function POST(request: Request): Promise<Response> {
 				// `payment_status` guards the one gap in Checkout: a session can complete
 				// while payment is still processing, and only `paid` means money moved.
 				if (session.payment_status !== "paid") break;
-				await markDonationSucceeded({
+				const { applied, donationId } = await markDonationSucceeded({
 					stripeCheckoutSessionId: session.id,
 					stripePaymentIntentId: idOf(session.payment_intent),
 					// For a guest this is the *only* identity we get, and it arrives here
@@ -68,6 +69,13 @@ export async function POST(request: Request): Promise<Response> {
 						session.customer_details?.email ?? session.customer_email ?? null,
 					donorName: session.customer_details?.name ?? null,
 				});
+				// The acknowledgement rides on the same transition the totals do, so a
+				// redelivery that changes nothing also mails nothing. It never throws —
+				// a mail failure must not turn into a 500 and make Stripe redeliver a
+				// payment event.
+				if (applied && donationId) {
+					await sendDonationAcknowledgement(donationId);
+				}
 				break;
 			}
 

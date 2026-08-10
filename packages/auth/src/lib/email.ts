@@ -2,6 +2,9 @@ import AdminInviteEmail, {
 	adminInviteSubject,
 } from "@just-us/email/admin-invite";
 import CaseInviteEmail, { caseInviteSubject } from "@just-us/email/case-invite";
+import DonationThankYouEmail, {
+	donationThankYouSubject,
+} from "@just-us/email/donation-thank-you";
 import MagicLinkEmail, { magicLinkSubject } from "@just-us/email/magic-link";
 import NewMessageEmail, { newMessageSubject } from "@just-us/email/new-message";
 import ResetPasswordEmail, {
@@ -131,6 +134,38 @@ export function sendCaseInviteEmail(params: {
 			attorneyName: params.attorneyName,
 			hasAccount: params.hasAccount,
 			expiresInDays: params.expiresInDays,
+		}),
+	});
+}
+
+/**
+ * The donor acknowledgement for one successful donation — confirmation of the
+ * gift plus the plaintiff's own thank-you note.
+ *
+ * Sending is guarded upstream, not here: the caller must already hold the
+ * donation's `DonationAcknowledgement` reservation, which is what makes this
+ * exactly one email per donation across webhook redeliveries and read-time
+ * reconciliation alike. Calling it without that reservation will send a duplicate.
+ */
+export function sendDonationThankYouEmail(params: {
+	to: string;
+	url: string;
+	caseTitle: string;
+	amountLabel: string;
+	donorName?: string | null;
+	thankYouNote?: string | null;
+	plaintiffName?: string | null;
+}) {
+	return send({
+		to: params.to,
+		subject: donationThankYouSubject,
+		react: DonationThankYouEmail({
+			url: params.url,
+			caseTitle: params.caseTitle,
+			amountLabel: params.amountLabel,
+			donorName: params.donorName,
+			thankYouNote: params.thankYouNote,
+			plaintiffName: params.plaintiffName,
 		}),
 	});
 }
