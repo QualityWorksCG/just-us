@@ -161,3 +161,18 @@ enum DonationStatus {
   failed
   refunded
 }
+
+/// Outcome of the donor acknowledgement for one donation — see
+/// `DonationAcknowledgement`.
+///
+///   sent    — handed to the email provider and accepted.
+///   skipped — deliberately not sent, and why is on the row. A guest checkout
+///             that yielded no email is the usual cause; there is nowhere to
+///             send, and that is a fact about the donation, not a failure.
+///   failed  — the provider rejected it. Terminal: the reservation is already
+///             taken, so nothing retries on its own.
+enum DonationAcknowledgementStatus {
+  sent
+  skipped
+  failed
+}

@@ -51,6 +51,9 @@ import { CASE_CATEGORIES } from "@/lib/case-categories";
 
 const CATEGORIES = CASE_CATEGORIES;
 
+/** Mirrors the cap in `editCaseSchema` — the note is email copy, not an essay. */
+const THANK_YOU_MAX = 600;
+
 export type ManageCaseData = {
 	id: string;
 	title: string;
@@ -66,6 +69,8 @@ export type ManageCaseData = {
 	sharesCount: number;
 	coverImageUrl: string | null;
 	images: string[];
+	/** The plaintiff's thank-you, sent to every donor. Null when unwritten. */
+	thankYouNote: string | null;
 	attorneyName: string | null;
 	attorneyFirm: string | null;
 	attorneyArea: string | null;
@@ -178,6 +183,7 @@ export function ManageCase({
 		title: useId(),
 		summary: useId(),
 		story: useId(),
+		thankYouNote: useId(),
 	};
 
 	const [tab, setTab] = useState<"overview" | "edit">("overview");
@@ -187,6 +193,7 @@ export function ManageCase({
 	const [state, setState] = useState(data.location);
 	const [summary, setSummary] = useState(data.summary);
 	const [story, setStory] = useState(data.story);
+	const [thankYouNote, setThankYouNote] = useState(data.thankYouNote ?? "");
 	const [coverUrl, setCoverUrl] = useState<string | null>(data.coverImageUrl);
 	const [images, setImages] = useState<string[]>(data.images);
 	const [uploadingCover, setUploadingCover] = useState(false);
@@ -219,6 +226,7 @@ export function ManageCase({
 		state !== data.location ||
 		summary !== data.summary ||
 		story !== data.story ||
+		thankYouNote !== (data.thankYouNote ?? "") ||
 		coverUrl !== data.coverImageUrl ||
 		images.join("|") !== data.images.join("|");
 
@@ -274,6 +282,7 @@ export function ManageCase({
 				story: story.trim(),
 				coverImageUrl: coverUrl,
 				images,
+				thankYouNote: thankYouNote.trim() || null,
 			});
 			if (res.ok) {
 				toast.success("Changes saved.");
@@ -587,6 +596,33 @@ export function ManageCase({
 									rows={7}
 									placeholder="What happened, when, and what it's cost you."
 								/>
+							</div>
+
+							{/* Sent inside the acknowledgement email every donor receives, so
+							    the character cap matches the server's — a note that fails to
+							    save is worse discovered here than after a donation. */}
+							<div>
+								<label
+									htmlFor={ids.thankYouNote}
+									className="mb-1.5 block font-semibold text-[13px] text-ink"
+								>
+									Thank-you note to your donors
+								</label>
+								<Textarea
+									id={ids.thankYouNote}
+									value={thankYouNote}
+									onChange={(e) =>
+										setThankYouNote(e.target.value.slice(0, THANK_YOU_MAX))
+									}
+									rows={4}
+									maxLength={THANK_YOU_MAX}
+									placeholder="Say thank you in your own words — every donor gets this with their confirmation."
+								/>
+								<p className="mt-1.5 text-ink-soft text-label">
+									{thankYouNote.trim()
+										? `Sent to every donor with their confirmation. ${THANK_YOU_MAX - thankYouNote.length} characters left.`
+										: "Optional. Without one, donors still get a confirmation — just no note from you."}
+								</p>
 							</div>
 						</div>
 					</section>

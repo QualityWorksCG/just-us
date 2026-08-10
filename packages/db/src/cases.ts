@@ -474,6 +474,8 @@ export type CaseEditFields = {
 	story?: string;
 	coverImageUrl?: string | null;
 	images?: string[];
+	/** Null clears it, which sends acknowledgements as a plain confirmation. */
+	thankYouNote?: string | null;
 };
 
 /** Update editable fields on an owned, non-deleted case, preserving its status.
@@ -492,6 +494,8 @@ export async function updateOwnedCase(
 	if (fields.coverImageUrl !== undefined)
 		data.coverImageUrl = fields.coverImageUrl;
 	if (fields.images !== undefined) data.images = fields.images;
+	if (fields.thankYouNote !== undefined)
+		data.thankYouNote = fields.thankYouNote;
 	return prisma.case.updateMany({
 		where: { id, ownerId, deletedAt: null },
 		data,

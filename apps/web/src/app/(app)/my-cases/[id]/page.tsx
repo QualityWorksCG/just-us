@@ -92,6 +92,7 @@ export default async function CasePage({
 		sharesCount: c.sharesCount,
 		coverImageUrl: c.coverImageUrl,
 		images: c.images ?? [],
+		thankYouNote: c.thankYouNote,
 		attorneyName: c.attorneyName,
 		attorneyFirm: c.attorneyFirm,
 		attorneyArea: c.attorneyArea,

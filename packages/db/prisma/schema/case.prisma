@@ -46,6 +46,16 @@ model Case {
   coverImageUrl String?
   images        String[] @default([])
 
+  /// The plaintiff's own words to the people who back them, sent inside every
+  /// donation acknowledgement. Written once and reused for every donor rather
+  /// than composed per gift: a plaintiff cannot write a note per donation, and a
+  /// thank-you that arrives days later is not an acknowledgement.
+  ///
+  /// Null until they write one, and the acknowledgement then sends as a plain
+  /// confirmation — a generic note signed with a real person's name reads worse
+  /// than no note at all.
+  thankYouNote String?
+
   // Step 3 — chosen attorney + agreed fee. Fee is the funding goal, in cents.
   attorneyName     String?
   attorneyFirm     String?
@@ -262,6 +272,9 @@ model Donation {
   succeededAt DateTime?
   refundedAt  DateTime?
 
+  /// The thank-you sent for this gift. Absent until the donation succeeds.
+  acknowledgement DonationAcknowledgement?
+
   @@index([donorId])
   // Guest donations are found by email — both for `donorsCount` and for attaching
   // them to an account the donor makes later.
@@ -271,6 +284,42 @@ model Donation {
   // checkouts, and that sweep is the only query that scans by status.
   @@index([status])
   @@map("donation")
+}
+
+/// The donor acknowledgement sent for one succeeded donation — confirmation plus
+/// the plaintiff's thank-you note.
+///
+/// **One row per donation, and the row is taken before the provider is called.**
+/// Two independent paths mark a donation succeeded — the Stripe webhook, which
+/// Stripe redelivers, and the read-time reconciliation in `donation-sync` — so
+/// "send after marking succeeded" would send twice given the wrong ordering. The
+/// unique constraint on `donationId` is what makes the second attempt lose, and
+/// reserving *before* the send (rather than recording after it) is what keeps a
+/// crash mid-send from re-sending on the next delivery. Same shape, and for the
+/// same reason, as `MessageEmailDelivery`.
+///
+/// A `skipped` row is a deliberate non-send — most often a donation with no
+/// email on it — recorded rather than left absent so the acknowledgement of every
+/// donation is accounted for, not merely missing.
+model DonationAcknowledgement {
+  id         String   @id @default(cuid())
+  donation   Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+  donationId String   @unique
+
+  /// The address it went to, as of the send. Held here rather than read back
+  /// through the donation because a guest can later claim their donations to an
+  /// account with a different address, and "where did this actually go" has to
+  /// stay answerable afterwards.
+  recipientEmail String?
+
+  status    DonationAcknowledgementStatus
+  /// Why, for `skipped` and `failed`. Free text, read by humans only.
+  reason    String?
+  createdAt DateTime                      @default(now())
+  sentAt    DateTime?
+
+  @@index([status, createdAt])
+  @@map("donation_acknowledgement")
 }
 
 // Lifecycle of an attorney's expression of interest. JUS-25 words these as

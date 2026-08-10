@@ -281,6 +281,14 @@ const editCaseSchema = z.object({
 	story: z.string().trim().min(10, "Tell your story."),
 	coverImageUrl: z.string().url().nullish(),
 	images: z.array(z.string().url()).optional(),
+	// The note sent to every donor. Emptied to null rather than to "" so the
+	// acknowledgement's "did they write one" check stays a null check.
+	thankYouNote: z
+		.string()
+		.trim()
+		.max(600, "Keep your thank-you under 600 characters.")
+		.nullish()
+		.transform((v) => (v ? v : null)),
 });
 
 export type EditCaseInput = z.infer<typeof editCaseSchema>;

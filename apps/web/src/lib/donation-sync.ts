@@ -5,6 +5,7 @@ import {
 	markDonationSucceeded,
 } from "@just-us/db/donations";
 import { isPaymentsConfigured, stripe } from "@just-us/payments";
+import { sendDonationAcknowledgement } from "./donation-acknowledgement";
 
 /**
  * Catching a donation up with Stripe on read.
@@ -53,7 +54,7 @@ export async function syncDonationBySession(
 		);
 		if (session.payment_status !== "paid") return { settled: false };
 
-		await markDonationSucceeded({
+		const { applied, donationId } = await markDonationSucceeded({
 			stripeCheckoutSessionId: session.id,
 			stripePaymentIntentId:
 				typeof session.payment_intent === "string"
@@ -63,6 +64,14 @@ export async function syncDonationBySession(
 				session.customer_details?.email ?? session.customer_email ?? null,
 			donorName: session.customer_details?.name ?? null,
 		});
+		// This path is the *only* one that runs where no webhook is forwarding — every
+		// local environment, and any deployment during a delivery outage — so the
+		// acknowledgement has to hang off it too, not off the webhook alone. Sending
+		// twice is not the risk: the reservation inside decides, and only one of the
+		// two paths can hold it.
+		if (applied && donationId) {
+			await sendDonationAcknowledgement(donationId);
+		}
 		// Settled either way: `applied: false` here means the webhook got there first,
 		// which is still a paid donation now folded into the case.
 		return { settled: true };
