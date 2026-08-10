@@ -74,7 +74,7 @@ export const HELP_SECTIONS: HelpSection[] = [
 	{
 		slug: "where-things-live",
 		title: "Where to find things in the app",
-		body: "Every signed-in user lands on their dashboard. Plaintiffs have My cases, Find an attorney, My representation, Case updates, Messages, and Verification. Donors have Discover cases, Saved, My donations, and Updates. Attorneys have the representation queue as their dashboard, plus My cases and their Directory profile. Administrators have Moderation, Campaigns, Users, Configuration, and the Audit log. Some screens are still being built and say so when opened. Donations are not yet switched on — backing a case currently says donations are coming soon.",
+		body: "Every signed-in user lands on their dashboard. Plaintiffs have My cases, Find an attorney, My representation, Case updates, Messages, and Verification. Donors have Discover cases, Saved, My donations, and Updates. Attorneys have the representation queue as their dashboard, plus My cases and their Directory profile. Administrators have Moderation, Campaigns, Users, Configuration, and the Audit log. Some screens are still being built and say so when opened. Backing a case takes you to that case's page, where you pick an amount, see the 5% fee to the cent, and pay through Stripe — no account needed. A case that isn't live, or hasn't finished setting up where its donations go, says so in place of the amount picker.",
 	},
 	{
 		slug: "unanswered",

@@ -51,6 +51,7 @@ export default async function DiscoverCaseUpdatesPage({
 				viewerFirstName={session.user.name.split(/\s+/)[0] ?? null}
 				backHref={`/discover/${id}` as Route}
 				backLabel="Back to case"
+				caseHref={`/discover/${id}`}
 				headingLevel="h2"
 				highlightSince={highlightSince}
 				following={following}
