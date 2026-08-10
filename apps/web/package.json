@@ -8,7 +8,8 @@
 		"test:jus65": "tsx jus65-check.ts",
 		"start": "next start",
 		"e2e:jus67": "bun jus67-e2e.ts",
-		"e2e:jus68": "bun jus68-e2e.ts"
+		"e2e:jus68": "bun jus68-e2e.ts",
+		"e2e:jus81": "bun jus81-e2e.ts"
 	},
 	"dependencies": {
 		"@ai-sdk/react": "^4.0.51",
