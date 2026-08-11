@@ -576,6 +576,7 @@ export function CaseWizard({
 				phone: attorney?.phone,
 			},
 			evidence,
+			thankYouNote: thankYouNote.trim() || null,
 			coverImageUrl: coverUrl,
 			images: moreImages,
 		});
