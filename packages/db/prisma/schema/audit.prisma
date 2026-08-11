@@ -2,9 +2,18 @@
 // transaction as the mutation it records. The actor relation deliberately
 // doesn't cascade — audit history must survive its actor.
 model AuditLog {
-  id      String @id @default(cuid())
-  actorId String
-  actor   User   @relation("AuditLogActor", fields: [actorId], references: [id])
+  id String @id @default(cuid())
+
+  /// Who did it, when that is a JustUs account. **Null when nobody was signed
+  /// in** — an attorney can decline a case invitation from the emailed link
+  /// alone, and recording that against the plaintiff who sent it would make the
+  /// log assert the opposite of what happened. Screens render "not signed in";
+  /// the metadata carries whatever else is known about the actor.
+  /// `Restrict` is stated rather than left to default: an optional relation
+  /// defaults to SetNull, which would quietly strip attribution from history the
+  /// moment an account was removed.
+  actorId String?
+  actor   User?   @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: Restrict)
 
   // Dot-namespaced verb ("user.blocked", "invite.created", ...). The allowlist
   // lives in packages/db/src/audit.ts.

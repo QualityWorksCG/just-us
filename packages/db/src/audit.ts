@@ -16,14 +16,26 @@ export const AUDIT_ACTIONS = [
 	"case.removed",
 	"case.restored",
 	"case.messaged",
+	// Bring-your-own-attorney invitations. Namespaced apart from the `invite.*`
+	// verbs above because they invite a different thing — representation of one
+	// case, not an administrator account — and the admin audit screen should be
+	// able to tell the two apart at a glance.
+	"case_invite.created",
+	"case_invite.resent",
+	"case_invite.revoked",
+	"case_invite.confirmed",
+	"case_invite.declined",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export type AuditEntry = {
-	actorId: string;
+	/** Null only where the action genuinely has no account behind it — declining a
+	 *  case invitation from the emailed link is the one such act. Attributing it to
+	 *  somebody else would be worse than leaving it unattributed. */
+	actorId: string | null;
 	action: AuditAction;
-	targetType?: "user" | "invitation" | "case";
+	targetType?: "user" | "invitation" | "case" | "case_invitation";
 	targetId?: string;
 	reason?: string;
 	metadata?: Prisma.InputJsonValue;

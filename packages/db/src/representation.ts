@@ -3,7 +3,12 @@ import type {
 	MatchOrigin,
 	RequestStatus,
 } from "../prisma/generated/enums";
-import { type CaseEvidence, caseEvidence } from "./cases";
+import { pendingCaseInvitationWhere } from "./case-invitations";
+import {
+	type CaseEvidence,
+	caseEvidence,
+	designatedAttorneyWhere,
+} from "./cases";
 import prisma from "./index";
 
 /**
@@ -86,13 +91,23 @@ const detailSelect = {
 } as const;
 
 /**
- * A case is in the queue only while it is genuinely seeking representation.
+ * A case is in the queue only while it is genuinely seeking representation, and
+ * that is decided by two records: whether it has a `Match`, and whether an
+ * invitation to a named attorney is still awaiting an answer.
  *
- * Two independent checks stand for "not already matched", because there are two
- * ways a case can have an attorney: `match` is the record this story writes, and
- * `attorneyName` catches the bring-your-own path (JUS-23), which sets an attorney
- * on the case directly without one. Either one present means the case is spoken
- * for, and neither implies the other.
+ * A match means the case is represented and settled. A *pending* invitation
+ * means the plaintiff has asked someone specific and has not heard back — the
+ * case is spoken for provisionally, and putting it in front of other attorneys
+ * in the meantime would invite two of them to work on the same matter.
+ *
+ * The plaintiff's typed `attorneyName` used to stand in for the second test, and
+ * it was the wrong record: a name is a label, and the attorney behind it may
+ * never have been contacted, may have declined, or may never answer. Naming one
+ * removed the case from the queue permanently, with nothing that could ever put
+ * it back. Reading invitations instead makes the queue self-correcting — a
+ * decline, a revoke, or a lapsed invitation stops being pending, and the case
+ * returns here on its own with no write to the case at all. See
+ * `pendingCaseInvitationWhere`.
  */
 function queueWhere(filters: QueueFilters = {}) {
 	return {
@@ -102,7 +117,7 @@ function queueWhere(filters: QueueFilters = {}) {
 		// (Reg. & Ops §3–4) — the attorney queue is a visibility surface too.
 		moderationStatus: "ok" as const,
 		match: { is: null },
-		attorneyName: null,
+		invitations: { none: pendingCaseInvitationWhere(new Date()) },
 		...(filters.category ? { category: filters.category } : {}),
 		...(filters.state ? { location: filters.state } : {}),
 	};
@@ -399,10 +414,16 @@ export async function listMyInterests(attorneyId: string) {
  * The cases an attorney is actually acting on — their "My cases" screen.
  *
  * Two routes attach an attorney to a case, and both count, because both can fund:
- * an accepted expression of interest writes a `Match`, and the bring-your-own path
- * (JUS-23) writes only the plaintiff's chosen `attorneyEmail`. The same pair is
- * what the payout layer binds money on, so a case that can pay this attorney is a
- * case that appears here.
+ * an accepted expression of interest writes a `Match`, and older bring-your-own
+ * cases carry only the plaintiff's typed `attorneyEmail`. The same pair is what the
+ * payout layer binds money on, so a case that can pay this attorney is a case that
+ * appears here.
+ *
+ * The email route is deliberately the narrow one — see `designatedAttorneyWhere`.
+ * A typed address is the plaintiff's assertion, not an agreement, so it only reaches
+ * a case that has already been committed to that attorney and has no `Match` of its
+ * own. Every case published through the invitation flow is `seeking` until the
+ * attorney confirms, and confirming writes the `Match` that the first branch reads.
  *
  * Drafts are excluded. A draft is private to the plaintiff — it is not published
  * to anyone, including an attorney named in it — and there is nothing an attorney
@@ -426,10 +447,7 @@ function myCasesWhere(userId: string, email: string) {
 		status: {
 			in: ["seeking", "pending_payout", "live", "closed"] as CaseStatus[],
 		},
-		OR: [
-			{ match: { attorneyId: userId } },
-			{ attorneyEmail: { equals: email, mode: "insensitive" as const } },
-		],
+		OR: [{ match: { attorneyId: userId } }, designatedAttorneyWhere(email)],
 	};
 }
 

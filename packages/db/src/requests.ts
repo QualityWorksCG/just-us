@@ -5,6 +5,7 @@ import type {
 	VerificationStatus,
 } from "../prisma/generated/enums";
 import { averageRating } from "./attorney-directory";
+import { pendingInvitationsForCases } from "./case-invitations";
 import prisma from "./index";
 
 /**
@@ -442,6 +443,15 @@ export type RepresentationCase = {
 	 *  still owed. */
 	openInterest: number;
 	newInterest: number;
+	/**
+	 * The attorney the plaintiff named, who has yet to answer.
+	 *
+	 * Set only while the invitation is live. Its presence is the difference
+	 * between "out to attorneys" and "out to exactly one attorney, and hidden from
+	 * everyone else" — two states the plaintiff's screens read as one otherwise,
+	 * and only one of which explains a week of silence.
+	 */
+	pendingInvitation: { email: string; expiresAt: Date } | null;
 };
 
 export async function listRepresentation(
@@ -483,15 +493,25 @@ export async function listRepresentation(
 
 	// The addresses on cases nobody was matched to. Resolved in one query rather
 	// than per case, and only for cases that need it.
-	const designated = await designatedAttorneys(
-		cases.filter((k) => !k.match).map((k) => k.attorneyEmail),
-	);
+	const [designated, invitations] = await Promise.all([
+		designatedAttorneys(
+			cases.filter((k) => !k.match).map((k) => k.attorneyEmail),
+		),
+		pendingInvitationsForCases(cases.filter((k) => !k.match).map((k) => k.id)),
+	]);
 
 	return cases.map((k) => {
-		const attorney = toRepresentationAttorney(
-			k,
-			designated.get(k.attorneyEmail?.trim().toLowerCase() ?? "") ?? null,
-		);
+		const invitation = invitations.get(k.id) ?? null;
+		// An unanswered invitation is not representation. Reporting the typed name
+		// as "your attorney" would tell the plaintiff they have one while the case
+		// sits held back from every attorney, waiting on somebody who has agreed to
+		// nothing — the two facts they most need told apart.
+		const attorney = invitation
+			? null
+			: toRepresentationAttorney(
+					k,
+					designated.get(k.attorneyEmail?.trim().toLowerCase() ?? "") ?? null,
+				);
 		const counts = interests[k.id];
 		return {
 			id: k.id,
@@ -507,8 +527,14 @@ export async function listRepresentation(
 			attorney,
 			origin: k.match?.origin ?? null,
 			matchedAt: k.match?.createdAt ?? null,
-			openInterest: attorney ? 0 : (counts?.open ?? 0),
-			newInterest: attorney ? 0 : (counts?.unseen ?? 0),
+			// Nobody can express interest in a case an invitation is holding back, so
+			// the counts are zero for the same reason they are zero once an attorney
+			// is settled: there is no decision owed.
+			openInterest: attorney || invitation ? 0 : (counts?.open ?? 0),
+			newInterest: attorney || invitation ? 0 : (counts?.unseen ?? 0),
+			pendingInvitation: invitation
+				? { email: invitation.email, expiresAt: invitation.expiresAt }
+				: null,
 		};
 	});
 }

@@ -1,3 +1,4 @@
+import type { CaseStatus } from "../prisma/generated/enums";
 import prisma from "./index";
 
 export type CaseAttorney = {
@@ -178,10 +179,17 @@ export async function publishCase(
 }
 
 /**
- * Publish a case out to attorneys (the "no attorney yet" path). The case
- * becomes `seeking` — visible to attorneys who can request it — without a
- * funding goal, which is set once an attorney is chosen. Updates in place when
- * `id` is given. Returns id + status.
+ * Publish a case out to attorneys. The case becomes `seeking` — no attorney is
+ * committed to it, so it is visible to every bar-verified attorney browsing the
+ * queue, unless an invitation to a named attorney is still awaiting an answer.
+ *
+ * Two paths land here: "no attorney yet" (no fee, no attorney fields) and the
+ * bring-your-own path, which carries the agreed fee and the plaintiff's typed
+ * attorney details and pairs this with an invitation.
+ *
+ * Updates in place when `id` is given. Returns id + status — **and the caller has
+ * to read that status**, because a case that refuses to move is reported rather
+ * than duplicated.
  */
 export async function publishForAttorneys(
 	input: { ownerId: string; id?: string } & CaseFields,
@@ -196,20 +204,61 @@ export async function publishForAttorneys(
 			where: {
 				id: input.id,
 				ownerId: input.ownerId,
-				// Only pre-public states publish out to attorneys. A live, pending, or
-				// closed case must not be walked back here — closing is terminal, and a
-				// closed case can never reopen; the plaintiff starts a new case instead.
+				// The same allow-list `publishCase` applies, and for the same reason:
+				// `seeking` is a *less* public state than `live` and a less committed one
+				// than `pending_payout`. Re-running the wizard against the id of a case
+				// that is already raising, or already handed to its attorney, must not
+				// walk it backwards — donors are on the first and a firm is set up on the
+				// second. `closed` is final, and can never reopen.
 				status: { in: ["draft", "seeking"] },
 			},
 			data,
 		});
 		if (res.count > 0) return { id: input.id, status: "seeking" as const };
+		// Nothing updated. Either the id belongs to someone else, in which case a
+		// fresh case is the right answer, or it is this owner's case in a status that
+		// refuses to publish — and creating a second copy of it would be the worst
+		// possible response.
+		const existing = await prisma.case.findFirst({
+			where: { id: input.id, ownerId: input.ownerId },
+			select: { id: true, status: true },
+		});
+		if (existing) return existing;
 	}
 	const created = await prisma.case.create({
 		data: { ownerId: input.ownerId, ...data },
 		select: { id: true, status: true },
 	});
 	return created;
+}
+
+/**
+ * Undo a `seeking` publish that never completed — back to a private draft.
+ *
+ * The bring-your-own path publishes the case and then writes its invitation, and
+ * those cannot be one statement. If the second half fails, the case is sitting in
+ * a queue every bar-verified attorney reads, with its story and the plaintiff's
+ * name, at the moment the screen is telling them nothing was sent. This is how
+ * that gets taken back.
+ *
+ * Refuses anything that has moved on: a match, a bound payout account, or any
+ * status other than `seeking`. `publishedAt` is left where it was — the case has
+ * been published before and pretending otherwise would rewrite history.
+ * Returns whether it took.
+ */
+export async function revertSeekingToDraft(id: string, ownerId: string) {
+	const res = await prisma.case.updateMany({
+		where: {
+			id,
+			ownerId,
+			status: "seeking",
+			deletedAt: null,
+			match: { is: null },
+			payoutAccountId: null,
+		},
+		data: { status: "draft" },
+	});
+	return res.count > 0;
 }
 
 /** The plaintiff's most recent in-progress draft, if any, to resume. */
@@ -223,6 +272,42 @@ export async function getResumableDraft(ownerId: string) {
 /** A specific case owned by the plaintiff — used to resume a chosen draft. */
 export async function getOwnedCase(id: string, ownerId: string) {
 	return prisma.case.findFirst({ where: { id, ownerId } });
+}
+
+/**
+ * The one narrow circumstance in which the plaintiff's typed `attorneyEmail` is
+ * enough to reach a case — **an authorization fragment**, not a lookup.
+ *
+ * `attorneyEmail` is free text the plaintiff entered. It is an assertion about who
+ * they intend to instruct, and on its own it proves nothing: the address may be
+ * mistyped, the person behind it may never have agreed, may have declined, or may
+ * have been replaced. Treating it as a key by itself would hand the story, the
+ * evidence and the case's Stripe onboarding to whoever holds that address.
+ *
+ * So two conditions travel with it everywhere it is used:
+ *
+ *   - **the case has no `Match`.** A match is settled representation and names a
+ *     `User`; where one exists it is the only answer, and the previous designee
+ *     must lose access the moment the plaintiff takes someone else forward.
+ *     `acceptInterest` overwrites the typed attorney *name* but not the address,
+ *     so without this the old one would keep it forever.
+ *   - **the case is already committed to that attorney** — `pending_payout`,
+ *     `live`, or `closed`. A `draft` is private, and a `seeking` case is one the
+ *     plaintiff has published *asking* for representation. Since the invitation
+ *     flow, a `seeking` case can carry the typed address while the named attorney
+ *     has yet to answer; access before that answer is exactly what the invitation
+ *     exists to withhold. Confirming writes the `Match` and moves the case on, and
+ *     from there the first branch carries them.
+ *
+ * Pre-invitation cases keep working: they reached `pending_payout` through
+ * `publishCase` with no match, which is precisely what this describes.
+ */
+export function designatedAttorneyWhere(email: string) {
+	return {
+		match: { is: null },
+		status: { in: ["pending_payout", "live", "closed"] as CaseStatus[] },
+		attorneyEmail: { equals: email, mode: "insensitive" as const },
+	};
 }
 
 /**
@@ -307,9 +392,10 @@ export function caseEvidence(json: unknown, caseId: string): CaseEvidence[] {
  *
  * Two people may open a case's documents: the plaintiff who filed them, and the
  * attorney actually representing the case. Both are re-derived from the case row
- * rather than trusted from the request, and an attorney *browsing* the queue is
- * deliberately not among them — the queue view says documents are shared once you
- * are representing the matter, and this is where that holds.
+ * rather than trusted from the request. Neither an attorney *browsing* the queue
+ * nor one who has merely been *named* on a case they have not confirmed is among
+ * them — the queue view says documents are shared once you are representing the
+ * matter, and this is where that holds. See `designatedAttorneyWhere`.
  *
  * Returns null for every failure — wrong case, wrong viewer, no such entry, an
  * entry that is not a stored file — so the caller answers all of them with a 404
@@ -329,7 +415,7 @@ export async function caseEvidenceFile(input: {
 			OR: [
 				{ ownerId: input.viewerId },
 				{ match: { attorneyId: input.viewerId } },
-				{ attorneyEmail: { equals: input.viewerEmail, mode: "insensitive" } },
+				designatedAttorneyWhere(input.viewerEmail),
 			],
 		},
 		select: { evidence: true },
