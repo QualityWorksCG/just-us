@@ -1,11 +1,13 @@
 import type { Role } from "@just-us/auth";
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
+import { listUpdatesForBacker } from "@just-us/db/case-updates";
 import { listOwnedCases } from "@just-us/db/cases";
-import { donorStats } from "@just-us/db/donations";
+import { donorStats, listBackedCases } from "@just-us/db/donations";
 import { listMessageConversations } from "@just-us/db/messages";
 import { attorneyPayoutReadiness } from "@just-us/db/payouts";
 import {
 	interestCounts,
+	listAttorneyCases,
 	listMyInterests,
 	listSeekingQueue,
 	queueCategories,
@@ -14,8 +16,10 @@ import {
 import { interestCountsByCase } from "@just-us/db/requests";
 import { countSavedCases, listSavedCases } from "@just-us/db/saves";
 
+import { AdminOverview } from "@/components/dashboard/admin-overview";
 import { toDonorCase } from "@/components/dashboard/donor-case";
 import { DonorDashboard } from "@/components/dashboard/donor-dashboard";
+import { MatchedCasesPanel } from "@/components/dashboard/matched-cases-panel";
 import { PayoutNudge } from "@/components/dashboard/payout-nudge";
 import {
 	type CaseSummary,
@@ -79,19 +83,46 @@ export default async function DashboardHome({
 	}
 
 	if (role === "donor") {
-		const [stats, savedCount, saved] = await Promise.all([
-			donorStats(session.user.id, new Date().getFullYear()),
-			countSavedCases(session.user.id),
-			listSavedCases(session.user.id, 3),
-		]);
+		const [stats, savedCount, saved, backed, backerUpdates] = await Promise.all(
+			[
+				donorStats(session.user.id, new Date().getFullYear()),
+				countSavedCases(session.user.id),
+				listSavedCases(session.user.id, 3),
+				// Real backed cases (live + closed), newest gift first.
+				listBackedCases(session.user.id),
+				listUpdatesForBacker(session.user.id, 4),
+			],
+		);
 		return (
 			<DonorDashboard
 				data={{
 					totalCents: stats.totalCents,
 					casesBacked: stats.casesBacked,
 					savedCount,
-					helpedFund: 0,
+					// Total raised across every case they backed — real community impact.
+					helpedFundCents: backed.reduce(
+						(sum, b) => sum + (b.case.raisedCents ?? 0),
+						0,
+					),
 					saved: saved.map(toDonorCase),
+					backing: backed.slice(0, 3).map((b) => ({
+						id: b.case.id,
+						title: b.case.title,
+						category: b.case.category,
+						status: b.case.status,
+						givenCents: b.givenCents,
+						raisedCents: b.case.raisedCents,
+						goalCents: b.case.goalCents,
+					})),
+					backingCount: backed.length,
+					updates: backerUpdates.map((u) => ({
+						id: u.id,
+						caseId: u.caseId,
+						caseTitle: u.caseTitle,
+						authorName: u.authorName,
+						body: u.body,
+						createdAt: u.createdAt,
+					})),
 				}}
 			/>
 		);
@@ -102,25 +133,36 @@ export default async function DashboardHome({
 	// The attorney's home is the Seeking Representation queue (JUS-25).
 	if (role === "attorney") {
 		const filters = readQueueParams(await searchParams);
-		const [cases, categories, states, tally, interests, profile, payout] =
-			await Promise.all([
-				listSeekingQueue(session.user.id, {
-					category: filters.category,
-					state: filters.state,
-					sort: toQueueSort(filters.sort),
-				}),
-				queueCategories(),
-				queueStates(),
-				interestCounts(session.user.id),
-				listMyInterests(session.user.id),
-				getAttorneyProfile(session.user.id),
-				// Donations pay the firm, so an unfinished payout account here blocks
-				// someone else's published case. This is the only screen that tells them.
-				attorneyPayoutReadiness({
-					userId: session.user.id,
-					email: session.user.email,
-				}),
-			]);
+		const [
+			cases,
+			categories,
+			states,
+			tally,
+			interests,
+			profile,
+			payout,
+			matched,
+		] = await Promise.all([
+			listSeekingQueue(session.user.id, {
+				category: filters.category,
+				state: filters.state,
+				sort: toQueueSort(filters.sort),
+			}),
+			queueCategories(),
+			queueStates(),
+			interestCounts(session.user.id),
+			listMyInterests(session.user.id),
+			getAttorneyProfile(session.user.id),
+			// Donations pay the firm, so an unfinished payout account here blocks
+			// someone else's published case. This is the only screen that tells them.
+			attorneyPayoutReadiness({
+				userId: session.user.id,
+				email: session.user.email,
+			}),
+			// Matched cases for the dashboard panel — gated to this attorney's own
+			// cases (account activity + update posting are scoped by this).
+			listAttorneyCases({ userId: session.user.id, email: session.user.email }),
+		]);
 
 		return (
 			<div>
@@ -130,9 +172,19 @@ export default async function DashboardHome({
 					inReviewCases={payout.inReviewCases}
 					blockedCases={payout.blockedCases}
 				/>
-				<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-					{home.sub}
-				</p>
+				{/* Matched cases first — the attorney's active work, with each case's
+				    account activity and a way to post updates without leaving here. */}
+				<div className="mt-2 mb-10">
+					<MatchedCasesPanel cases={matched} authorName={session.user.name} />
+				</div>
+				<div className="border-border border-t pt-8">
+					<h2 className="font-bold text-[18px] text-ink">
+						Seeking representation
+					</h2>
+					<p className="mt-1 max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+						{home.sub}
+					</p>
+				</div>
 				<div className="mt-8">
 					<SeekingQueue
 						cases={cases}
@@ -147,6 +199,11 @@ export default async function DashboardHome({
 				</div>
 			</div>
 		);
+	}
+
+	// The administrator's home is the platform overview dashboard.
+	if (role === "administrator") {
+		return <AdminOverview />;
 	}
 
 	return <ScreenPlaceholder sub={home.sub} />;

@@ -25,6 +25,9 @@ export type DonateConfig = {
 	/** False when the case can't take money; `blockedReason` says why. */
 	canDonate: boolean;
 	blockedReason: string | null;
+	/** The case has closed — a terminal state. The blocked copy reads "no longer"
+	 *  rather than "not yet", because donations will never reopen on this case. */
+	closed?: boolean;
 };
 
 function usd(cents: number) {
@@ -275,11 +278,15 @@ export function PublicCaseActions({
 			) : (
 				<div className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-4">
 					<p className="font-bold text-[14px] text-ink">
-						Not accepting donations yet
+						{config.closed
+							? "No longer accepting donations"
+							: "Not accepting donations yet"}
 					</p>
 					<p className="mt-1 text-[12.5px] text-muted-foreground leading-relaxed">
 						{config.blockedReason ??
-							"This case isn't raising right now. Check back shortly."}
+							(config.closed
+								? "This case has closed. Thank you to everyone who backed it."
+								: "This case isn't raising right now. Check back shortly.")}
 					</p>
 				</div>
 			)}

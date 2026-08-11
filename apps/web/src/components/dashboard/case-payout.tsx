@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import {
 	bindCasePayoutAction,
-	goLiveAction,
+	checkAndGoLiveAction,
 } from "@/app/(app)/my-cases/[id]/payout-actions";
 
 /** The firm this case pays out to, and how far its Stripe setup has got. */
@@ -68,7 +68,16 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 	// binding — see `goLiveCase`.
 	const isPending = status === "pending_payout";
 	const attorney = data.attorney;
-	const ready = !!attorney?.transfersEnabled;
+	// The firm's readiness is a cache of Stripe's view; "Check & publish" refreshes
+	// it from Stripe, so it lives in state and updates in place after a check rather
+	// than only on a full reload — the reload is what was stuck showing "waiting".
+	const [ready, setReady] = useState(!!attorney?.transfersEnabled);
+	const [detailsSubmitted, setDetailsSubmitted] = useState(
+		!!attorney?.detailsSubmitted,
+	);
+	const effAttorney = attorney
+		? { ...attorney, transfersEnabled: ready, detailsSubmitted }
+		: null;
 	const recipient = attorney
 		? (attorney.firmName ?? attorney.name)
 		: "your attorney's firm";
@@ -87,18 +96,36 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 		});
 	}
 
-	function publish() {
+	function checkAndPublish() {
 		startTransition(async () => {
-			const result = await goLiveAction({ caseId: data.caseId });
-			if (result.ok) {
+			const result = await checkAndGoLiveAction({ caseId: data.caseId });
+			if (!result.ok) {
+				toast.error(result.error);
+				return;
+			}
+			if (result.live) {
 				setBound(true);
 				setStatus("live");
+				setReady(true);
 				toast.success(
 					`Your case is live. Donations go to ${result.recipientName}.`,
 				);
-			} else {
-				toast.error(result.error);
+				return;
 			}
+			// Re-checked with Stripe and it still can't receive — update the panel to
+			// the fresh state and say exactly what's outstanding, rather than leaving a
+			// stale "waiting on your attorney" the plaintiff can't move.
+			setReady(false);
+			setDetailsSubmitted(result.detailsSubmitted);
+			toast(
+				result.reason === "no_attorney"
+					? "No attorney is linked to this case yet, so there's nowhere for donations to go."
+					: result.reason === "attorney_no_account"
+						? `${recipient} hasn't opened a payout account for this case yet.`
+						: result.detailsSubmitted
+							? `Checked with Stripe — ${recipient}'s details are in and still under review. Your case publishes the moment it clears.`
+							: `Checked with Stripe — ${recipient} hasn't finished payout setup for this case yet.`,
+			);
 		});
 	}
 
@@ -131,7 +158,7 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 								{attorney.barNumber ? ` · Bar #${attorney.barNumber}` : ""}
 							</span>
 							<span className="mt-1 block text-[12.5px] text-ink-soft leading-relaxed">
-								{describe(attorney)}
+								{describe(effAttorney ?? attorney)}
 							</span>
 						</span>
 						{bound && ready && (
@@ -180,20 +207,22 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 					<>
 						<button
 							type="button"
-							onClick={publish}
-							disabled={pending || !ready}
+							onClick={checkAndPublish}
+							disabled={pending}
 							className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-[var(--radius-control)] bg-brass px-4 font-bold text-[13.5px] text-white transition-colors hover:bg-brass-deep disabled:cursor-not-allowed disabled:opacity-60"
 						>
 							{pending
-								? "Publishing…"
+								? ready
+									? "Publishing…"
+									: "Checking with Stripe…"
 								: ready
 									? "Publish & go live"
-									: "Waiting on your attorney"}
+									: "Check & publish"}
 						</button>
 						<p className="text-[12px] text-muted-foreground leading-relaxed">
 							{ready
 								? `Your case goes public straight away, raising toward its goal, with ${recipient} receiving. The destination is fixed from that moment — donors are shown it before they give.`
-								: "Your case is finished and private. It publishes the moment the account above can receive — nothing else is outstanding."}
+								: `Your case is finished and private. Once ${recipient} enables payouts this doesn't always update on its own — press Check & publish to re-check with Stripe and go live the moment their account can receive.`}
 						</p>
 					</>
 				) : bound ? (

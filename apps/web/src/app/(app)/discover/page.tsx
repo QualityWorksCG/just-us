@@ -1,4 +1,6 @@
 import { browseLiveCases, countLiveCases } from "@just-us/db/cases";
+import { listBackedCaseIds } from "@just-us/db/donations";
+import { listFollowedCaseIds } from "@just-us/db/follows";
 import { listSavedCaseIds } from "@just-us/db/saves";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
@@ -40,15 +42,19 @@ export default async function DiscoverPage({
 	const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 	const page = Math.min(Math.max(1, Number(sp.page) || 1), totalPages);
 
-	const [cases, savedIds] = await Promise.all([
+	const [cases, savedIds, followedIds, backedIds] = await Promise.all([
 		browseLiveCases({
 			...filters,
 			skip: (page - 1) * PAGE_SIZE,
 			take: PAGE_SIZE,
 		}),
 		listSavedCaseIds(session.user.id),
+		listFollowedCaseIds(session.user.id),
+		listBackedCaseIds(session.user.id),
 	]);
 	const savedSet = new Set(savedIds);
+	const followedSet = new Set(followedIds);
+	const backedSet = new Set(backedIds);
 
 	// Preserve the active filters when building pagination links.
 	const pageHref = (p: number): Route => {
@@ -114,6 +120,8 @@ export default async function DiscoverPage({
 							key={c.id}
 							c={toDonorCase(c)}
 							initialSaved={savedSet.has(c.id)}
+							initialFollowing={followedSet.has(c.id)}
+							backed={backedSet.has(c.id)}
 						/>
 					))}
 				</div>

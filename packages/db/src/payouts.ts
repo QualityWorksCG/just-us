@@ -1,3 +1,5 @@
+import type { CaseStatus } from "../prisma/generated/enums";
+import { designatedAttorneyWhere } from "./cases";
 import prisma from "./index";
 
 /**
@@ -119,9 +121,12 @@ export async function attorneyPayoutReadiness(input: {
 			status: { in: ["pending_payout", "live"] },
 			deletedAt: null,
 			// Both routes an attorney can be on a case — see `representingAttorney`.
+			// The email route carries its own conditions (`designatedAttorneyWhere`);
+			// its status allow-list intersects with the one above rather than widening
+			// it, so a `closed` case still can't be counted as work outstanding.
 			OR: [
 				{ match: { attorneyId: input.userId } },
-				{ attorneyEmail: { equals: input.email, mode: "insensitive" } },
+				designatedAttorneyWhere(input.email),
 			],
 		},
 		select: {
@@ -276,29 +281,56 @@ export type PayoutDestination =
 export async function resolvePayoutDestination(
 	caseId: string,
 ): Promise<PayoutDestination> {
+	const accountSelect = {
+		id: true,
+		stripeAccountId: true,
+		transfersEnabled: true,
+		user: { select: { name: true, firmName: true } },
+	} as const;
+
 	const k = await prisma.case.findFirst({
 		where: { id: caseId, deletedAt: null },
 		select: {
+			id: true,
 			status: true,
-			payoutAccount: {
-				select: {
-					stripeAccountId: true,
-					transfersEnabled: true,
-					user: { select: { name: true, firmName: true } },
-				},
-			},
+			payoutAccountId: true,
+			// The bound destination (the frozen recipient).
+			payoutAccount: { select: accountSelect },
+			// The account the attorney opened *for this case*, whether or not the case
+			// has been bound to it yet.
+			payoutAccountForCase: { select: accountSelect },
 		},
 	});
 	if (!k || k.status !== "live") return { ok: false, reason: "not_live" };
-	if (!k.payoutAccount) return { ok: false, reason: "unbound" };
-	if (!k.payoutAccount.transfersEnabled) {
+
+	let account = k.payoutAccount;
+
+	// Self-heal a live case that was never bound. Binding normally happens at
+	// go-live; a case that reached `live` without it (seeded/imported, or a missed
+	// bind after the attorney finished onboarding) is stranded — the firm can
+	// receive, but donors are told it "can't accept donations yet". If the case's
+	// own attorney account is ready, bind to it now. Safe: an unbound case has taken
+	// no donations, so there is no prior recipient disclosure to preserve.
+	if (!k.payoutAccountId && k.payoutAccountForCase?.transfersEnabled) {
+		await prisma.case.updateMany({
+			where: { id: k.id, payoutAccountId: null },
+			data: {
+				payoutAccountId: k.payoutAccountForCase.id,
+				payoutRecipient: "attorney",
+			},
+		});
+		account = k.payoutAccountForCase;
+	}
+
+	if (!account) return { ok: false, reason: "unbound" };
+	if (!account.transfersEnabled) {
 		return { ok: false, reason: "transfers_disabled" };
 	}
 	return {
 		ok: true,
-		stripeAccountId: k.payoutAccount.stripeAccountId,
-		holderName: k.payoutAccount.user.name,
-		holderFirm: k.payoutAccount.user.firmName?.trim() || null,
+		stripeAccountId: account.stripeAccountId,
+		holderName: account.user.name,
+		holderFirm: account.user.firmName?.trim() || null,
 	};
 }
 
@@ -378,6 +410,7 @@ function accountHeldBy(account: CaseAccount, attorneyId: string): CaseAccount {
  * confirms, because a mistyped address is the one way this points at the wrong firm.
  */
 async function representingAttorney(k: {
+	status: CaseStatus;
 	attorneyEmail: string | null;
 	match: { attorney: RepresentingAttorney } | null;
 }): Promise<{
@@ -385,6 +418,11 @@ async function representingAttorney(k: {
 	via: "match" | "invited_email";
 } | null> {
 	if (k.match) return { attorney: k.match.attorney, via: "match" };
+	// A case that is still `draft` or `seeking` has not been committed to anybody.
+	// Since the invitation flow a `seeking` case can carry the typed address while
+	// the attorney it names has yet to answer, and resolving them here would name a
+	// firm on the plaintiff's payout screen that has agreed to nothing.
+	if (k.status === "draft" || k.status === "seeking") return null;
 	const email = k.attorneyEmail?.trim();
 	if (!email) return null;
 	const attorney = await prisma.user.findFirst({
@@ -420,7 +458,11 @@ export async function attorneyRepresentedCase(input: {
 			deletedAt: null,
 			OR: [
 				{ match: { attorneyId: input.userId } },
-				{ attorneyEmail: { equals: input.email, mode: "insensitive" } },
+				// A typed address alone is not authority to open a Stripe account against
+				// someone's case — see `designatedAttorneyWhere`. An attorney invited to a
+				// `seeking` case reaches this only after confirming, which writes the
+				// match the branch above reads.
+				designatedAttorneyWhere(input.email),
 			],
 		},
 		select: { id: true, title: true, status: true },

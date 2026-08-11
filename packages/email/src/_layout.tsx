@@ -89,7 +89,7 @@ export const paragraph: React.CSSProperties = {
 
 export const buttonStyle: React.CSSProperties = {
 	backgroundColor: COLORS.brass,
-	color: COLORS.brassInk,
+	color: "#ffffff",
 	borderRadius: 9,
 	padding: "14px 30px",
 	fontSize: 15,

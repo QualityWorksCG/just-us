@@ -53,6 +53,10 @@ export type CaseUpdate = {
 	authorName: string;
 	tag: string | null;
 	attachments: UpdateAttachment[];
+	/** Moderation gate: "ok" | "held" | "removed". Only ever non-"ok" in views
+	 *  that opt into including moderated updates (the owner/attorney case screens),
+	 *  so they can show a "under review" marker; public views never receive them. */
+	moderationStatus: string;
 };
 
 /** Resolve who wrote an update from the case's owner/attorney, since only those
@@ -138,8 +142,18 @@ export async function editCaseUpdate(input: {
 	return { ok: true };
 }
 
-/** A case's updates, newest first, each attributed to its real author. */
-export async function listCaseUpdates(caseId: string): Promise<CaseUpdate[]> {
+/**
+ * A case's updates, newest first, each attributed to its real author.
+ *
+ * By default this is a public/backer view and excludes updates held or removed by
+ * moderation. The owner and the matched attorney pass `includeModerated` on their
+ * own case screens so they still see a held update (marked "under review") rather
+ * than having it silently vanish — it is theirs, and they wrote it.
+ */
+export async function listCaseUpdates(
+	caseId: string,
+	opts?: { includeModerated?: boolean },
+): Promise<CaseUpdate[]> {
 	const c = await prisma.case.findUnique({
 		where: { id: caseId },
 		select: {
@@ -149,7 +163,10 @@ export async function listCaseUpdates(caseId: string): Promise<CaseUpdate[]> {
 		},
 	});
 	const rows = await prisma.caseUpdate.findMany({
-		where: { caseId },
+		where: {
+			caseId,
+			...(opts?.includeModerated ? {} : { moderationStatus: "ok" }),
+		},
 		orderBy: { createdAt: "desc" },
 		select: {
 			id: true,
@@ -159,6 +176,7 @@ export async function listCaseUpdates(caseId: string): Promise<CaseUpdate[]> {
 			authorId: true,
 			tag: true,
 			attachments: true,
+			moderationStatus: true,
 		},
 	});
 	return rows.map((r) => ({
@@ -169,6 +187,7 @@ export async function listCaseUpdates(caseId: string): Promise<CaseUpdate[]> {
 		authorId: r.authorId,
 		tag: r.tag,
 		attachments: parseAttachments(r.attachments),
+		moderationStatus: r.moderationStatus,
 		...resolveAuthor(
 			r.authorId,
 			c?.ownerId ?? "",
@@ -181,6 +200,42 @@ export async function listCaseUpdates(caseId: string): Promise<CaseUpdate[]> {
 /** How many updates a case has — for a count beside the heading. */
 export async function countCaseUpdates(caseId: string): Promise<number> {
 	return prisma.caseUpdate.count({ where: { caseId } });
+}
+
+/** One update with the facts a notification needs — resolved author name, case
+ *  title, and the author id (so the fan-out can exclude the poster). */
+export async function getCaseUpdateForNotify(updateId: string) {
+	const u = await prisma.caseUpdate.findUnique({
+		where: { id: updateId },
+		select: {
+			id: true,
+			caseId: true,
+			body: true,
+			tag: true,
+			authorId: true,
+			case: {
+				select: {
+					title: true,
+					ownerId: true,
+					attorneyName: true,
+					owner: { select: { name: true } },
+				},
+			},
+		},
+	});
+	if (!u) return null;
+	const isOwner = u.authorId === u.case.ownerId;
+	return {
+		id: u.id,
+		caseId: u.caseId,
+		body: u.body,
+		tag: u.tag,
+		authorId: u.authorId,
+		caseTitle: u.case.title || "your case",
+		authorName: isOwner
+			? (u.case.owner?.name ?? "The plaintiff")
+			: (u.case.attorneyName ?? "The attorney"),
+	};
 }
 
 export type CaseUpdateNotice = {
@@ -311,7 +366,8 @@ export async function listUpdatesForBacker(
 	if (caseIds.length === 0) return [];
 
 	const rows = await prisma.caseUpdate.findMany({
-		where: { caseId: { in: caseIds } },
+		// Backers never see an update held or removed by moderation (Reg. & Ops §3–4).
+		where: { caseId: { in: caseIds }, moderationStatus: "ok" },
 		orderBy: { createdAt: "desc" },
 		take,
 		select: {
@@ -322,6 +378,7 @@ export async function listUpdatesForBacker(
 			authorId: true,
 			tag: true,
 			attachments: true,
+			moderationStatus: true,
 			caseId: true,
 			case: {
 				select: {
@@ -341,6 +398,7 @@ export async function listUpdatesForBacker(
 		authorId: r.authorId,
 		tag: r.tag,
 		attachments: parseAttachments(r.attachments),
+		moderationStatus: r.moderationStatus,
 		caseId: r.caseId,
 		caseTitle: r.case.title || "Untitled case",
 		...resolveAuthor(
@@ -372,6 +430,7 @@ export async function listUpdatesForOwner(
 			authorId: true,
 			tag: true,
 			attachments: true,
+			moderationStatus: true,
 			caseId: true,
 			case: {
 				select: {
@@ -391,6 +450,7 @@ export async function listUpdatesForOwner(
 		authorId: r.authorId,
 		tag: r.tag,
 		attachments: parseAttachments(r.attachments),
+		moderationStatus: r.moderationStatus,
 		caseId: r.caseId,
 		caseTitle: r.case.title || "Untitled case",
 		...resolveAuthor(
@@ -449,6 +509,7 @@ export async function listCaseUpdateGroupsForOwner(
 						authorId: true,
 						tag: true,
 						attachments: true,
+						moderationStatus: true,
 					},
 				},
 			},
@@ -474,6 +535,7 @@ export async function listCaseUpdateGroupsForOwner(
 					authorId: u.authorId,
 					tag: u.tag,
 					attachments: parseAttachments(u.attachments),
+					moderationStatus: u.moderationStatus,
 					...resolveAuthor(
 						u.authorId,
 						ownerId,

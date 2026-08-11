@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth-server";
+import { notifyCaseUpdate } from "@/lib/notify";
 
 /** Refresh every surface an update reads on, so a reload anywhere reflects it. */
 function revalidateUpdateSurfaces(caseId: string) {
@@ -66,6 +67,9 @@ export async function postCaseUpdateAction(
 		if (!res.ok) {
 			return { ok: false, error: FAILURE_MESSAGES[res.reason] };
 		}
+		// Notify backers/followers (in-app + email). Never let a notification
+		// failure fail the post itself.
+		await notifyCaseUpdate(res.id).catch(() => {});
 		revalidateUpdateSurfaces(parsed.data.caseId);
 		return { ok: true };
 	} catch {

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth-server";
+import { notifyExpressionOfInterest } from "@/lib/notify";
 
 /**
  * The attorney side of the Seeking Representation queue (JUS-25).
@@ -43,6 +44,11 @@ export async function expressInterestAction(
 		if (!res.ok) {
 			return { ok: false, error: FAILURE_MESSAGES[res.reason] };
 		}
+		// Tell the plaintiff interest arrived (in-app + email). This is a
+		// system-generated nudge to check their dashboard — it carries only the
+		// attorney's name, no attorney-authored message, so the "no channel until
+		// the plaintiff reaches out" rule above still holds.
+		await notifyExpressionOfInterest(res.interestId).catch(() => {});
 		revalidatePath("/home");
 		return { ok: true };
 	} catch {

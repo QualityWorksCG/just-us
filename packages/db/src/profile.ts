@@ -31,8 +31,18 @@ export async function getOwnProfile(userId: string) {
 			image: true,
 			role: true,
 			jurisdiction: true,
+			donationsAnonymous: true,
 			createdAt: true,
 		},
+	});
+}
+
+/** Set whether this account's donations appear as "Anonymous" on public supporter
+ *  lists. Scoped to the signed-in user's own row. */
+export async function setDonationAnonymous(userId: string, anonymous: boolean) {
+	return prisma.user.update({
+		where: { id: userId },
+		data: { donationsAnonymous: anonymous },
 	});
 }
 

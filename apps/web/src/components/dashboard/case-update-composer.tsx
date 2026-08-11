@@ -17,7 +17,7 @@ type Attachment = { url: string; name: string; contentType: string };
 
 function initials(name: string) {
 	return (
-		name
+		(name ?? "")
 			.trim()
 			.split(/\s+/)
 			.slice(0, 2)
@@ -38,12 +38,16 @@ export function CaseUpdateComposer({
 	authorName,
 	authorTone = "brass",
 	placeholder,
+	onPosted,
 }: {
 	caseId: string;
 	authorName: string;
 	/** Avatar colour — brass for the attorney, green for the plaintiff. */
 	authorTone?: "brass" | "green";
 	placeholder: string;
+	/** Called after a successful post — lets a host (e.g. a dashboard modal) close
+	 *  itself. The composer still clears, toasts, and refreshes on its own. */
+	onPosted?: () => void;
 }) {
 	const router = useRouter();
 	const [body, setBody] = useState("");
@@ -97,6 +101,7 @@ export function CaseUpdateComposer({
 				setAttachments([]);
 				toast.success("Update posted — your backers can see it now.");
 				router.refresh();
+				onPosted?.();
 			} else {
 				toast.error(res.error);
 			}

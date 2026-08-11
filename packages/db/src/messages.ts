@@ -121,6 +121,7 @@ export async function getConversationForModeration(conversationId: string) {
 			messages: {
 				orderBy: { createdAt: "asc" },
 				include: { author: { select: { id: true, name: true, role: true } } },
+				// `deletedAt` drives the "Message removed" state + hides the remove button.
 			},
 			reports: {
 				orderBy: { createdAt: "desc" },
@@ -379,6 +380,7 @@ export async function recipientForMessage(messageId: string) {
 export async function reportConversation(input: {
 	conversationId: string;
 	reporterId: string;
+	category: string;
 	reason: string;
 }) {
 	const conversation = await prisma.conversation.findUnique({
@@ -412,13 +414,72 @@ export async function listConversationReports() {
 export async function resolveConversationReport(
 	reportId: string,
 	resolverId: string,
+	resolution:
+		| "dismissed"
+		| "message_removed"
+		| "user_blocked"
+		| "warned" = "dismissed",
 ) {
 	return prisma.conversationReport.update({
 		where: { id: reportId },
 		data: {
 			status: "resolved",
+			resolution,
 			resolvedAt: new Date(),
 			resolvedById: resolverId,
 		},
 	});
+}
+
+/** Soft-remove any message in a conversation — the moderator's takedown, distinct
+ *  from `removeOwnMessage` which only lets an author remove their own. Returns
+ *  whether a still-visible message was removed. */
+export async function removeMessageByModerator(
+	messageId: string,
+): Promise<boolean> {
+	const res = await prisma.message.updateMany({
+		where: { id: messageId, deletedAt: null },
+		data: { deletedAt: new Date() },
+	});
+	return res.count === 1;
+}
+
+/**
+ * Everything an admin action on a report needs: who reported, who was reported
+ * (the *other* participant), and the report's category — so the action can block
+ * the right account and notify both sides. Null if the report doesn't exist.
+ */
+export async function getConversationReportContext(reportId: string) {
+	const report = await prisma.conversationReport.findUnique({
+		where: { id: reportId },
+		select: {
+			id: true,
+			category: true,
+			reason: true,
+			status: true,
+			reporterId: true,
+			conversation: {
+				select: {
+					id: true,
+					plaintiff: { select: { id: true, name: true, email: true } },
+					attorney: { select: { id: true, name: true, email: true } },
+				},
+			},
+		},
+	});
+	if (!report) return null;
+	const { plaintiff, attorney } = report.conversation;
+	const reporterIsPlaintiff = report.reporterId === plaintiff.id;
+	const reporter = reporterIsPlaintiff ? plaintiff : attorney;
+	// The reported party is whichever participant did not file the report.
+	const reported = reporterIsPlaintiff ? attorney : plaintiff;
+	return {
+		reportId: report.id,
+		category: report.category,
+		reason: report.reason,
+		status: report.status,
+		conversationId: report.conversation.id,
+		reporter: { id: reporter.id, name: reporter.name, email: reporter.email },
+		reported: { id: reported.id, name: reported.name, email: reported.email },
+	};
 }

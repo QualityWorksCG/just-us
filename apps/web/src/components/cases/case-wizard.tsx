@@ -47,11 +47,14 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { goLiveAction } from "@/app/(app)/my-cases/[id]/payout-actions";
+import {
+	goLiveAction,
+	refreshCasePayoutAction,
+} from "@/app/(app)/my-cases/[id]/payout-actions";
 import {
 	type CasePayoutReadiness,
-	casePayoutReadinessAction,
 	commitCaseAction,
+	commitCaseWithInviteAction,
 	deleteCaseAction,
 	publishForAttorneysAction,
 	saveCaseDraftAction,
@@ -107,7 +110,12 @@ export type WizardInitial = {
 	payout?: CasePayoutReadiness | null;
 };
 
-type View = "wizard" | "preview" | "success" | "published-attorneys";
+type View =
+	| "wizard"
+	| "preview"
+	| "success"
+	| "published-attorneys"
+	| "invited";
 type Attorney = {
 	name: string;
 	firm: string;
@@ -150,6 +158,15 @@ function formatSize(bytes: number) {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Shape only. The address is proved by the invitation actually arriving, and the
+// server re-validates it anyway — this is here so the plaintiff finds a typo on
+// the step that owns the field rather than at the point of sending.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isEmail(value: string) {
+	return EMAIL_PATTERN.test(value.trim());
+}
+
 function ThinBar({ pct = 0 }: { pct?: number }) {
 	return (
 		<div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -177,6 +194,7 @@ export function CaseWizard({
 		manualFirm: useId(),
 		manualState: useId(),
 		attorneyEmail: useId(),
+		attorneyEmailError: useId(),
 		attorneyPhone: useId(),
 	};
 	const firstName = name.trim().split(" ")[0] || "there";
@@ -262,6 +280,9 @@ export function CaseWizard({
 	const [atName, setAtName] = useState(initial?.attorney?.name ?? "");
 	const [atFirm, setAtFirm] = useState(initial?.attorney?.firm ?? "");
 	const [atEmail, setAtEmail] = useState(initial?.attorney?.email ?? "");
+	// The email error only appears once the plaintiff has been near the field or
+	// tried to move on — a required-field error on an untouched form is noise.
+	const [atEmailTouched, setAtEmailTouched] = useState(false);
 	const [atPhone, setAtPhone] = useState(initial?.attorney?.phone ?? "");
 	const [atState, setAtState] = useState(attorneyState);
 
@@ -294,6 +315,9 @@ export function CaseWizard({
 	const [checking, setChecking] = useState(false);
 	const payoutReady = !!payout?.attorney?.transfersEnabled;
 
+	// The address the invitation went to, for the confirmation screen.
+	const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
+
 	const coverInput = useRef<HTMLInputElement>(null);
 	const moreInput = useRef<HTMLInputElement>(null);
 	const evidenceInput = useRef<HTMLInputElement>(null);
@@ -301,6 +325,24 @@ export function CaseWizard({
 	const goal = Number(fee.replace(/[^0-9.]/g, "")) || 0;
 	const displayTitle = title.trim() || "Your case title";
 	const attorneyName = attorney?.name ?? "your attorney";
+
+	/**
+	 * The plaintiff brought this attorney themselves, so nobody has agreed to
+	 * anything yet: the case is published as `seeking` and the attorney is emailed
+	 * a link to confirm. An attorney who accepted a request is already matched
+	 * (`attorneyConfirmed`) and goes straight to payout setup instead.
+	 */
+	const bringYourOwn = !attorneyConfirmed;
+	const atEmailValid = isEmail(atEmail);
+	const atEmailError =
+		atEmailTouched && !atEmailValid
+			? atEmail.trim()
+				? "Enter a valid email address."
+				: "We need their email — it's where the invitation goes."
+			: null;
+	// The address as recorded on the case, which is what actually gets invited.
+	const inviteEmail = attorney?.email?.trim() ?? "";
+	const canSendInvite = isEmail(inviteEmail);
 	// One-line hook for cards, derived from the story's first sentence.
 	const summary =
 		story
@@ -346,14 +388,24 @@ export function CaseWizard({
 	}
 
 	// Step 3, "Yes, I have an attorney" → record them and move to the fee.
+	//
+	// The email is required here rather than at the point of sending: it is the
+	// only way this attorney can be reached, and a case published without one names
+	// somebody who can never confirm it.
 	function sendInviteAndContinue() {
 		if (!atName.trim()) return toast.error("Add your attorney's full name.");
+		if (!atEmailValid) {
+			setAtEmailTouched(true);
+			return toast.error(
+				"Add your attorney's email — that's where the invitation goes.",
+			);
+		}
 		setAttorney({
 			name: atName.trim(),
 			firm: atFirm.trim() || "Independent",
 			area: category,
 			location: atState || state,
-			email: atEmail.trim() || undefined,
+			email: atEmail.trim().toLowerCase(),
 			phone: atPhone.trim() || undefined,
 		});
 		toast.success(`We'll invite ${atName.trim().split(" ")[0]} to your case.`);
@@ -486,12 +538,85 @@ export function CaseWizard({
 		}
 	}
 
-	/** Step 5 — re-read the firm's Stripe progress. It finishes elsewhere, so
-	 *  nothing in this browser would otherwise tell the plaintiff. */
+	/**
+	 * Step 5 on the bring-your-own path — publish the case and email the attorney
+	 * the plaintiff named.
+	 *
+	 * The case becomes `seeking`, not `pending_payout`. There is no payout account
+	 * to wait on because there is not yet an attorney: the invitation is what turns
+	 * a typed name into representation, and only when it is confirmed does the case
+	 * move on to the payout step. If it is declined or lapses, the case goes in
+	 * front of every other attorney on JustUs without the plaintiff doing anything.
+	 */
+	async function sendInvitation() {
+		if (missingEssential()) return;
+		if (!canSendInvite) {
+			toast.error("Add your attorney's email so we can send the invitation.");
+			setAtEmailTouched(true);
+			setRepChoice("have");
+			setStep(3);
+			window.scrollTo({ top: 0 });
+			return;
+		}
+
+		setCommitting(true);
+		const result = await commitCaseWithInviteAction({
+			id: caseId ?? undefined,
+			title: title.trim(),
+			category,
+			location: state,
+			summary: summary || story.trim().slice(0, 140),
+			story: story.trim(),
+			goalCents: Math.round(goal * 100),
+			payoutType,
+			attorney: {
+				name: attorney?.name ?? "",
+				firm: attorney?.firm,
+				area: attorney?.area,
+				location: attorney?.location,
+				email: inviteEmail,
+				phone: attorney?.phone,
+			},
+			evidence,
+			thankYouNote: thankYouNote.trim() || null,
+			coverImageUrl: coverUrl,
+			images: moreImages,
+		});
+		setCommitting(false);
+
+		if (!result.ok) {
+			// The case may already exist even though the send failed — keep its id so
+			// trying again resends rather than filing the case a second time.
+			if (result.caseId) setCaseId(result.caseId);
+			toast.error(result.error);
+			return;
+		}
+
+		setCaseId(result.caseId);
+		if (result.kind === "matched") {
+			// This case already had an attorney of its own, so it went down the payout
+			// path instead and there is nothing to invite. Say so — the step behind
+			// this button is the payout account now, not an invitation.
+			setAttorneyConfirmed(true);
+			setPayout(result.payout);
+			setCommitted(true);
+			toast.success(
+				`Sent to ${attorneyName}. We'll email you when they're set.`,
+			);
+			return;
+		}
+		setInvitedEmail(result.email);
+		setView("invited");
+		window.scrollTo({ top: 0 });
+	}
+
+	/** Step 5 — re-check the firm's Stripe progress. It finishes elsewhere (and may
+	 *  land without a webhook), so this pulls the account's status straight from
+	 *  Stripe rather than re-reading a cache nothing in this browser would update. */
 	async function checkPayout() {
 		if (!caseId) return;
 		setChecking(true);
-		const result = await casePayoutReadinessAction(caseId);
+		const result = await refreshCasePayoutAction({ caseId });
 		setChecking(false);
 		if (!result.ok) {
 			toast.error(result.error);
@@ -500,8 +625,14 @@ export function CaseWizard({
 		setPayout(result.payout);
 		if (result.payout.attorney?.transfersEnabled) {
 			toast.success("Your attorney is set up. You can publish now.");
+		} else if (!result.payout.attorney) {
+			toast.info(
+				"No attorney is linked to this case yet — add one to set up donations.",
+			);
 		} else {
-			toast.info("Not yet — nothing has changed on their side.");
+			toast.info(
+				"Checked with Stripe — their account still can't receive yet.",
+			);
 		}
 	}
 
@@ -527,9 +658,12 @@ export function CaseWizard({
 		} else {
 			toast.error(result.error);
 			setPublishing(false);
-			// Every refusal left is about the firm's account, and step 5 is the only
-			// screen that explains it and offers a way to re-check.
-			await checkPayout();
+			// `goLiveAction` already re-checked Stripe, so refresh the payout state from
+			// that same read (silently — the error toast above is the message) and send
+			// them to step 5, the only screen that spells out what's outstanding and
+			// lets them re-check.
+			const refreshed = await refreshCasePayoutAction({ caseId });
+			if (refreshed.ok) setPayout(refreshed.payout);
 			setStep(5);
 		}
 	}
@@ -751,6 +885,109 @@ export function CaseWizard({
 		if (!url) return;
 		navigator.clipboard?.writeText(url);
 		toast.success("Link copied to clipboard.");
+	}
+
+	// ─────────────────────────── Invitation-sent confirmation
+	//
+	// The end of the bring-your-own path. The case is saved and private, and the
+	// only outstanding question is one the plaintiff cannot answer — so this screen
+	// says who was asked, and what happens on either answer.
+	if (view === "invited") {
+		return (
+			<div className="h-svh overflow-y-auto bg-surface px-6 py-16">
+				<div className="mx-auto max-w-[620px] text-center">
+					<div className="relative mx-auto mb-6 flex size-[92px] items-center justify-center">
+						<span
+							aria-hidden="true"
+							className="absolute inset-0 rounded-full bg-[radial-gradient(circle,color-mix(in_oklch,var(--brass)_28%,transparent),transparent_70%)]"
+						/>
+						<span className="relative flex size-16 items-center justify-center rounded-full bg-brass text-white">
+							<Mail className="size-7" aria-hidden="true" />
+						</span>
+					</div>
+					<p className="mb-3 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.14em]">
+						Invitation sent
+					</p>
+					<h1 className="font-extrabold text-[clamp(1.875rem,3.6vw,2.75rem)] text-ink tracking-[-0.03em]">
+						We've emailed {attorneyName}
+					</h1>
+					<p className="mx-auto mt-3 max-w-[460px] text-[15px] text-ink-soft leading-relaxed">
+						{invitedEmail} has a link to confirm they represent you on this
+						case. Nothing is attached to your case until they do.
+					</p>
+
+					<div className="mt-8 flex items-center justify-between gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 text-left shadow-[var(--shadow-rest)]">
+						<div className="min-w-0">
+							<p className="truncate font-bold text-[15px] text-ink">
+								{displayTitle}
+							</p>
+							<p className="mt-0.5 text-[12.5px] text-muted-foreground">
+								{category} · {state || "—"} · goal {money(goal)}
+							</p>
+						</div>
+						<span className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-brass-wash px-3 py-1 font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.06em]">
+							<Clock className="size-3" aria-hidden="true" />
+							Awaiting reply
+						</span>
+					</div>
+
+					<div className="mt-6 flex flex-col gap-3 rounded-[var(--radius-card-lg)] bg-surface-2 p-5 text-left">
+						<p className="font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
+							What happens next
+						</p>
+						<p className="flex gap-2.5 text-[13.5px] text-ink-soft leading-relaxed">
+							<CircleCheck
+								className="mt-0.5 size-4 shrink-0 text-success"
+								aria-hidden="true"
+							/>
+							<span>
+								<span className="font-semibold text-ink">If they confirm</span>{" "}
+								— they're attached to your case and open its payout account. You
+								publish once it can receive.
+							</span>
+						</p>
+						<p className="flex gap-2.5 text-[13.5px] text-ink-soft leading-relaxed">
+							<Users
+								className="mt-0.5 size-4 shrink-0 text-brass-deep"
+								aria-hidden="true"
+							/>
+							<span>
+								<span className="font-semibold text-ink">
+									If they decline, or don't answer
+								</span>{" "}
+								— your case goes in front of bar-verified attorneys on JustUs,
+								who can request to represent you. Nothing to do on your side.
+							</span>
+						</p>
+					</div>
+
+					<div className="mt-6 flex items-center justify-center gap-2.5">
+						<Link
+							href={(caseId ? `/my-cases/${caseId}` : "/my-cases") as Route}
+							className={cn(buttonVariants({ size: "lg" }), "px-5")}
+						>
+							Go to my case
+							<ArrowRight data-icon="inline-end" aria-hidden="true" />
+						</Link>
+						<Link
+							href="/home"
+							className={cn(
+								buttonVariants({ variant: "outline", size: "lg" }),
+								"px-5",
+							)}
+						>
+							Back to dashboard
+						</Link>
+					</div>
+
+					<p className="mt-5 flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground">
+						<Lock className="size-3.5" aria-hidden="true" />
+						Your case stays private while you wait — nobody can see it or give
+						to it yet.
+					</p>
+				</div>
+			</div>
+		);
 	}
 
 	// ─────────────────────────── Published-to-attorneys confirmation
@@ -988,13 +1225,14 @@ export function CaseWizard({
 							size="sm"
 							className="h-9 px-3.5"
 							onClick={publish}
-							// Same gate as the review step's button — the preview is a second
-							// door onto the same act, and it must not be an open one.
-							disabled={publishing || !payoutReady}
+							// Same behaviour as the review step's button — the preview is a
+							// second door onto the same act: pressing it re-checks Stripe and
+							// publishes if the firm can now receive.
+							disabled={publishing}
 							title={
 								payoutReady
 									? undefined
-									: `Waiting on ${attorneyName}'s payout account`
+									: "Re-check the firm's payout account and publish if it's ready"
 							}
 						>
 							<Rocket data-icon="inline-start" aria-hidden="true" />
@@ -1002,7 +1240,7 @@ export function CaseWizard({
 								? "Publishing…"
 								: payoutReady
 									? "Publish case"
-									: "Waiting on your attorney"}
+									: "Check & publish"}
 						</Button>
 					</div>
 				</div>
@@ -1199,7 +1437,7 @@ export function CaseWizard({
 												s.n
 											)}
 										</span>
-										{s.label}
+										{s.n === 5 && bringYourOwn ? "Send invitation" : s.label}
 									</button>
 								</li>
 							);
@@ -1999,15 +2237,36 @@ export function CaseWizard({
 													className="font-semibold text-[13px] text-ink"
 												>
 													Email
+													<span className="ml-0.5 text-danger">*</span>
 												</label>
 												<Input
 													id={ids.attorneyEmail}
 													type="email"
-													className={inputClass}
+													className={cn(
+														inputClass,
+														atEmailError && "border-danger",
+													)}
 													value={atEmail}
 													onChange={(e) => setAtEmail(e.target.value)}
+													onBlur={() => setAtEmailTouched(true)}
+													aria-invalid={atEmailError ? true : undefined}
+													aria-describedby={
+														atEmailError ? ids.attorneyEmailError : undefined
+													}
 													placeholder="attorney@email.com"
 												/>
+												{atEmailError ? (
+													<p
+														id={ids.attorneyEmailError}
+														className="text-[12.5px] text-danger"
+													>
+														{atEmailError}
+													</p>
+												) : (
+													<p className="text-[12.5px] text-muted-foreground">
+														Where we send their invitation.
+													</p>
+												)}
 											</div>
 										</div>
 										<div className="grid gap-4 sm:grid-cols-2">
@@ -2069,8 +2328,8 @@ export function CaseWizard({
 												aria-hidden="true"
 											/>
 											We'll email them an invite to represent you. They confirm
-											before they're attached — and you agree the fee together
-											on the next step.
+											before they're attached — and if they decline or don't
+											answer, your case goes to attorneys on JustUs instead.
 										</p>
 									</div>
 								)}
@@ -2156,9 +2415,9 @@ export function CaseWizard({
 									Agree the fee
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
-									You're working with {attorneyName}. Set the fee you agreed
-									together — it becomes your funding goal, and nothing more is
-									ever raised.
+									{bringYourOwn
+										? `Set the fee you agreed with ${attorneyName} — it becomes your funding goal, and nothing more is ever raised. They'll see it when they confirm.`
+										: `You're working with ${attorneyName}. Set the fee you agreed together — it becomes your funding goal, and nothing more is ever raised.`}
 								</p>
 
 								<p className="mt-7 mb-2.5 font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.1em]">
@@ -2183,10 +2442,20 @@ export function CaseWizard({
 													.join(" · ")}
 											</p>
 										</div>
-										<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1.5 font-semibold text-[12px] text-green-deep">
-											<CircleCheck className="size-3.5" aria-hidden="true" />
-											Representing you
-										</span>
+										{/* A plaintiff-named attorney has confirmed nothing. Calling
+										    them "representing you" here would be the wizard asserting
+										    the very thing the invitation exists to establish. */}
+										{bringYourOwn ? (
+											<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-brass-wash px-3 py-1.5 font-semibold text-[12px] text-brass-deep">
+												<Clock className="size-3.5" aria-hidden="true" />
+												Not confirmed yet
+											</span>
+										) : (
+											<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1.5 font-semibold text-[12px] text-green-deep">
+												<CircleCheck className="size-3.5" aria-hidden="true" />
+												Representing you
+											</span>
+										)}
 									</div>
 								) : (
 									<div className="rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-4 py-4 text-[13.5px] text-muted-foreground">
@@ -2235,7 +2504,74 @@ export function CaseWizard({
 							</>
 						)}
 
-						{step === 5 && (
+						{/* Step 5 asks two different questions depending on how the
+						    attorney got here. A matched attorney is settled, so the only
+						    thing left is their payout account. A plaintiff-named one has
+						    agreed to nothing, so there is nothing to set up yet — the step
+						    is the invitation itself. */}
+						{step === 5 && bringYourOwn && (
+							<>
+								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
+									Invite {attorneyName}
+								</h1>
+								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
+									Nobody is attached to your case until they say so. We'll email
+									them a link to confirm they represent you — then they open the
+									payout account this case is funded into, and you publish.
+								</p>
+
+								<p className="mt-7 mb-2.5 font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
+									Invitation
+								</p>
+
+								<div className="flex max-w-[520px] items-center gap-4 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+									<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
+										<Mail className="size-5" aria-hidden="true" />
+									</span>
+									<div className="min-w-0 flex-1">
+										<p className="truncate font-bold text-[15px] text-ink">
+											{inviteEmail || "No email yet"}
+										</p>
+										<p className="text-[12.5px] text-muted-foreground">
+											{canSendInvite
+												? `${attorneyName} · the link expires 7 days after we send it`
+												: `We need ${attorneyName}'s email before we can send this`}
+										</p>
+									</div>
+									<button
+										type="button"
+										onClick={() => {
+											setRepChoice("have");
+											setStep(3);
+											window.scrollTo({ top: 0 });
+										}}
+										className="shrink-0 font-semibold text-[13px] text-brass-deep underline underline-offset-2"
+									>
+										{canSendInvite ? "Change" : "Add their email"}
+									</button>
+								</div>
+
+								<div className="mt-6 flex max-w-[520px] gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
+									<Lock
+										className="mt-0.5 size-4 shrink-0 text-brass-deep"
+										aria-hidden="true"
+									/>
+									<div className="text-[13px] leading-relaxed">
+										<p className="font-bold text-ink">
+											Your case stays private while they decide
+										</p>
+										<p className="text-ink-soft">
+											Nobody can see it, share it or give to it yet. If they
+											decline — or don't answer within 7 days — your case goes
+											in front of bar-verified attorneys on JustUs, who can
+											request to represent you.
+										</p>
+									</div>
+								</div>
+							</>
+						)}
+
+						{step === 5 && !bringYourOwn && (
 							<>
 								<h1 className="font-extrabold text-[clamp(1.75rem,3vw,2.375rem)] text-ink tracking-[-0.03em]">
 									Where the money lands
@@ -2367,7 +2703,9 @@ export function CaseWizard({
 											{
 												label: payoutReady
 													? `Payout account ready · ${payout?.attorney?.firmName ?? attorneyName}`
-													: `Payout account — waiting on ${attorneyName}`,
+													: payout?.attorney
+														? `Payout account — waiting on ${payout.attorney.firmName ?? attorneyName}`
+														: "Payout account — no attorney linked to this case yet",
 												done: payoutReady,
 											},
 										].map((item) => (
@@ -2421,14 +2759,16 @@ export function CaseWizard({
 								size="lg"
 								className="px-6"
 								onClick={publish}
-								// Gated on the firm being able to receive. `goLiveCase`
-								// enforces this server-side from the case row; disabling here
-								// is so the plaintiff is not invited to press it.
-								disabled={publishing || !payoutReady}
+								// Never disabled on "not ready": pressing it re-checks the firm's
+								// account with Stripe (`goLiveAction` refreshes first), which is
+								// how the case unsticks when the attorney enabled payouts after
+								// this page loaded. `goLiveCase` still enforces readiness
+								// server-side, so a genuine not-ready case can't slip public.
+								disabled={publishing}
 								title={
 									payoutReady
 										? undefined
-										: `Waiting on ${attorneyName}'s payout account`
+										: "Re-check the firm's payout account and publish if it's ready"
 								}
 							>
 								<Rocket data-icon="inline-start" aria-hidden="true" />
@@ -2436,7 +2776,26 @@ export function CaseWizard({
 									? "Publishing…"
 									: payoutReady
 										? "Publish & go live"
-										: "Waiting on your attorney"}
+										: "Check & publish"}
+							</Button>
+						) : step === 5 && bringYourOwn ? (
+							// The bring-your-own path ends here: the case is published as
+							// seeking and the attorney is emailed. There is nothing to review
+							// and publish until they confirm.
+							<Button
+								type="button"
+								size="lg"
+								className="px-6"
+								onClick={sendInvitation}
+								disabled={committing || !canSendInvite}
+								title={
+									canSendInvite
+										? undefined
+										: "Add your attorney's email address first"
+								}
+							>
+								<Send data-icon="inline-start" aria-hidden="true" />
+								{committing ? "Sending…" : "Send invitation"}
 							</Button>
 						) : step === 5 ? (
 							// One control, whether or not the case has been sent yet: it

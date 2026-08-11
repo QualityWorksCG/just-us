@@ -12,6 +12,7 @@ import {
 	Mail,
 	TrendingUp,
 } from "lucide-react";
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
@@ -76,10 +77,17 @@ const MAGIC_LINK_ERRORS: Record<string, string> = {
 export function AuthScreen({
 	initialMode = "signin",
 	initialError,
+	next,
 }: {
 	initialMode?: Mode;
 	initialError?: string;
+	/** Where to land after signing in, when they were interrupted on the way
+	 *  somewhere. Already validated as a same-site path by the page. */
+	next?: string | null;
 }) {
+	// One name for every post-sign-in destination, so the password form, the magic
+	// link and its callback can't drift apart.
+	const landing = next ?? "/home";
 	const router = useRouter();
 	const ids = {
 		name: useId(),
@@ -175,12 +183,12 @@ export function AuthScreen({
 			{
 				email: siEmail.trim(),
 				password: siPassword,
-				callbackURL: "/home",
+				callbackURL: landing,
 			},
 			{
 				onSuccess: () => {
 					toast.success("Signed in");
-					router.push("/home");
+					router.push(landing as Route);
 				},
 				onError: (ctx) => {
 					const msg = ctx.error.message || ctx.error.statusText;
@@ -235,7 +243,7 @@ export function AuthScreen({
 		await authClient.signIn.magicLink(
 			{
 				email: target,
-				callbackURL: "/home",
+				callbackURL: landing,
 				errorCallbackURL: "/login?mode=signin",
 			},
 			{

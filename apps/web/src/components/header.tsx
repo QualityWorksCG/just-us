@@ -30,6 +30,8 @@ const CHROME_LESS_ROUTES = [
 	"/cases/new",
 	"/terms",
 	"/privacy",
+	// The certificate of appreciation is its own full-bleed, printable page.
+	"/certificates",
 ];
 
 export default function Header() {

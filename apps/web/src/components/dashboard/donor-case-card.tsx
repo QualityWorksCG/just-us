@@ -3,6 +3,7 @@
 
 import { cn } from "@just-us/ui/lib/utils";
 import {
+	Bell,
 	Bookmark,
 	HandCoins,
 	Heart,
@@ -21,6 +22,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { toggleSaveAction } from "@/app/(app)/donor-actions";
+import { toggleFollowAction } from "@/app/(app)/follow-actions";
 import type { DonorCase } from "@/components/dashboard/donor-case";
 import { donateHref } from "@/lib/donate-link";
 
@@ -72,18 +74,25 @@ const DEFAULT_CAT = { bg: "bg-brass-wash", fg: "text-brass-deep", icon: Scale };
 const STATUS_BADGE: Record<string, { label: string; dot: string }> = {
 	live: { label: "Live · Raising", dot: "bg-success" },
 	seeking: { label: "Seeking attorney", dot: "bg-brass-deep" },
-	closed: { label: "Resolved", dot: "bg-green-deep" },
+	closed: { label: "Closed", dot: "bg-green-deep" },
 	draft: { label: "Draft", dot: "bg-ink-soft" },
 };
 
 export function DonorCaseCard({
 	c,
 	initialSaved,
+	initialFollowing = false,
+	backed = false,
 	variant = "full",
 	hasNewUpdate = false,
 }: {
 	c: DonorCase;
 	initialSaved: boolean;
+	/** Whether the viewer already follows this case (for the follow CTA). */
+	initialFollowing?: boolean;
+	/** Whether the viewer has already donated to this case — shows a "Backed" tag
+	 *  and turns the CTA into "Give again". */
+	backed?: boolean;
 	variant?: "full" | "compact";
 	/** Show a "New update" tag — a followed case has updates the donor hasn't
 	 *  seen. */
@@ -91,6 +100,8 @@ export function DonorCaseCard({
 }) {
 	const [saved, setSaved] = useState(initialSaved);
 	const [, startSave] = useTransition();
+	const [following, setFollowing] = useState(initialFollowing);
+	const [, startFollow] = useTransition();
 	const pathname = usePathname();
 	const pct =
 		c.goal > 0 ? Math.min(100, Math.round((c.raised / c.goal) * 100)) : 0;
@@ -119,6 +130,24 @@ export function DonorCaseCard({
 				toast.error("Couldn't update saved cases.");
 			} else {
 				toast.success(next ? "Saved for later." : "Removed from saved.");
+			}
+		});
+	}
+
+	function toggleFollow() {
+		const next = !following;
+		setFollowing(next);
+		startFollow(async () => {
+			const res = await toggleFollowAction({ caseId: c.id, follow: next });
+			if (!res.ok) {
+				setFollowing(!next);
+				toast.error("Couldn't update following.");
+			} else {
+				toast.success(
+					next
+						? "Following — you'll get this case's updates."
+						: "Unfollowed — you'll stop getting updates.",
+				);
 			}
 		});
 	}
@@ -156,14 +185,20 @@ export function DonorCaseCard({
 			</Link>
 			{/* Status badge + optional "new update" tag */}
 			<div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-1.5">
-				<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-surface/90 px-2.5 py-1 font-mono font-semibold text-[10px] text-ink uppercase tracking-[0.06em] backdrop-blur-sm">
+				<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-surface/90 px-2.5 py-1 font-mono font-semibold text-[10px] text-ink uppercase leading-none tracking-[0.06em] backdrop-blur-sm">
 					<span className={cn("size-1.5 rounded-full", status.dot)} />
 					{status.label}
 				</span>
 				{hasNewUpdate && (
-					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-gold-bright px-2.5 py-1 font-mono font-semibold text-[10px] text-gold-bright-ink uppercase tracking-[0.06em] shadow-[var(--shadow-rest)]">
+					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-gold-bright px-2.5 py-1 font-mono font-semibold text-[10px] text-gold-bright-ink uppercase leading-none tracking-[0.06em] shadow-[var(--shadow-rest)]">
 						<Megaphone className="size-3" aria-hidden="true" />
 						New update
+					</span>
+				)}
+				{backed && (
+					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-deep px-2.5 py-1 font-mono font-semibold text-[10px] text-white uppercase leading-none tracking-[0.06em] shadow-[var(--shadow-rest)]">
+						<Heart className="size-3 fill-current" aria-hidden="true" />
+						Backed
 					</span>
 				)}
 			</div>
@@ -200,9 +235,17 @@ export function DonorCaseCard({
 					<div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
 						{/* Plaintiff — the person raising the case */}
 						<div className="flex items-center gap-2">
-							<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-green-soft font-bold text-[10px] text-green-deep">
-								{initials(c.owner)}
-							</span>
+							{c.ownerImage ? (
+								<img
+									src={c.ownerImage}
+									alt=""
+									className="size-7 shrink-0 rounded-full object-cover"
+								/>
+							) : (
+								<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-green-soft font-bold text-[10px] text-green-deep">
+									{initials(c.owner)}
+								</span>
+							)}
 							<div className="min-w-0 leading-tight">
 								<p className="truncate font-bold text-[12.5px] text-ink">
 									{c.owner}
@@ -215,9 +258,17 @@ export function DonorCaseCard({
 						{/* Attorney — their lawyer */}
 						{c.attorney ? (
 							<div className="flex items-center gap-2">
-								<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brass-wash font-bold text-[10px] text-brass-deep">
-									{initials(c.attorney)}
-								</span>
+								{c.attorneyImage ? (
+									<img
+										src={c.attorneyImage}
+										alt=""
+										className="size-7 shrink-0 rounded-full object-cover"
+									/>
+								) : (
+									<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brass-wash font-bold text-[10px] text-brass-deep">
+										{initials(c.attorney)}
+									</span>
+								)}
 								<div className="min-w-0 leading-tight">
 									<p className="truncate font-bold text-[12.5px] text-ink">
 										{c.attorney}
@@ -275,17 +326,41 @@ export function DonorCaseCard({
 						className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brass px-4 font-semibold text-[13.5px] text-white transition-colors hover:bg-brass-deep"
 					>
 						<HandCoins className="size-4" aria-hidden="true" />
-						Back this case
+						{backed ? "Give again" : "Back this case"}
 					</Link>
 					{variant === "full" && (
-						<button
-							type="button"
-							onClick={share}
-							aria-label="Share"
-							className="flex size-10 items-center justify-center rounded-[var(--radius-control)] border border-border bg-surface text-ink-soft transition-colors hover:border-brass-deep hover:text-brass-deep"
-						>
-							<Share2 className="size-4" aria-hidden="true" />
-						</button>
+						<>
+							<button
+								type="button"
+								onClick={toggleFollow}
+								aria-pressed={following}
+								aria-label={
+									following
+										? "Following — stop getting updates"
+										: "Follow for updates"
+								}
+								title={following ? "Following" : "Follow for updates"}
+								className={cn(
+									"flex size-10 items-center justify-center rounded-[var(--radius-control)] border transition-colors",
+									following
+										? "border-brass-deep bg-brass-wash text-brass-deep"
+										: "border-border bg-surface text-ink-soft hover:border-brass-deep hover:text-brass-deep",
+								)}
+							>
+								<Bell
+									className={cn("size-4", following && "fill-brass-deep")}
+									aria-hidden="true"
+								/>
+							</button>
+							<button
+								type="button"
+								onClick={share}
+								aria-label="Share"
+								className="flex size-10 items-center justify-center rounded-[var(--radius-control)] border border-border bg-surface text-ink-soft transition-colors hover:border-brass-deep hover:text-brass-deep"
+							>
+								<Share2 className="size-4" aria-hidden="true" />
+							</button>
+						</>
 					)}
 				</div>
 			</div>

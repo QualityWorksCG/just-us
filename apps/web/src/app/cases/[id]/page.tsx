@@ -1,8 +1,10 @@
 import type { Role } from "@just-us/auth";
-import { getPublicCase } from "@just-us/db/cases";
+import { getViewableCase } from "@just-us/db/cases";
 import {
+	countCaseDonations,
 	donorSupportForCase,
 	getDonationForCheckoutSession,
+	listCaseBackers,
 } from "@just-us/db/donations";
 import { isCaseFollowing } from "@just-us/db/follows";
 import {
@@ -48,7 +50,7 @@ export async function generateMetadata({
 	params: Promise<{ id: string }>;
 }): Promise<Metadata> {
 	const { id } = await params;
-	const c = await getPublicCase(id);
+	const c = await getViewableCase(id);
 	if (!c) return { title: "Case not found" };
 	return {
 		title: `${c.title} · JustUs Financial`,
@@ -80,7 +82,7 @@ export default async function PublicCasePage({
 	// they were never told about. No-ops unless the case is live and unbound.
 	await bindReadyLiveCase(id);
 
-	const c = await getPublicCase(id);
+	const c = await getViewableCase(id);
 	if (!c) notFound();
 
 	const owner = c.owner?.name ?? "A plaintiff";
@@ -89,6 +91,10 @@ export default async function PublicCasePage({
 	// case's *bound* payout account, so the button state and the charge path agree
 	// rather than each deciding for itself.
 	const destination = await resolvePayoutDestination(c.id);
+	const [backers, donationCount] = await Promise.all([
+		listCaseBackers(c.id),
+		countCaseDonations(c.id),
+	]);
 	const BLOCKED: Record<string, string> = {
 		not_live: "This case isn't raising right now.",
 		unbound:
@@ -168,11 +174,16 @@ export default async function PublicCasePage({
 						feeBps: platformFeeBps(),
 						alreadyBacked: iBackedThis,
 						canDonate: destination.ok,
+						closed: c.status === "closed",
 						blockedReason: destination.ok
 							? null
-							: (BLOCKED[destination.reason] ?? null),
+							: c.status === "closed"
+								? "This case has closed. Thank you to everyone who backed it."
+								: (BLOCKED[destination.reason] ?? null),
 					}}
 					fundsNote={fundsNote}
+					backers={backers}
+					donationCount={donationCount}
 					backHref={"/cases" as Route}
 					backLabel="Back to cases"
 					canSave={canSave}
