@@ -6,6 +6,7 @@ import {
 import { env } from "@just-us/env/server";
 import { isPaymentsConfigured, type Stripe, stripe } from "@just-us/payments";
 import { sendDonationAcknowledgement } from "@/lib/donation-acknowledgement";
+import { notifyDonation } from "@/lib/notify";
 
 /**
  * The donation ledger webhook.
@@ -75,6 +76,7 @@ export async function POST(request: Request): Promise<Response> {
 				// payment event.
 				if (applied && donationId) {
 					await sendDonationAcknowledgement(donationId);
+					await notifyDonation(donationId).catch(() => {});
 				}
 				break;
 			}

@@ -83,7 +83,7 @@ export default async function CaseUpdatesPage({
 		clientName = c.owner.name;
 	}
 
-	const updates = await listCaseUpdates(id);
+	const updates = await listCaseUpdates(id, { includeModerated: true });
 	// The plaintiff's "who sees this" audience counts followers alongside backers.
 	const followers = isAttorney ? 0 : await countCaseFollowers(id);
 	const goal = goalCents / 100;

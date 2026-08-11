@@ -44,10 +44,21 @@ const replySchema = z
 const conversationSchema = z
 	.object({ conversationId: z.string().min(1) })
 	.strict();
+/** The categories a participant can report a conversation under. */
+const REPORT_CATEGORIES = [
+	"spam",
+	"fraud",
+	"harassment",
+	"inappropriate",
+	"other",
+] as const;
+
 const reportSchema = z
 	.object({
 		conversationId: z.string().min(1),
-		reason: z.string().trim().min(5).max(1000),
+		category: z.enum(REPORT_CATEGORIES),
+		// Detail is optional now — the category carries the signal. Trimmed, capped.
+		reason: z.string().trim().max(1000).optional().default(""),
 	})
 	.strict();
 
@@ -194,7 +205,7 @@ export async function reportConversationAction(
 	if (!parsed.success)
 		return {
 			ok: false,
-			error: "Describe the issue in at least five characters.",
+			error: "Choose a category for your report.",
 		};
 	const report = await reportConversation({
 		reporterId: session.user.id,

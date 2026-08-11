@@ -6,6 +6,7 @@ import {
 } from "@just-us/db/donations";
 import { isPaymentsConfigured, stripe } from "@just-us/payments";
 import { sendDonationAcknowledgement } from "./donation-acknowledgement";
+import { notifyDonation } from "./notify";
 
 /**
  * Catching a donation up with Stripe on read.
@@ -71,6 +72,9 @@ export async function syncDonationBySession(
 		// two paths can hold it.
 		if (applied && donationId) {
 			await sendDonationAcknowledgement(donationId);
+			// In-app donation notification for the donor (the email receipt is the
+			// line above). Both are once-only, so redelivery never doubles either.
+			await notifyDonation(donationId).catch(() => {});
 		}
 		// Settled either way: `applied: false` here means the webhook got there first,
 		// which is still a paid donation now folded into the case.

@@ -113,6 +113,9 @@ function queueWhere(filters: QueueFilters = {}) {
 	return {
 		status: "seeking" as const,
 		deletedAt: null,
+		// A case held or removed by moderation is not offered to attorneys either
+		// (Reg. & Ops §3–4) — the attorney queue is a visibility surface too.
+		moderationStatus: "ok" as const,
 		match: { is: null },
 		invitations: { none: pendingCaseInvitationWhere(new Date()) },
 		...(filters.category ? { category: filters.category } : {}),
@@ -332,6 +335,41 @@ export async function expressInterest(
 		// no-op, and the attorney's interest is on record either way.
 		return { ok: false, reason: "already_expressed" };
 	}
+}
+
+/** One expression of interest with the facts a plaintiff's notification needs:
+ *  the case, its owner (recipient), and the interested attorney's display name. */
+export async function getInterestForNotify(interestId: string) {
+	const r = await prisma.attorneyRequest.findUnique({
+		where: { id: interestId },
+		select: {
+			id: true,
+			caseId: true,
+			case: {
+				select: {
+					title: true,
+					ownerId: true,
+					owner: { select: { name: true, email: true } },
+				},
+			},
+			attorney: {
+				select: {
+					name: true,
+					attorneyProfile: { select: { legalName: true } },
+				},
+			},
+		},
+	});
+	if (!r) return null;
+	return {
+		interestId: r.id,
+		caseId: r.caseId,
+		caseTitle: r.case.title || "your case",
+		ownerId: r.case.ownerId,
+		ownerName: r.case.owner?.name ?? null,
+		ownerEmail: r.case.owner?.email ?? null,
+		attorneyName: r.attorney.attorneyProfile?.legalName ?? r.attorney.name,
+	};
 }
 
 /**

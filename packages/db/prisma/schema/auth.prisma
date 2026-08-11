@@ -15,6 +15,11 @@ model User {
   // (welcome + role selection). Gates access to the app until done.
   onboarded Boolean @default(false)
 
+  // Donor privacy: when true, this account's donations show as "Anonymous" in a
+  // case's public supporter list instead of by name. Default false — names show,
+  // which is what most donors expect and what makes the supporter list feel human.
+  donationsAnonymous Boolean @default(false)
+
   // Licensing jurisdiction (US state) — where an attorney is admitted to
   // practice. Captured at sign-up for attorneys only (JUS-12) — see
   // JURISDICTION_ROLES in the auth package. Gates bar verification and the

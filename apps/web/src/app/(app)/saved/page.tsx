@@ -1,3 +1,4 @@
+import { listBackedCases } from "@just-us/db/donations";
 import {
 	followedCaseIdsWithUnseenUpdates,
 	listFollowedCases,
@@ -5,7 +6,7 @@ import {
 import { listSavedCases } from "@just-us/db/saves";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { Bell, Bookmark } from "lucide-react";
+import { Bell, Bookmark, HandCoins } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 
@@ -16,9 +17,18 @@ import { requireRole } from "@/lib/auth-server";
 const TABS = [
 	{ key: "saved", label: "Saved" },
 	{ key: "following", label: "Following" },
+	{ key: "backed", label: "Backed" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["key"];
+
+const INTRO: Record<Tab, string> = {
+	saved: "Cases you've saved to come back to.",
+	following:
+		"Cases you're following — you'll see every new update here and in your bell.",
+	backed:
+		"Cases you've contributed to — including ones that have closed, so you can look back on them any time.",
+};
 
 export default async function SavedPage({
 	searchParams,
@@ -26,35 +36,45 @@ export default async function SavedPage({
 	searchParams: Promise<{ tab?: string }>;
 }) {
 	const { session } = await requireRole("donor");
-	const tab: Tab =
-		(await searchParams)?.tab === "following" ? "following" : "saved";
+	const raw = (await searchParams)?.tab;
+	const tab: Tab = raw === "following" || raw === "backed" ? raw : "saved";
 
-	const [saved, followed, unseen] = await Promise.all([
+	const [saved, followed, unseen, backed] = await Promise.all([
 		listSavedCases(session.user.id),
 		listFollowedCases(session.user.id),
 		followedCaseIdsWithUnseenUpdates(session.user.id),
+		// Every case this donor has given to, live or closed, newest gift first.
+		listBackedCases(session.user.id),
 	]);
 
-	const cases = tab === "following" ? followed : saved;
+	const backedCases = backed.map((b) => b.case);
+	const cases =
+		tab === "following" ? followed : tab === "backed" ? backedCases : saved;
+	const savedIds = new Set(saved.map((c) => c.id));
+	const followedIds = new Set(followed.map((c) => c.id));
+	const backedSet = new Set(backedCases.map((c) => c.id));
+
+	const counts: Record<Tab, number> = {
+		saved: saved.length,
+		following: followed.length,
+		backed: backedCases.length,
+	};
 
 	return (
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				{tab === "following"
-					? "Cases you're following — you'll see every new update here and in your bell."
-					: "Cases you've saved to come back to."}
+				{INTRO[tab]}
 			</p>
 
 			{/* Tabs */}
 			<div className="flex flex-wrap gap-2">
 				{TABS.map((t) => {
 					const active = t.key === tab;
-					const count = t.key === "following" ? followed.length : saved.length;
 					return (
 						<Link
 							key={t.key}
 							href={
-								(t.key === "saved" ? "/saved" : "/saved?tab=following") as Route
+								(t.key === "saved" ? "/saved" : `/saved?tab=${t.key}`) as Route
 							}
 							aria-current={active ? "page" : undefined}
 							className={cn(
@@ -73,7 +93,7 @@ export default async function SavedPage({
 										: "bg-surface-2 text-ink-soft",
 								)}
 							>
-								{count}
+								{counts[t.key]}
 							</span>
 						</Link>
 					);
@@ -85,6 +105,8 @@ export default async function SavedPage({
 					<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
 						{tab === "following" ? (
 							<Bell className="size-6" aria-hidden="true" />
+						) : tab === "backed" ? (
+							<HandCoins className="size-6" aria-hidden="true" />
 						) : (
 							<Bookmark className="size-6" aria-hidden="true" />
 						)}
@@ -92,12 +114,16 @@ export default async function SavedPage({
 					<p className="font-bold text-[16px] text-ink">
 						{tab === "following"
 							? "Not following any cases yet"
-							: "Nothing saved yet"}
+							: tab === "backed"
+								? "You haven't backed a case yet"
+								: "Nothing saved yet"}
 					</p>
 					<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
 						{tab === "following"
 							? "Follow a case while you browse to get its updates here and in your bell."
-							: "Save cases while you browse to keep them handy here."}
+							: tab === "backed"
+								? "When you donate to a case, it shows here — even after it closes, so you can always look back."
+								: "Save cases while you browse to keep them handy here."}
 					</p>
 					<Link
 						href={"/discover" as Route}
@@ -112,7 +138,9 @@ export default async function SavedPage({
 						<DonorCaseCard
 							key={c.id}
 							c={toDonorCase(c)}
-							initialSaved={tab === "saved"}
+							initialSaved={savedIds.has(c.id)}
+							initialFollowing={followedIds.has(c.id)}
+							backed={backedSet.has(c.id)}
 							hasNewUpdate={tab === "following" && unseen.has(c.id)}
 						/>
 					))}

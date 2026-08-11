@@ -10,12 +10,12 @@ import {
 	upsertCaseInvitationForPublish,
 } from "@just-us/db/case-invitations";
 import {
+	closeCase,
 	deleteDraft,
 	getOwnedCase,
 	incrementShareCount,
 	publishCase,
 	publishForAttorneys,
-	restoreCase,
 	revertSeekingToDraft,
 	saveDraft,
 	softDeleteCase,
@@ -32,6 +32,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth-server";
+import { notifyCaseClosed, notifyStatusChange } from "@/lib/notify";
 import { THANK_YOU_MAX, THANK_YOU_TOO_LONG } from "@/lib/thank-you-note";
 
 /** How far the representing firm's Stripe setup for this case has got. */
@@ -186,6 +187,7 @@ export async function publishForAttorneysAction(
 		if (created.status !== "seeking") {
 			return { ok: false, error: NOT_REPUBLISHABLE };
 		}
+		await notifyStatusChange(created.id, "seeking").catch(() => {});
 		// This path clears the attorney the plaintiff had named — they chose "No, not
 		// yet" instead. Any invitation still out on that name has to go with it: it is
 		// what holds the case out of the queue they just asked to be in, and it is a
@@ -214,8 +216,8 @@ export type SaveDraftResult =
 
 export type DeleteCaseResult = { ok: true } | { ok: false; error: string };
 
-/** Soft-delete an owned draft. The row (and its images) are kept so it can be
- *  restored from the Deleted tab. */
+/** Delete an owned draft. Deletion is permanent — the row is retained only as a
+ *  record in the Deleted tab and can never be restored. */
 export async function deleteCaseAction(id: string): Promise<DeleteCaseResult> {
 	const { session } = await requireRole("plaintiff");
 	const existing = await getOwnedCase(id, session.user.id);
@@ -232,18 +234,42 @@ export async function deleteCaseAction(id: string): Promise<DeleteCaseResult> {
 	}
 }
 
-/** Restore a previously deleted case from the Deleted tab. */
-export async function restoreCaseAction(id: string): Promise<DeleteCaseResult> {
+const CLOSE_REASONS: Record<string, string> = {
+	case_not_found: "That case couldn't be found.",
+	not_live: "Only a live case can be closed.",
+	already_closed: "This case is already closed.",
+};
+
+/**
+ * Mark a live case Closed — the plaintiff's own act (mirrors go-live).
+ *
+ * On success, the close fan-out runs: backers get a certificate of appreciation
+ * and the plaintiff is notified. It is `.catch`-swallowed so a mail/generation
+ * hiccup can't undo a close that already happened — the certificates are also
+ * regenerated idempotently on any later close, and the AC's 24-hour window leaves
+ * ample room for a retry.
+ */
+export async function closeCaseAction(id: string): Promise<DeleteCaseResult> {
 	const { session } = await requireRole("plaintiff");
 	try {
-		const res = await restoreCase(id, session.user.id);
-		if (res.count === 0) {
-			return { ok: false, error: "Couldn't find that case to restore." };
+		const res = await closeCase(id, session.user.id);
+		if (!res.ok) {
+			return {
+				ok: false,
+				error: CLOSE_REASONS[res.reason] ?? "Couldn't close this case.",
+			};
 		}
+		await notifyCaseClosed(id).catch(() => {});
+		// The case leaves the public directory and its manage view changes.
+		revalidatePath(`/my-cases/${id}`);
 		revalidatePath("/my-cases");
+		revalidatePath(`/cases/${id}`);
+		revalidatePath(`/discover/${id}`);
+		revalidatePath("/discover");
+		revalidatePath("/home");
 		return { ok: true };
 	} catch {
-		return { ok: false, error: "Couldn't restore the case. Please try again." };
+		return { ok: false, error: "Couldn't close this case. Please try again." };
 	}
 }
 
@@ -455,6 +481,7 @@ export async function commitCaseAction(
 		});
 		const payout = await getCasePayoutOptions(created.id, session.user.id);
 		if (!payout) return { ok: false, error: "Couldn't find that case." };
+		await notifyStatusChange(created.id, "pending_payout").catch(() => {});
 		// The attorney's own screens now list this case and count it as waiting on
 		// them — see `attorneyPayoutReadiness`.
 		revalidatePath("/my-cases");

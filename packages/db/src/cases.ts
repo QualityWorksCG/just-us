@@ -83,11 +83,35 @@ export async function saveDraft(
 ) {
 	const data = toData(input);
 	if (input.id) {
+		// Update the owner's own case in place. Deliberately NOT scoped to
+		// `status: "draft"`: a case resumed in the wizard after it has moved on
+		// (sent to its attorney — `seeking` — or committed — `pending_payout`) is
+		// still theirs to save, and — the bug this guards — must never fall through
+		// to `create`. It used to: scoped to drafts only, "Save & exit" on a
+		// committed case matched nothing and quietly spawned a duplicate draft that
+		// carried the attorney's *name* but neither the match nor its payout account,
+		// which is what stranded plaintiffs on a fresh case that could never link a
+		// payout. `toData` writes content columns only, so status, payout binding and
+		// match stay untouched, and the wizard loads every content field, so a
+		// round-trip blanks nothing.
 		const res = await prisma.case.updateMany({
-			where: { id: input.id, ownerId: input.ownerId, status: "draft" },
+			where: {
+				id: input.id,
+				ownerId: input.ownerId,
+				deletedAt: null,
+				status: { in: ["draft", "seeking", "pending_payout"] },
+			},
 			data,
 		});
 		if (res.count > 0) return { id: input.id };
+		// The id is one the owner holds but has already gone public or closed. It is
+		// not the wizard's to rewrite from here, and must still never be duplicated —
+		// return it as-is rather than creating a copy.
+		const owned = await prisma.case.findFirst({
+			where: { id: input.id, ownerId: input.ownerId, deletedAt: null },
+			select: { id: true },
+		});
+		if (owned) return { id: owned.id };
 	}
 	const created = await prisma.case.create({
 		data: { ownerId: input.ownerId, ...data, status: "draft" },
@@ -185,7 +209,7 @@ export async function publishForAttorneys(
 				// than `pending_payout`. Re-running the wizard against the id of a case
 				// that is already raising, or already handed to its attorney, must not
 				// walk it backwards — donors are on the first and a firm is set up on the
-				// second. `closed` is final.
+				// second. `closed` is final, and can never reopen.
 				status: { in: ["draft", "seeking"] },
 			},
 			data,
@@ -412,7 +436,7 @@ export async function caseEvidenceFile(input: {
  *  first. Includes the plaintiff's name for display. */
 export async function listLiveCases(take = 6) {
 	return prisma.case.findMany({
-		where: { status: "live", deletedAt: null },
+		where: { status: "live", deletedAt: null, moderationStatus: "ok" },
 		orderBy: [{ raisedCents: "desc" }, { publishedAt: "desc" }],
 		take,
 		include: { owner: { select: { name: true } } },
@@ -424,10 +448,113 @@ export async function listLiveCases(take = 6) {
  *  sees the same progress the plaintiff and attorney posted (JUS-33). */
 export async function getPublicCase(id: string) {
 	return prisma.case.findFirst({
-		where: { id, status: "live", deletedAt: null },
+		where: { id, status: "live", deletedAt: null, moderationStatus: "ok" },
 		include: {
-			owner: { select: { name: true } },
+			// `image` powers the plaintiff's avatar; the matched attorney's photo comes
+			// from their directory headshot, falling back to their account avatar.
+			owner: { select: { name: true, image: true } },
+			match: {
+				select: {
+					attorney: {
+						select: {
+							name: true,
+							image: true,
+							attorneyProfile: { select: { headshotUrl: true } },
+						},
+					},
+				},
+			},
 			updates: {
+				// Held/removed updates are withheld from the public page (Reg. & Ops §3–4).
+				where: { moderationStatus: "ok" },
+				orderBy: { createdAt: "desc" },
+				select: {
+					id: true,
+					body: true,
+					createdAt: true,
+					editedAt: true,
+					authorId: true,
+					tag: true,
+					attachments: true,
+				},
+			},
+		},
+	});
+}
+
+/**
+ * A case a donor can still *read* — live or closed — for looking back on one they
+ * backed after it resolves. Same shape as `getPublicCase`, so it renders through
+ * the same view; the caller disables donating for a closed case (it's no longer
+ * raising). Draft/seeking/pending and moderated-away cases are still nothing here.
+ */
+export async function getViewableCase(id: string) {
+	return prisma.case.findFirst({
+		where: {
+			id,
+			status: { in: ["live", "closed"] },
+			deletedAt: null,
+			moderationStatus: "ok",
+		},
+		include: {
+			// Same shape as `getPublicCase` (see there) so both render through
+			// PublicCaseView — the plaintiff and matched-attorney avatars need images.
+			owner: { select: { name: true, image: true } },
+			match: {
+				select: {
+					attorney: {
+						select: {
+							name: true,
+							image: true,
+							attorneyProfile: { select: { headshotUrl: true } },
+						},
+					},
+				},
+			},
+			updates: {
+				where: { moderationStatus: "ok" },
+				orderBy: { createdAt: "desc" },
+				select: {
+					id: true,
+					body: true,
+					createdAt: true,
+					editedAt: true,
+					authorId: true,
+					tag: true,
+					attachments: true,
+				},
+			},
+		},
+	});
+}
+
+/**
+ * Any case, for an administrator's in-dashboard preview from the campaigns table.
+ *
+ * Unlike `getPublicCase`/`getViewableCase`, this applies no status, moderation, or
+ * deleted filter — oversight has to reach a draft, a removed campaign, or a
+ * seeking case just the same. The shape is identical to `getPublicCase` so the
+ * admin page renders through the very same `PublicCaseView` the donor sees; the
+ * updates stay filtered to `ok` so the preview matches the public reading of it.
+ */
+export async function getCaseForAdmin(id: string) {
+	return prisma.case.findFirst({
+		where: { id },
+		include: {
+			owner: { select: { name: true, image: true } },
+			match: {
+				select: {
+					attorney: {
+						select: {
+							name: true,
+							image: true,
+							attorneyProfile: { select: { headshotUrl: true } },
+						},
+					},
+				},
+			},
+			updates: {
+				where: { moderationStatus: "ok" },
 				orderBy: { createdAt: "desc" },
 				select: {
 					id: true,
@@ -457,6 +584,8 @@ function browseWhere(opts?: BrowseFilters) {
 	return {
 		status: "live" as const,
 		deletedAt: null,
+		// Never surface content held or removed by moderation (Reg. & Ops §3–4).
+		moderationStatus: "ok" as const,
 		...(opts?.state ? { location: opts.state } : {}),
 		...(opts?.category ? { category: opts.category } : {}),
 		...(q
@@ -489,7 +618,11 @@ export async function browseLiveCases(
 					: { donorsCount: "desc" as const },
 		skip: opts?.skip,
 		take: opts?.take ?? 60,
-		include: { owner: { select: { name: true } } },
+		include: {
+			owner: { select: { name: true, image: true } },
+			// The matched attorney's account — its photo, when there is one.
+			match: { select: { attorney: { select: { image: true } } } },
+		},
 	});
 }
 
@@ -632,10 +765,38 @@ export async function softDeleteCase(id: string, ownerId: string) {
 	});
 }
 
-/** Restore a previously soft-deleted case. Returns count. */
-export async function restoreCase(id: string, ownerId: string) {
-	return prisma.case.updateMany({
-		where: { id, ownerId, deletedAt: { not: null } },
-		data: { deletedAt: null },
+export type CloseCaseResult =
+	| { ok: true }
+	| { ok: false; reason: "case_not_found" | "not_live" | "already_closed" };
+
+/**
+ * Mark a live case Closed — the plaintiff's act, the counterpart to `goLiveCase`.
+ *
+ * Only a `live` case closes: closing is "this case has resolved / stopped
+ * funding", which draft/seeking/pending_payout cases have never started. The
+ * status-conditional `updateMany` (scoped to the owner) makes it idempotent, so a
+ * double submit or a retried action closes exactly once — the count decides. It
+ * deliberately does **not** touch money: closing acknowledges backers, it does
+ * not refund them, and there is nothing here that could.
+ */
+export async function closeCase(
+	id: string,
+	ownerId: string,
+): Promise<CloseCaseResult> {
+	const current = await prisma.case.findFirst({
+		where: { id, ownerId, deletedAt: null },
+		select: { status: true },
 	});
+	if (!current) return { ok: false, reason: "case_not_found" };
+	if (current.status === "closed")
+		return { ok: false, reason: "already_closed" };
+	if (current.status !== "live") return { ok: false, reason: "not_live" };
+
+	const res = await prisma.case.updateMany({
+		where: { id, ownerId, status: "live", deletedAt: null },
+		data: { status: "closed" },
+	});
+	// Lost the race to a concurrent close — treat as already done, not an error.
+	if (res.count === 0) return { ok: false, reason: "already_closed" };
+	return { ok: true };
 }

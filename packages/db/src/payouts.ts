@@ -281,29 +281,56 @@ export type PayoutDestination =
 export async function resolvePayoutDestination(
 	caseId: string,
 ): Promise<PayoutDestination> {
+	const accountSelect = {
+		id: true,
+		stripeAccountId: true,
+		transfersEnabled: true,
+		user: { select: { name: true, firmName: true } },
+	} as const;
+
 	const k = await prisma.case.findFirst({
 		where: { id: caseId, deletedAt: null },
 		select: {
+			id: true,
 			status: true,
-			payoutAccount: {
-				select: {
-					stripeAccountId: true,
-					transfersEnabled: true,
-					user: { select: { name: true, firmName: true } },
-				},
-			},
+			payoutAccountId: true,
+			// The bound destination (the frozen recipient).
+			payoutAccount: { select: accountSelect },
+			// The account the attorney opened *for this case*, whether or not the case
+			// has been bound to it yet.
+			payoutAccountForCase: { select: accountSelect },
 		},
 	});
 	if (!k || k.status !== "live") return { ok: false, reason: "not_live" };
-	if (!k.payoutAccount) return { ok: false, reason: "unbound" };
-	if (!k.payoutAccount.transfersEnabled) {
+
+	let account = k.payoutAccount;
+
+	// Self-heal a live case that was never bound. Binding normally happens at
+	// go-live; a case that reached `live` without it (seeded/imported, or a missed
+	// bind after the attorney finished onboarding) is stranded — the firm can
+	// receive, but donors are told it "can't accept donations yet". If the case's
+	// own attorney account is ready, bind to it now. Safe: an unbound case has taken
+	// no donations, so there is no prior recipient disclosure to preserve.
+	if (!k.payoutAccountId && k.payoutAccountForCase?.transfersEnabled) {
+		await prisma.case.updateMany({
+			where: { id: k.id, payoutAccountId: null },
+			data: {
+				payoutAccountId: k.payoutAccountForCase.id,
+				payoutRecipient: "attorney",
+			},
+		});
+		account = k.payoutAccountForCase;
+	}
+
+	if (!account) return { ok: false, reason: "unbound" };
+	if (!account.transfersEnabled) {
 		return { ok: false, reason: "transfers_disabled" };
 	}
 	return {
 		ok: true,
-		stripeAccountId: k.payoutAccount.stripeAccountId,
-		holderName: k.payoutAccount.user.name,
-		holderFirm: k.payoutAccount.user.firmName?.trim() || null,
+		stripeAccountId: account.stripeAccountId,
+		holderName: account.user.name,
+		holderFirm: account.user.firmName?.trim() || null,
 	};
 }
 

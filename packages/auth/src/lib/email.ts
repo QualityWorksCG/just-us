@@ -2,10 +2,21 @@ import AdminInviteEmail, {
 	adminInviteSubject,
 } from "@just-us/email/admin-invite";
 import CaseInviteEmail, { caseInviteSubject } from "@just-us/email/case-invite";
+import CaseStatusEmail, { caseStatusSubject } from "@just-us/email/case-status";
+import CaseUpdateEmail, { caseUpdateSubject } from "@just-us/email/case-update";
+import CertificateEmail, {
+	certificateSubject,
+} from "@just-us/email/certificate";
 import DonationThankYouEmail, {
 	donationThankYouSubject,
 } from "@just-us/email/donation-thank-you";
+import ExpressionOfInterestEmail, {
+	expressionOfInterestSubject,
+} from "@just-us/email/expression-of-interest";
 import MagicLinkEmail, { magicLinkSubject } from "@just-us/email/magic-link";
+import ModerationNoticeEmail, {
+	moderationNoticeSubject,
+} from "@just-us/email/moderation-notice";
 import NewMessageEmail, { newMessageSubject } from "@just-us/email/new-message";
 import ResetPasswordEmail, {
 	resetPasswordSubject,
@@ -170,6 +181,32 @@ export function sendDonationThankYouEmail(params: {
 	});
 }
 
+/**
+ * A moderation-team notice — a report outcome to a reporter, or an account
+ * restriction to the person acted on. Copy is passed in so one template serves
+ * both; the CTA is optional (an account-restriction notice has nothing to act on).
+ */
+export function sendModerationNoticeEmail(params: {
+	to: string;
+	headline: string;
+	message: string;
+	recipientName?: string;
+	url?: string;
+	ctaLabel?: string;
+}) {
+	return send({
+		to: params.to,
+		subject: moderationNoticeSubject,
+		react: ModerationNoticeEmail({
+			headline: params.headline,
+			message: params.message,
+			recipientName: params.recipientName,
+			url: params.url,
+			ctaLabel: params.ctaLabel,
+		}),
+	});
+}
+
 /** Transactional JUS-66 message notification. The message body is intentionally
  * omitted so email previews do not expose private conversation content. */
 export function sendNewMessageEmail(params: {
@@ -185,6 +222,98 @@ export function sendNewMessageEmail(params: {
 			url: params.url,
 			recipientName: params.recipientName,
 			senderName: params.senderName,
+		}),
+	});
+}
+
+/** A new case update, to backers/followers. Deduped by the caller's Notification
+ *  reservation (see notifications.ts). */
+export function sendCaseUpdateEmail(params: {
+	to: string;
+	url: string;
+	caseTitle: string;
+	actorName: string;
+	recipientName?: string;
+	snippet?: string;
+	tagLabel?: string;
+}) {
+	return send({
+		to: params.to,
+		subject: caseUpdateSubject,
+		react: CaseUpdateEmail({
+			url: params.url,
+			caseTitle: params.caseTitle,
+			actorName: params.actorName,
+			recipientName: params.recipientName,
+			snippet: params.snippet,
+			tagLabel: params.tagLabel,
+		}),
+	});
+}
+
+/** An attorney expression of interest, to the plaintiff who owns the case. */
+export function sendExpressionOfInterestEmail(params: {
+	to: string;
+	url: string;
+	caseTitle: string;
+	attorneyName?: string;
+	recipientName?: string;
+}) {
+	return send({
+		to: params.to,
+		subject: expressionOfInterestSubject,
+		react: ExpressionOfInterestEmail({
+			url: params.url,
+			caseTitle: params.caseTitle,
+			attorneyName: params.attorneyName,
+			recipientName: params.recipientName,
+		}),
+	});
+}
+
+/**
+ * The certificate of appreciation for a backer of a closed case. Deduped by the
+ * caller's `Certificate.emailedAt` reservation — this sends whatever it's given,
+ * so calling it without that reservation held will send a duplicate.
+ */
+export function sendCertificateEmail(params: {
+	to: string;
+	url: string;
+	caseTitle: string;
+	recipientName?: string;
+	serial?: string;
+}) {
+	return send({
+		to: params.to,
+		subject: certificateSubject,
+		react: CertificateEmail({
+			url: params.url,
+			caseTitle: params.caseTitle,
+			recipientName: params.recipientName,
+			serial: params.serial,
+		}),
+	});
+}
+
+/** A case status change, to the plaintiff and (on live/closed) backers/followers.
+ *  Copy is passed in so one template serves every transition and audience. */
+export function sendCaseStatusEmail(params: {
+	to: string;
+	url: string;
+	headline: string;
+	message: string;
+	ctaLabel: string;
+	recipientName?: string;
+}) {
+	return send({
+		to: params.to,
+		subject: caseStatusSubject,
+		react: CaseStatusEmail({
+			url: params.url,
+			headline: params.headline,
+			message: params.message,
+			ctaLabel: params.ctaLabel,
+			recipientName: params.recipientName,
 		}),
 	});
 }

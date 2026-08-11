@@ -184,6 +184,30 @@ export async function markDonationSucceeded(input: {
  * Only a `succeeded` donation is returned. Acknowledging a gift that has not been
  * captured would thank someone for money that may never arrive.
  */
+/** The account (non-guest) user ids who have successfully backed a case — a
+ *  notification audience. Guests have no account to notify in-app. */
+export async function listCaseBackerUserIds(caseId: string): Promise<string[]> {
+	const rows = await prisma.donation.findMany({
+		where: { caseId, status: "succeeded", donorId: { not: null } },
+		distinct: ["donorId"],
+		select: { donorId: true },
+	});
+	return rows.flatMap((r) => (r.donorId ? [r.donorId] : []));
+}
+
+/** Minimal donation + case facts for the donor's in-app donation notification. */
+export async function getDonationNotifyInfo(donationId: string) {
+	return prisma.donation.findUnique({
+		where: { id: donationId },
+		select: {
+			id: true,
+			donorId: true,
+			amountCents: true,
+			case: { select: { id: true, title: true } },
+		},
+	});
+}
+
 export async function getDonationForAcknowledgement(donationId: string) {
 	return prisma.donation.findFirst({
 		where: { id: donationId, status: "succeeded" },
@@ -401,8 +425,27 @@ export async function listPendingDonationsForCase(input: {
  * and nothing else identifying — **never the email**, which is on the row for
  * receipts and claiming, not for display.
  */
-export async function listCaseBackers(caseId: string, take = 8) {
-	return prisma.donation.findMany({
+export type CaseBackerDisplay = {
+	id: string;
+	/** Ready to render — "Anonymous" when the donor opted out or gave as a guest
+	 *  with no name. Never the raw email. */
+	displayName: string;
+	anonymous: boolean;
+	amountCents: number;
+	at: Date | null;
+};
+
+/**
+ * A case's supporters for the public list, newest first. Respects each account
+ * donor's `donationsAnonymous` preference (their profile toggle) — anonymous
+ * donors and nameless guests both render as "Anonymous", so the list can be shown
+ * publicly without leaking anyone who asked not to be named.
+ */
+export async function listCaseBackers(
+	caseId: string,
+	take = 12,
+): Promise<CaseBackerDisplay[]> {
+	const rows = await prisma.donation.findMany({
 		where: { caseId, status: "succeeded" },
 		orderBy: { succeededAt: "desc" },
 		take,
@@ -414,6 +457,49 @@ export async function listCaseBackers(caseId: string, take = 8) {
 			succeededAt: true,
 		},
 	});
+	if (rows.length === 0) return [];
+
+	const donorIds = [
+		...new Set(rows.map((r) => r.donorId).filter((x): x is string => !!x)),
+	];
+	const users =
+		donorIds.length > 0
+			? await prisma.user.findMany({
+					where: { id: { in: donorIds } },
+					select: { id: true, name: true, donationsAnonymous: true },
+				})
+			: [];
+	const userById = new Map(users.map((u) => [u.id, u]));
+
+	return rows.map((r) => {
+		if (r.donorId) {
+			const u = userById.get(r.donorId);
+			const anon = u?.donationsAnonymous ?? false;
+			return {
+				id: r.id,
+				displayName: anon ? "Anonymous" : u?.name?.trim() || "A supporter",
+				anonymous: anon,
+				amountCents: r.amountCents,
+				at: r.succeededAt,
+			};
+		}
+		// Guest donation — show the name they gave at checkout, or Anonymous.
+		const name = r.donorName?.trim();
+		return {
+			id: r.id,
+			displayName: name || "Anonymous",
+			anonymous: !name,
+			amountCents: r.amountCents,
+			at: r.succeededAt,
+		};
+	});
+}
+
+/** How many successful gifts a case has received — counts every donation, so a
+ *  donor who gave twice counts twice. Distinct from `Case.donorsCount`, which
+ *  counts *people*. */
+export async function countCaseDonations(caseId: string): Promise<number> {
+	return prisma.donation.count({ where: { caseId, status: "succeeded" } });
 }
 
 /**
@@ -483,6 +569,17 @@ export async function listDonations(donorId: string, take?: number) {
 		take,
 		include: { case: { include: { owner: { select: { name: true } } } } },
 	});
+}
+
+/** The ids of every case this donor has successfully backed — for marking cards
+ *  "Backed" across a list in one query. */
+export async function listBackedCaseIds(donorId: string): Promise<string[]> {
+	const rows = await prisma.donation.findMany({
+		where: { donorId, status: "succeeded" },
+		distinct: ["caseId"],
+		select: { caseId: true },
+	});
+	return rows.map((r) => r.caseId);
 }
 
 /** Aggregate donor giving stats: total given, distinct cases, given this year. */

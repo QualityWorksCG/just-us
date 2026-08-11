@@ -125,8 +125,16 @@ model ConversationReport {
   conversationId String
   reporter       User                     @relation("ConversationReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
   reporterId     String
+  // What the reporter picked: spam | fraud | harassment | inappropriate | other.
+  // Text, not an enum, so the taxonomy can grow without a migration. Existing rows
+  // predate categories and default to "other".
+  category       String                   @default("other")
+  // Optional free-text detail. No longer required — the category carries the signal.
   reason         String
   status         ConversationReportStatus @default(open)
+  // How the report was closed: "dismissed" (no action), "message_removed", or
+  // "user_blocked". Null while still open.
+  resolution     String?
   resolvedAt     DateTime?
   resolver       User?                    @relation("ConversationReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
   resolvedById   String?

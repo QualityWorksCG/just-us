@@ -20,6 +20,7 @@ import {
 	Megaphone,
 	Plus,
 	Settings2,
+	Trash2,
 	UsersRound,
 } from "lucide-react";
 import type { Route } from "next";
@@ -27,7 +28,6 @@ import Link from "next/link";
 
 import { AttorneyCases } from "@/components/dashboard/attorney-cases";
 import { DeleteDraftButton } from "@/components/dashboard/delete-draft-button";
-import { RestoreCaseButton } from "@/components/dashboard/restore-case-button";
 import { requireRole } from "@/lib/auth-server";
 
 const PAGE_SIZE = 6;
@@ -215,7 +215,7 @@ export default async function MyCasesPage({
 					</p>
 					<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
 						{filter === "deleted"
-							? "Deleted cases show up here so you can restore them."
+							? "Deleted cases stay here as a record. Deleting is permanent — a deleted case can't be restored."
 							: "Start your first case — tell your story, choose your attorney, and raise the agreed fee."}
 					</p>
 					{filter !== "deleted" && (
@@ -356,7 +356,7 @@ export default async function MyCasesPage({
 											</p>
 										) : isDeleted ? (
 											<p className="text-[13px] text-muted-foreground">
-												Removed — restore to keep working on it.
+												Deleted — this can't be undone.
 											</p>
 										) : (
 											<>
@@ -382,7 +382,10 @@ export default async function MyCasesPage({
 									    question, just a missing door. */}
 									<div className="mt-4 flex items-center justify-between gap-3 border-border border-t pt-4">
 										{isDeleted ? (
-											<RestoreCaseButton id={c.id} />
+											<span className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-muted-foreground">
+												<Trash2 className="size-4" aria-hidden="true" />
+												Permanently deleted
+											</span>
 										) : isLive ? (
 											<Link
 												href={`/my-cases/${c.id}` as Route}

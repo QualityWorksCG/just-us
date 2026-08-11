@@ -12,6 +12,10 @@ export const AUDIT_ACTIONS = [
 	"user.role_changed",
 	"attorney.verified",
 	"attorney.verification_cleared",
+	// Administrator oversight on a case from the campaigns dashboard.
+	"case.removed",
+	"case.restored",
+	"case.messaged",
 	// Bring-your-own-attorney invitations. Namespaced apart from the `invite.*`
 	// verbs above because they invite a different thing — representation of one
 	// case, not an administrator account — and the admin audit screen should be
@@ -31,7 +35,7 @@ export type AuditEntry = {
 	 *  somebody else would be worse than leaving it unattributed. */
 	actorId: string | null;
 	action: AuditAction;
-	targetType?: "user" | "invitation" | "case_invitation";
+	targetType?: "user" | "invitation" | "case" | "case_invitation";
 	targetId?: string;
 	reason?: string;
 	metadata?: Prisma.InputJsonValue;
@@ -71,4 +75,60 @@ export async function listAuditEntries(opts?: {
 
 export async function countAuditEntries() {
 	return prisma.auditLog.count();
+}
+
+export type CaseAuditEntry = {
+	id: string;
+	action: string;
+	reason: string | null;
+	createdAt: Date;
+	actorName: string | null;
+};
+
+/**
+ * The administrative decision trail for one case — every take-down, restore, and
+ * message an admin recorded against it, newest first. Powers the "Decision
+ * history" panel on the campaigns oversight page.
+ */
+/**
+ * Records a single administrator action against a case. A one-row create with no
+ * surrounding mutation, so it runs on the base client rather than a transaction —
+ * the reads-free case `writeAudit` documents.
+ */
+export async function recordCaseAudit(input: {
+	actorId: string;
+	action: Extract<AuditAction, `case.${string}`>;
+	caseId: string;
+	note?: string | null;
+}) {
+	return writeAudit(prisma, {
+		actorId: input.actorId,
+		action: input.action,
+		targetType: "case",
+		targetId: input.caseId,
+		reason: input.note?.trim() || undefined,
+	});
+}
+
+export async function listCaseAuditEntries(
+	caseId: string,
+): Promise<CaseAuditEntry[]> {
+	const rows = await prisma.auditLog.findMany({
+		where: { targetType: "case", targetId: caseId },
+		orderBy: { createdAt: "desc" },
+		select: {
+			id: true,
+			action: true,
+			reason: true,
+			createdAt: true,
+			actor: { select: { name: true } },
+		},
+	});
+	return rows.map((r) => ({
+		id: r.id,
+		action: r.action,
+		reason: r.reason,
+		createdAt: r.createdAt,
+		actorName: r.actor?.name ?? null,
+	}));
 }

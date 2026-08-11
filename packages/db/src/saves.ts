@@ -44,7 +44,14 @@ export async function listSavedCases(userId: string, take?: number) {
 		where: { userId, case: { deletedAt: null } },
 		orderBy: { createdAt: "desc" },
 		take,
-		include: { case: { include: { owner: { select: { name: true } } } } },
+		include: {
+			case: {
+				include: {
+					owner: { select: { name: true, image: true } },
+					match: { select: { attorney: { select: { image: true } } } },
+				},
+			},
+		},
 	});
 	return rows.map((r) => r.case);
 }

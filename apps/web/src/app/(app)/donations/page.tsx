@@ -1,6 +1,7 @@
+import { listCertificatesForUser } from "@just-us/db/certificates";
 import { donorStats, listDonations } from "@just-us/db/donations";
 import { cn } from "@just-us/ui/lib/utils";
-import { HandCoins, Scale, Trophy } from "lucide-react";
+import { Award, ExternalLink, HandCoins, Scale, Trophy } from "lucide-react";
 
 import { requireRole } from "@/lib/auth-server";
 
@@ -23,9 +24,10 @@ function formatDate(d: Date) {
 export default async function DonationsPage() {
 	const { session } = await requireRole("donor");
 	const year = new Date().getFullYear();
-	const [rows, stats] = await Promise.all([
+	const [rows, stats, certificates] = await Promise.all([
 		listDonations(session.user.id),
 		donorStats(session.user.id, year),
+		listCertificatesForUser(session.user.id),
 	]);
 
 	return (
@@ -68,6 +70,43 @@ export default async function DonationsPage() {
 					</p>
 				</div>
 			</div>
+
+			{/* Certificates of appreciation — issued when a case the donor backed is
+			    closed. Shown only once they have at least one. */}
+			{certificates.length > 0 && (
+				<section className="flex flex-col gap-3">
+					<div className="flex items-center gap-2">
+						<Award className="size-[18px] text-brass-deep" aria-hidden="true" />
+						<h2 className="font-bold text-[15px] text-ink">
+							Certificates of appreciation
+						</h2>
+					</div>
+					<div className="grid gap-3 sm:grid-cols-2">
+						{certificates.map((c) => (
+							<a
+								key={c.id}
+								href={`/certificates/${c.accessToken}`}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="group flex items-center justify-between gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:border-brass-deep"
+							>
+								<span className="min-w-0">
+									<span className="block truncate font-bold text-[14px] text-ink">
+										{c.caseTitle}
+									</span>
+									<span className="mt-0.5 block font-mono text-[11px] text-muted-foreground uppercase tracking-[0.06em]">
+										{c.serial} · {formatDate(c.issuedAt)}
+									</span>
+								</span>
+								<span className="inline-flex shrink-0 items-center gap-1 font-semibold text-[12.5px] text-brass-deep transition-colors group-hover:text-ink">
+									View
+									<ExternalLink className="size-3.5" aria-hidden="true" />
+								</span>
+							</a>
+						))}
+					</div>
+				</section>
+			)}
 
 			{/* Table / empty state */}
 			<section className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
@@ -121,7 +160,7 @@ export default async function DonationsPage() {
 														: "bg-green-soft text-green-deep",
 												)}
 											>
-												{live ? "Raising" : "Resolved"}
+												{live ? "Raising" : "Closed"}
 											</span>
 										</td>
 									</tr>

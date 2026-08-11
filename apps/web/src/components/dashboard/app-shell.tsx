@@ -87,6 +87,7 @@ export function AppShell({
 	flags,
 	messageUnreadCount = 0,
 	notifications = [],
+	notificationUnreadCount = 0,
 	children,
 }: {
 	role: Role;
@@ -100,8 +101,10 @@ export function AppShell({
 	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
 	flags: FlagState;
 	messageUnreadCount?: number;
-	/** Unseen attorney requests for the header bell — plaintiffs only, else empty. */
+	/** Recent notification rows for the header bell (any role). */
 	notifications?: BellNotification[];
+	/** Total unread notifications — the bell badge count. */
+	notificationUnreadCount?: number;
 	children: React.ReactNode;
 }) {
 	const pathname = usePathname();
@@ -319,7 +322,8 @@ export function AppShell({
 						</h1>
 						<NotificationBell
 							items={notifications}
-							poll={role === "plaintiff" || role === "donor"}
+							unreadCount={notificationUnreadCount}
+							poll
 							emptyHint={
 								role === "plaintiff"
 									? "Attorney requests and case updates will show up here."

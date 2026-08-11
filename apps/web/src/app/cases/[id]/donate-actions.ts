@@ -91,6 +91,12 @@ export async function startDonation(
 	}
 
 	const origin = appOrigin();
+	// A signed-in donor returns to the in-app case view so they stay in the app
+	// (sidebar, their thank-you, their session); a guest returns to the public
+	// page. `/discover/[id]` is donor-only, so only route donors there.
+	const donorRole = (donor as { role?: string } | null)?.role;
+	const returnBase =
+		donorRole === "donor" ? `/discover/${caseId}` : `/cases/${caseId}`;
 	try {
 		const checkout = await createDonationCheckout({
 			caseId,
@@ -104,8 +110,8 @@ export async function startDonation(
 			// totals lands out-of-band: without knowing *which* donation just
 			// happened, the page can only show stale totals and hope. Left literal —
 			// encoding the braces would send Stripe's placeholder through unexpanded.
-			successUrl: `${origin}/cases/${caseId}?donated=1&session_id={CHECKOUT_SESSION_ID}`,
-			cancelUrl: `${origin}/cases/${caseId}`,
+			successUrl: `${origin}${returnBase}?donated=1&session_id={CHECKOUT_SESSION_ID}`,
+			cancelUrl: `${origin}${returnBase}`,
 		});
 
 		// Recorded before the donor reaches Stripe, so a completed payment always has
