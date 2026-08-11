@@ -38,14 +38,20 @@ import { syncPendingDonationsForCase } from "@/lib/donation-sync";
  */
 export default async function CasePage({
 	params,
+	searchParams,
 }: {
 	params: Promise<{ id: string }>;
+	searchParams: Promise<{ tab?: string }>;
 }) {
 	// Both roles land here from their own "My cases": the plaintiff manages the
 	// case they own; the attorney acts on it, holds the payout account, and posts
 	// the progress updates.
 	const { session, role } = await requireRole("plaintiff", "attorney");
 	const { id } = await params;
+	// `?tab=edit` opens straight on the editor — how the case list's edit control
+	// arrives here. Anything else falls back to the overview rather than erroring:
+	// it is a view preference in a URL people share and re-type.
+	const tab = (await searchParams)?.tab === "edit" ? "edit" : "overview";
 
 	// Before reading the case: fold in any donation that was paid at Stripe but is
 	// still pending here because its webhook was late, lost, or never forwarded.
@@ -181,6 +187,7 @@ export default async function CasePage({
 				updates={updates}
 				updatesHighlightSince={c.ownerUpdatesSeenAt}
 				viewerId={session.user.id}
+				initialTab={tab}
 			/>
 
 			{payout && (

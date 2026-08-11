@@ -17,6 +17,7 @@ import {
 	ImageIcon,
 	Megaphone,
 	Plus,
+	Settings2,
 	UsersRound,
 } from "lucide-react";
 import type { Route } from "next";
@@ -333,7 +334,18 @@ export default async function MyCasesPage({
 										)}
 									</div>
 
-									{/* Footer action */}
+									{/* Footer: what this case needs next on the left, and — for
+									    everything still in the plaintiff's hands — a way straight to
+									    the editor on the right.
+
+									    The two are separate because they were previously the same
+									    control, and only a live case's version of it led anywhere
+									    editable: a `seeking` card offered "Review interest" and a
+									    draft "Continue draft", so the only route to a case's details
+									    was to publish it first. The manage screen has always handled
+									    every status — see the "Draft — not live yet" and "Out to
+									    attorneys" states it renders — so this was never a permission
+									    question, just a missing door. */}
 									<div className="mt-4 flex items-center justify-between gap-3 border-border border-t pt-4">
 										{isDeleted ? (
 											<RestoreCaseButton id={c.id} />
@@ -366,19 +378,38 @@ export default async function MyCasesPage({
 												<ArrowRight className="size-3.5" aria-hidden="true" />
 											</Link>
 										) : (
-											<>
+											<Link
+												href={resume}
+												className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-brass-deep hover:underline"
+											>
+												Continue draft
+												<ArrowRight className="size-3.5" aria-hidden="true" />
+											</Link>
+										)}
+
+										{!isDeleted && (
+											<div className="flex shrink-0 items-center gap-1">
+												{/* Straight to the editor rather than the case's overview:
+												    a gear that lands on a stats panel has answered a
+												    question nobody asked it. Icon-only, so the accessible
+												    name carries the case title — a screen reader hearing
+												    six "Edit case" links in a grid learns nothing about
+												    which is which. */}
 												<Link
-													href={resume}
-													className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-brass-deep hover:underline"
+													href={`/my-cases/${c.id}?tab=edit` as Route}
+													title="Edit case details"
+													aria-label={`Edit ${c.title || "untitled case"}`}
+													className="inline-flex size-8 items-center justify-center rounded-[var(--radius-control)] text-muted-foreground transition-colors hover:bg-surface-2 hover:text-ink"
 												>
-													Continue draft
-													<ArrowRight className="size-3.5" aria-hidden="true" />
+													<Settings2 className="size-4" aria-hidden="true" />
 												</Link>
-												<DeleteDraftButton
-													id={c.id}
-													title={c.title || undefined}
-												/>
-											</>
+												{!isLive && !isSeeking && !isPending && (
+													<DeleteDraftButton
+														id={c.id}
+														title={c.title || undefined}
+													/>
+												)}
+											</div>
 										)}
 									</div>
 								</div>
