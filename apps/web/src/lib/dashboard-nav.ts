@@ -15,6 +15,7 @@ import {
 	type LucideIcon,
 	Megaphone,
 	MessageSquare,
+	Receipt,
 	Scale,
 	ScrollText,
 	Settings,
@@ -245,6 +246,13 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				sub: "Every case on the platform and its funding status.",
 			},
 			{
+				slug: "revenue",
+				label: "Revenue",
+				icon: Receipt,
+				title: "Revenue & donations",
+				sub: "Platform-fee revenue and donation activity across the platform.",
+			},
+			{
 				slug: "users",
 				label: "Users",
 				icon: Users,
@@ -336,6 +344,8 @@ export const APP_PATHS: string[] = [
 	),
 	// Not a nav entry: the attorney's case view, reached from the queue (JUS-25).
 	"/queue",
+	// Not a nav entry: the full notification list, reached from the header bell.
+	"/notifications",
 ];
 
 const FALLBACK_ROLE: Role = "donor";

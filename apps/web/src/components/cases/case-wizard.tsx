@@ -47,10 +47,12 @@ import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { goLiveAction } from "@/app/(app)/my-cases/[id]/payout-actions";
+import {
+	goLiveAction,
+	refreshCasePayoutAction,
+} from "@/app/(app)/my-cases/[id]/payout-actions";
 import {
 	type CasePayoutReadiness,
-	casePayoutReadinessAction,
 	commitCaseAction,
 	deleteCaseAction,
 	publishForAttorneysAction,
@@ -474,12 +476,13 @@ export function CaseWizard({
 		}
 	}
 
-	/** Step 5 — re-read the firm's Stripe progress. It finishes elsewhere, so
-	 *  nothing in this browser would otherwise tell the plaintiff. */
+	/** Step 5 — re-check the firm's Stripe progress. It finishes elsewhere (and may
+	 *  land without a webhook), so this pulls the account's status straight from
+	 *  Stripe rather than re-reading a cache nothing in this browser would update. */
 	async function checkPayout() {
 		if (!caseId) return;
 		setChecking(true);
-		const result = await casePayoutReadinessAction(caseId);
+		const result = await refreshCasePayoutAction({ caseId });
 		setChecking(false);
 		if (!result.ok) {
 			toast.error(result.error);
@@ -488,8 +491,14 @@ export function CaseWizard({
 		setPayout(result.payout);
 		if (result.payout.attorney?.transfersEnabled) {
 			toast.success("Your attorney is set up. You can publish now.");
+		} else if (!result.payout.attorney) {
+			toast.info(
+				"No attorney is linked to this case yet — add one to set up donations.",
+			);
 		} else {
-			toast.info("Not yet — nothing has changed on their side.");
+			toast.info(
+				"Checked with Stripe — their account still can't receive yet.",
+			);
 		}
 	}
 
@@ -515,9 +524,12 @@ export function CaseWizard({
 		} else {
 			toast.error(result.error);
 			setPublishing(false);
-			// Every refusal left is about the firm's account, and step 5 is the only
-			// screen that explains it and offers a way to re-check.
-			await checkPayout();
+			// `goLiveAction` already re-checked Stripe, so refresh the payout state from
+			// that same read (silently — the error toast above is the message) and send
+			// them to step 5, the only screen that spells out what's outstanding and
+			// lets them re-check.
+			const refreshed = await refreshCasePayoutAction({ caseId });
+			if (refreshed.ok) setPayout(refreshed.payout);
 			setStep(5);
 		}
 	}
@@ -973,13 +985,14 @@ export function CaseWizard({
 							size="sm"
 							className="h-9 px-3.5"
 							onClick={publish}
-							// Same gate as the review step's button — the preview is a second
-							// door onto the same act, and it must not be an open one.
-							disabled={publishing || !payoutReady}
+							// Same behaviour as the review step's button — the preview is a
+							// second door onto the same act: pressing it re-checks Stripe and
+							// publishes if the firm can now receive.
+							disabled={publishing}
 							title={
 								payoutReady
 									? undefined
-									: `Waiting on ${attorneyName}'s payout account`
+									: "Re-check the firm's payout account and publish if it's ready"
 							}
 						>
 							<Rocket data-icon="inline-start" aria-hidden="true" />
@@ -987,7 +1000,7 @@ export function CaseWizard({
 								? "Publishing…"
 								: payoutReady
 									? "Publish case"
-									: "Waiting on your attorney"}
+									: "Check & publish"}
 						</Button>
 					</div>
 				</div>
@@ -2316,7 +2329,9 @@ export function CaseWizard({
 											{
 												label: payoutReady
 													? `Payout account ready · ${payout?.attorney?.firmName ?? attorneyName}`
-													: `Payout account — waiting on ${attorneyName}`,
+													: payout?.attorney
+														? `Payout account — waiting on ${payout.attorney.firmName ?? attorneyName}`
+														: "Payout account — no attorney linked to this case yet",
 												done: payoutReady,
 											},
 										].map((item) => (
@@ -2370,14 +2385,16 @@ export function CaseWizard({
 								size="lg"
 								className="px-6"
 								onClick={publish}
-								// Gated on the firm being able to receive. `goLiveCase`
-								// enforces this server-side from the case row; disabling here
-								// is so the plaintiff is not invited to press it.
-								disabled={publishing || !payoutReady}
+								// Never disabled on "not ready": pressing it re-checks the firm's
+								// account with Stripe (`goLiveAction` refreshes first), which is
+								// how the case unsticks when the attorney enabled payouts after
+								// this page loaded. `goLiveCase` still enforces readiness
+								// server-side, so a genuine not-ready case can't slip public.
+								disabled={publishing}
 								title={
 									payoutReady
 										? undefined
-										: `Waiting on ${attorneyName}'s payout account`
+										: "Re-check the firm's payout account and publish if it's ready"
 								}
 							>
 								<Rocket data-icon="inline-start" aria-hidden="true" />
@@ -2385,7 +2402,7 @@ export function CaseWizard({
 									? "Publishing…"
 									: payoutReady
 										? "Publish & go live"
-										: "Waiting on your attorney"}
+										: "Check & publish"}
 							</Button>
 						) : step === 5 ? (
 							// One control, whether or not the case has been sent yet: it

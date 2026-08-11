@@ -1,0 +1,66 @@
+// Content moderation for campaigns and updates (Regulatory & Operational Rules
+// §3–4; System Architecture — Moderation Flag entity).
+//
+// One row per raised concern about a piece of content. A flag comes from one of
+// two sources:
+//
+//   ai     — AI-assisted screening at publication/post time (defamation risk,
+//            frivolous claims, sensitive content, accidental third-party PII).
+//            `aiGenerated` is true; these are advisory and NEVER auto-reject —
+//            they hold content for a human ruling, they do not decide it.
+//   report — a member of the public used "report this campaign".
+//
+// The flag does not itself hide anything; visibility is a property of the target
+// (`Case.moderationStatus` / `CaseUpdate.moderationStatus`), which the moderation
+// service sets. AI flags hold their target immediately (it must not become
+// visible before review); public reports hold only once enough accumulate, so a
+// single anonymous report cannot take a live campaign down on its own.
+//
+// `targetType ∈ {case, update}` (stored as text to avoid enum-keyword pitfalls).
+// `caseId` is always the owning case — equal to `targetId` for a case flag, and
+// the update's case for an update flag — so the admin queue can group, link, and
+// cascade-delete by case.
+model ModerationFlag {
+  id String @id @default(cuid())
+
+  // What is being flagged. `targetType` is "case" or "update"; `targetId` is that
+  // row's id. `caseId` is the owning case for both, for the queue and the FK.
+  targetType String
+  targetId   String
+  case       Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId     String
+
+  // "ai" | "report". `aiGenerated` mirrors source == "ai" and is what the UI reads
+  // to label a flag as machine-produced.
+  source      String
+  aiGenerated Boolean @default(false)
+
+  // "defamation" | "frivolous" | "sensitive" | "pii" for AI flags; "report" for a
+  // public report. Free text so the taxonomy can grow without a migration.
+  category String
+  // The AI's rationale, or the reporter's reason. Shown to the reviewing admin.
+  detail   String
+  // AI self-reported confidence 0–100; null for public reports.
+  confidence Int?
+
+  // "open" until an administrator rules; then "resolved" with a `resolution`.
+  status     String  @default("open")
+  // "cleared" (content is fine → visible) or "removed" (taken down). Null while open.
+  resolution String?
+  // The moderator's note on why they kept or removed it. Optional, for the record.
+  resolutionNote String?
+
+  // The signed-in account that reported, when there was one. Null for AI flags and
+  // for anonymous public reports. A plain id, like the rest of the codebase, so no
+  // back-relation is added to the auth `User`.
+  reporterId String?
+
+  createdAt    DateTime  @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+
+  @@index([status, createdAt])
+  @@index([caseId])
+  @@index([targetType, targetId, status])
+  @@map("moderation_flag")
+}

@@ -133,6 +133,19 @@ model Case {
   updates CaseUpdate[]
   // Users following the case for its updates (JUS-33).
   follows CaseFollow[]
+  // Certificates of appreciation issued to backers when the case is closed.
+  certificates Certificate[]
+  // Content-moderation flags raised against this case or its updates.
+  moderationFlags ModerationFlag[]
+
+  // Content-moderation visibility gate, orthogonal to `status` (Reg. & Ops §3–4):
+  //   ok      — cleared; shown wherever `status`/`deletedAt` allow.
+  //   held    — flagged and awaiting an administrator's ruling; withheld from the
+  //             public and the attorney queue until reviewed. AI flags set this at
+  //             publish time so flagged content is never seen before review.
+  //   removed — an administrator took it down. Never public again.
+  // Every public/queue read filters to `ok`; the owner still sees their own case.
+  moderationStatus String @default("ok")
 
   @@index([ownerId])
   @@index([status])
@@ -171,6 +184,11 @@ model CaseUpdate {
   // Set when the author revises an update, so readers see it was edited. Only
   // the author can edit, and only body/tag change — never authorship or time.
   editedAt  DateTime?
+
+  // Content-moderation gate, same meaning as `Case.moderationStatus`: "ok" |
+  // "held" | "removed". A held update is not shown to backers or the public and
+  // its backers are not notified until an administrator clears it.
+  moderationStatus String @default("ok")
 
   @@index([caseId, createdAt])
   @@map("case_update")

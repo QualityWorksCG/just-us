@@ -15,6 +15,7 @@ import { Textarea } from "@just-us/ui/components/textarea";
 import { cn } from "@just-us/ui/lib/utils";
 import { upload } from "@vercel/blob/client";
 import {
+	ArrowRight,
 	Eye,
 	HandCoins,
 	ImageIcon,
@@ -31,9 +32,11 @@ import {
 	Trash2,
 	TrendingUp,
 	Upload,
+	Users,
 	X,
 } from "lucide-react";
 import type { Route } from "next";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -46,6 +49,7 @@ import {
 	type CaseUpdateItem,
 	CaseUpdates,
 } from "@/components/cases/case-updates";
+import { CaseUpdateComposer } from "@/components/dashboard/case-update-composer";
 
 import { CASE_CATEGORIES } from "@/lib/case-categories";
 
@@ -67,6 +71,8 @@ export type ManageCaseData = {
 	donorsCount: number;
 	viewsCount: number;
 	sharesCount: number;
+	/** People following this case for its updates (JUS-33). */
+	followerCount: number;
 	coverImageUrl: string | null;
 	images: string[];
 	/** The plaintiff's thank-you, sent to every donor. Null when unwritten. */
@@ -93,11 +99,17 @@ async function uploadImage(file: File): Promise<string> {
 	return blob.url;
 }
 
-type MetricTone = "green" | "tan" | "dark" | "gold";
+type MetricTone = "white" | "green" | "tan" | "dark" | "gold";
 const METRIC_TONES: Record<
 	MetricTone,
 	{ card: string; chip: string; value: string; label: string }
 > = {
+	white: {
+		card: "bg-surface border-border",
+		chip: "bg-green-soft text-success",
+		value: "text-ink",
+		label: "text-ink-muted",
+	},
 	green: {
 		card: "bg-green-soft",
 		chip: "bg-surface text-green-deep",
@@ -169,6 +181,7 @@ export function ManageCase({
 	updates = [],
 	updatesHighlightSince,
 	viewerId,
+	viewerName,
 }: {
 	data: ManageCaseData;
 	/** The case's progress updates, newest first (JUS-33). */
@@ -177,6 +190,8 @@ export function ManageCase({
 	updatesHighlightSince?: Date | string | null;
 	/** The signed-in plaintiff (owner) — for attributing their own posts. */
 	viewerId: string;
+	/** The plaintiff's display name — the byline on updates they post here. */
+	viewerName: string;
 }) {
 	const router = useRouter();
 	const ids = {
@@ -297,7 +312,7 @@ export function ManageCase({
 		startDeleting(async () => {
 			const res = await deleteOwnedCaseAction(data.id);
 			if (res.ok) {
-				toast.success("Case deleted — restore it anytime from Deleted.");
+				toast.success("Case deleted — this can't be undone.");
 				router.push("/my-cases");
 			} else {
 				toast.error(res.error);
@@ -412,11 +427,17 @@ export function ManageCase({
 					</section>
 
 					{/* Metrics */}
-					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
 						<Metric
 							icon={HandCoins}
 							label={data.donorsCount === 1 ? "donor" : "donors"}
 							value={String(data.donorsCount)}
+							tone="white"
+						/>
+						<Metric
+							icon={Users}
+							label={data.followerCount === 1 ? "follower" : "followers"}
+							value={String(data.followerCount)}
 							tone="green"
 						/>
 						<Metric
@@ -439,25 +460,46 @@ export function ManageCase({
 						/>
 					</div>
 
-					{/* Case updates — the same progress the attorney broadcasts to
-					    backers, shown to the owner on their overview (JUS-33). */}
+					{/* Case updates — the plaintiff can post here (their attorney can too),
+					    and jump to the full history (JUS-33). */}
 					<section>
-						<h2 className="mb-3 flex items-center gap-2 font-bold text-[15px] text-ink">
-							Case updates
-							{updates.length > 0 && (
-								<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
-									{updates.length}
-								</span>
-							)}
-						</h2>
+						<div className="mb-3 flex items-center justify-between gap-3">
+							<h2 className="flex items-center gap-2 font-bold text-[15px] text-ink">
+								Case updates
+								{updates.length > 0 && (
+									<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
+										{updates.length}
+									</span>
+								)}
+							</h2>
+							{/* Persistent CTA to the full updates page, whether or not any
+							    exist yet. */}
+							<Link
+								href={`/my-cases/${data.id}/updates` as Route}
+								className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-[13px] text-brass-deep transition-colors hover:text-brass"
+							>
+								View all case updates
+								<ArrowRight className="size-3.5" aria-hidden="true" />
+							</Link>
+						</div>
+
+						{/* Post an update from the overview — attributed to the plaintiff. */}
+						<div className="mb-4">
+							<CaseUpdateComposer
+								caseId={data.id}
+								authorName={viewerName}
+								authorTone="green"
+								placeholder="Post an update for your backers — a milestone, a hearing date, a thank-you…"
+							/>
+						</div>
+
 						<CaseUpdates
 							updates={updates}
 							viewerId={viewerId}
 							viewerRole="plaintiff"
 							caseId={data.id}
-							emptyHint="No updates yet — your attorney will post progress here as your case moves."
+							emptyHint="No updates yet — post the first one above. Your attorney can post here too as your case moves."
 							limit={2}
-							viewAllHref={`/my-cases/${data.id}/updates` as Route}
 							highlightSince={updatesHighlightSince}
 						/>
 					</section>
@@ -787,8 +829,8 @@ export function ManageCase({
 					<section className="rounded-[var(--radius-card-lg)] border border-danger/30 bg-danger/5 p-6">
 						<h2 className="font-bold text-danger text-lg">Delete this case</h2>
 						<p className="mt-1.5 max-w-[60ch] text-[13.5px] text-ink-soft leading-relaxed">
-							The case moves to your Deleted list. Nothing is lost — you can
-							restore it anytime.
+							This permanently deletes the case. It can't be undone — a deleted
+							case can't be restored, and you'd have to start a new one.
 						</p>
 						<button
 							type="button"
@@ -823,8 +865,8 @@ export function ManageCase({
 							Delete this case?
 						</h3>
 						<p className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed">
-							“{data.title || "This case"}” will move to your Deleted cases. You
-							can restore it anytime.
+							“{data.title || "This case"}” will be permanently deleted. This
+							can't be undone — a deleted case can't be restored.
 						</p>
 						<div className="mt-5 flex justify-end gap-2.5">
 							<Button

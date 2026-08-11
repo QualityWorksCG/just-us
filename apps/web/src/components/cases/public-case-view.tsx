@@ -1,5 +1,6 @@
 // biome-ignore-all lint/performance/noImgElement: case images are user-uploaded Blob URLs, not static assets
 import type { getPublicCase } from "@just-us/db/cases";
+import { cn } from "@just-us/ui/lib/utils";
 import {
 	Eye,
 	Heart,
@@ -10,9 +11,11 @@ import {
 	UserRound,
 } from "lucide-react";
 import type { Route } from "next";
+import type { ReactNode } from "react";
 
 import { CaseGallery } from "@/components/cases/case-gallery";
 import { CaseUpdates } from "@/components/cases/case-updates";
+import { ReportCampaign } from "@/components/cases/report-campaign";
 import { DetailBackLink } from "@/components/detail-back-link";
 import {
 	type DonateConfig,
@@ -63,14 +66,32 @@ export function PublicCaseView({
 	headingLevel = "h1",
 	donate,
 	fundsNote,
+	backers = [],
+	donationCount = 0,
 	canSave = false,
 	initialSaved = false,
 	canFollow = false,
 	initialFollowing = false,
 	updatesHref,
 	updatesHighlightSince,
+	adminSlot,
 }: {
 	c: PublicCase;
+	/** When set (administrator preview), replaces the donor donate/save/follow
+	 *  panel with admin controls, and drops the public report entry — an admin
+	 *  acts on the case rather than donating to or reporting it. */
+	adminSlot?: ReactNode;
+	/** The case's supporters, name or "Anonymous" per each donor's preference. */
+	backers?: {
+		id: string;
+		displayName: string;
+		anonymous: boolean;
+		amountCents: number;
+		at: Date | string | null;
+	}[];
+	/** Total successful gifts (a donor who gave twice counts twice) — the header
+	 *  count and the "+ N more" line, since the list shows individual donations. */
+	donationCount?: number;
 	/** Whether and how this case can take money, resolved server-side from its
 	 *  bound payout account. Required rather than optional: every route that shows
 	 *  a case has to answer the donate question the same way, and a default here
@@ -106,9 +127,26 @@ export function PublicCaseView({
 
 	const goal = c.goalCents / 100;
 	const raised = c.raisedCents / 100;
-	const pct = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
+	const pctExact = goal > 0 ? (raised / goal) * 100 : 0;
+	const pct = Math.min(100, Math.round(pctExact));
+	// $75 of $20k is 0.375% — rounding that to "0%" makes a funded case look
+	// untouched. Show "<1%" once any money is in, and keep the ring's fill at least
+	// a visible sliver so it doesn't read as empty.
+	const pctLabel = raised > 0 && pct < 1 ? "<1%" : `${pct}%`;
+	const ringDeg = Math.min(
+		360,
+		(raised > 0 ? Math.max(pctExact, 1.5) : pctExact) * 3.6,
+	);
 	const owner = c.owner?.name ?? "A plaintiff";
 	const ownerFirst = owner.split(" ")[0];
+	// Photo-or-initials, same as the rest of the app: the plaintiff shows their
+	// account avatar; the matched attorney prefers their directory headshot and
+	// falls back to their account avatar. Null on either falls back to initials.
+	const ownerImage = c.owner?.image ?? null;
+	const attorneyImage =
+		c.match?.attorney?.attorneyProfile?.headshotUrl ??
+		c.match?.attorney?.image ??
+		null;
 	const attorneyMeta =
 		[c.attorneyFirm, c.attorneyArea, c.attorneyLocation]
 			.filter(Boolean)
@@ -136,20 +174,32 @@ export function PublicCaseView({
 			<Heading className="font-extrabold text-[clamp(1.9rem,4vw,2.75rem)] text-ink leading-[1.05] tracking-[-0.03em]">
 				{c.title || "Untitled case"}
 			</Heading>
-			{/* Status — a clear, live funding indicator */}
-			<div className="mt-3 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-green-soft px-3.5 py-1.5 text-green-deep">
-				<span className="relative flex size-2">
-					<span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
-					<span className="relative inline-flex size-2 rounded-full bg-success" />
-				</span>
-				<span className="font-semibold text-[12.5px]">
-					Live — actively raising
-				</span>
-				<span className="text-green-deep/50">·</span>
-				<span className="font-semibold text-[12.5px] tabular-nums">
-					{pct}% funded
-				</span>
-			</div>
+			{/* Status — live cases pulse; a closed case reads as resolved, so a backer
+			    looking back sees it's over rather than a dead "raising" claim. */}
+			{c.status === "closed" ? (
+				<div className="mt-3 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-surface-2 px-3.5 py-1.5 text-ink-soft">
+					<span className="size-2 rounded-full bg-ink-soft" />
+					<span className="font-semibold text-[12.5px]">Closed</span>
+					<span className="text-ink-soft/50">·</span>
+					<span className="font-semibold text-[12.5px] tabular-nums">
+						{pctLabel} funded
+					</span>
+				</div>
+			) : (
+				<div className="mt-3 inline-flex items-center gap-2 rounded-[var(--radius-pill)] bg-green-soft px-3.5 py-1.5 text-green-deep">
+					<span className="relative flex size-2">
+						<span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
+						<span className="relative inline-flex size-2 rounded-full bg-success" />
+					</span>
+					<span className="font-semibold text-[12.5px]">
+						Live — actively raising
+					</span>
+					<span className="text-green-deep/50">·</span>
+					<span className="font-semibold text-[12.5px] tabular-nums">
+						{pctLabel} funded
+					</span>
+				</div>
+			)}
 
 			{/* Two columns — image beside the funding card; on mobile the funding card
 			    jumps above the story so donating/saving stays near the top. */}
@@ -174,8 +224,16 @@ export function PublicCaseView({
 					{/* Who's on this case — plaintiff (raising) and attorney (representing) */}
 					<div className="mt-5 flex flex-wrap items-center gap-x-8 gap-y-4 border-border border-b pb-5">
 						<div className="flex items-center gap-2.5">
-							<span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-green-soft font-bold text-[13px] text-green-deep">
-								{initials(owner)}
+							<span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-green-soft font-bold text-[13px] text-green-deep">
+								{ownerImage ? (
+									<img
+										src={ownerImage}
+										alt=""
+										className="size-full object-cover"
+									/>
+								) : (
+									initials(owner)
+								)}
 							</span>
 							<div>
 								<p className="font-bold text-[15px] text-ink">{owner}</p>
@@ -186,8 +244,16 @@ export function PublicCaseView({
 						</div>
 						{c.attorneyName ? (
 							<div className="flex items-center gap-2.5">
-								<span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brass-wash font-bold text-[13px] text-brass-deep">
-									{initials(c.attorneyName)}
+								<span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brass-wash font-bold text-[13px] text-brass-deep">
+									{attorneyImage ? (
+										<img
+											src={attorneyImage}
+											alt=""
+											className="size-full object-cover"
+										/>
+									) : (
+										initials(c.attorneyName)
+									)}
 								</span>
 								<div>
 									<p className="font-bold text-[15px] text-ink">
@@ -225,12 +291,12 @@ export function PublicCaseView({
 							<div
 								className="relative flex size-[76px] shrink-0 items-center justify-center rounded-full"
 								style={{
-									background: `conic-gradient(var(--success) ${pct * 3.6}deg, var(--surface-2) 0)`,
+									background: `conic-gradient(var(--success) ${ringDeg}deg, var(--surface-2) 0)`,
 								}}
 							>
 								<div className="flex size-[60px] items-center justify-center rounded-full bg-surface">
 									<span className="font-extrabold text-[15px] text-ink tabular-nums leading-none">
-										{pct}%
+										{pctLabel}
 									</span>
 								</div>
 							</div>
@@ -245,24 +311,28 @@ export function PublicCaseView({
 									of {money(goal)} goal
 								</p>
 								<p className="mt-0.5 text-[12.5px] text-muted-foreground">
-									{c.donorsCount}{" "}
-									{c.donorsCount === 1 ? "donation" : "donations"}
+									{donationCount}{" "}
+									{donationCount === 1 ? "donation" : "donations"}
 								</p>
 							</div>
 						</div>
 						<div className="mt-5">
-							{/* Always the public link, even from inside the app — the in-app
-							    route is signed-in only, so sharing it would send everyone
-							    else to the login screen. */}
-							<PublicCaseActions
-								caseId={c.id}
-								sharePath={`/cases/${c.id}`}
-								config={donate}
-								canSave={canSave}
-								initialSaved={initialSaved}
-								canFollow={canFollow}
-								initialFollowing={initialFollowing}
-							/>
+							{/* An administrator previewing the case gets oversight controls
+							    here instead of the donor's donate/save/follow panel. */}
+							{adminSlot ?? (
+								// Always the public link, even from inside the app — the in-app
+								// route is signed-in only, so sharing it would send everyone
+								// else to the login screen.
+								<PublicCaseActions
+									caseId={c.id}
+									sharePath={`/cases/${c.id}`}
+									config={donate}
+									canSave={canSave}
+									initialSaved={initialSaved}
+									canFollow={canFollow}
+									initialFollowing={initialFollowing}
+								/>
+							)}
 						</div>
 					</div>
 
@@ -273,12 +343,43 @@ export function PublicCaseView({
 								<TrendingUp className="size-4" aria-hidden="true" />
 							</span>
 							<p className="font-bold text-[14px] text-ink">
-								{c.donorsCount > 0
-									? `${c.donorsCount} ${c.donorsCount === 1 ? "donation" : "donations"}`
+								{donationCount > 0
+									? `${donationCount} ${donationCount === 1 ? "donation" : "donations"}`
 									: "Recent donations"}
 							</p>
 						</div>
-						{c.donorsCount > 0 ? (
+						{backers.length > 0 ? (
+							<ul className="flex flex-col gap-1">
+								{backers.map((b) => (
+									<li
+										key={b.id}
+										className="flex items-center gap-3 rounded-[var(--radius-card)] px-2 py-2"
+									>
+										<span
+											className={cn(
+												"flex size-8 shrink-0 items-center justify-center rounded-full font-bold text-[11px]",
+												b.anonymous
+													? "bg-surface-2 text-muted-foreground"
+													: "bg-green-soft text-green-deep",
+											)}
+										>
+											{b.anonymous ? "—" : initials(b.displayName)}
+										</span>
+										<span className="min-w-0 flex-1 truncate font-semibold text-[13px] text-ink">
+											{b.displayName}
+										</span>
+										<span className="shrink-0 font-bold text-[13px] text-ink tabular-nums">
+											{money(b.amountCents / 100)}
+										</span>
+									</li>
+								))}
+								{donationCount > backers.length && (
+									<li className="px-2 pt-1 text-[12px] text-muted-foreground">
+										+ {donationCount - backers.length} more
+									</li>
+								)}
+							</ul>
+						) : c.donorsCount > 0 ? (
 							<p className="text-[13px] text-ink-soft leading-relaxed">
 								{c.donorsCount === 1
 									? "1 person has"
@@ -400,8 +501,16 @@ export function PublicCaseView({
 								Represented by
 							</h2>
 							<div className="flex items-center gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
-								<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[13px] text-white">
-									{initials(c.attorneyName)}
+								<span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brass font-bold text-[13px] text-white">
+									{attorneyImage ? (
+										<img
+											src={attorneyImage}
+											alt=""
+											className="size-full object-cover"
+										/>
+									) : (
+										initials(c.attorneyName)
+									)}
 								</span>
 								<div>
 									<p className="font-bold text-[15px] text-ink">
@@ -413,6 +522,14 @@ export function PublicCaseView({
 								</div>
 							</div>
 						</section>
+					)}
+
+					{/* Quiet, always-available public report entry point (Reg. & Ops §3–4).
+					    An administrator acts on the case directly, so it's dropped there. */}
+					{!adminSlot && (
+						<div className="flex justify-end pt-2">
+							<ReportCampaign targetId={c.id} targetType="case" />
+						</div>
 					)}
 				</div>
 			</div>

@@ -1,7 +1,10 @@
+import { getNotificationPreference } from "@just-us/db/notifications";
 import { attorneyPayoutReadiness } from "@just-us/db/payouts";
 import { getOwnProfile } from "@just-us/db/profile";
 import { redirect } from "next/navigation";
 
+import { DonationPrivacySettings } from "@/components/dashboard/donation-privacy-settings";
+import { NotificationSettings } from "@/components/dashboard/notification-settings";
 import { PayoutCasesLink } from "@/components/dashboard/payout-cases-link";
 import { PayoutExplainer } from "@/components/dashboard/payout-explainer";
 import { ProfileSettings } from "@/components/dashboard/profile-settings";
@@ -9,7 +12,10 @@ import { requireOnboarded } from "@/lib/auth-server";
 
 export default async function SettingsPage() {
 	const session = await requireOnboarded();
-	const profile = await getOwnProfile(session.user.id);
+	const [profile, notificationPref] = await Promise.all([
+		getOwnProfile(session.user.id),
+		getNotificationPreference(session.user.id),
+	]);
 
 	if (!profile) redirect("/login");
 
@@ -41,6 +47,8 @@ export default async function SettingsPage() {
 					createdAt: profile.createdAt.toISOString(),
 				}}
 			/>
+			<NotificationSettings emailEnabled={notificationPref.emailEnabled} />
+			<DonationPrivacySettings anonymous={profile.donationsAnonymous} />
 			{readiness ? (
 				<PayoutCasesLink
 					waitingCases={readiness.waitingCases}

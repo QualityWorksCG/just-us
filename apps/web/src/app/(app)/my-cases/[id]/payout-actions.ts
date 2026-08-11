@@ -4,6 +4,7 @@ import {
 	attorneyBusinessUrlSources,
 	attorneyRepresentedCase,
 	bindCasePayout,
+	getCasePayoutOptions,
 	getPayoutAccountForCase,
 	goLiveCase,
 	syncPayoutAccount,
@@ -20,6 +21,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth-server";
+import { notifyStatusChange } from "@/lib/notify";
 
 /**
  * Everything a single case's donation payout needs, from both sides of it.
@@ -58,6 +60,35 @@ const NOT_YOUR_CASE =
 	"That case isn't one you represent, so there's no payout account to set up for it.";
 
 const caseInput = z.object({ caseId: z.string().min(1) });
+
+/**
+ * Pull this case's payout account status straight from Stripe into our cache.
+ *
+ * The whole `transfersEnabled` gate is a cache of Stripe's view, and until now it
+ * was only ever refreshed by the account.updated webhook or the attorney pressing
+ * "Check again" on their own screen. Neither is guaranteed: a dev environment
+ * without a webhook, or an attorney who enabled payouts and never came back, left
+ * the plaintiff's page permanently reading "waiting on your attorney" with no way
+ * to move it. This lets the plaintiff force a fresh read of the firm's account for
+ * *their own* case.
+ *
+ * It stays safe because the values written come from `fetchAccountStatus` —
+ * Stripe's truth — never from the caller, exactly as the webhook does. Callers
+ * must have already authorised (the case owner); this only reads and syncs.
+ * Best-effort: if Stripe is unreachable the cache is left as-is and the caller
+ * reports whatever we last knew rather than failing the whole flow.
+ */
+async function pullCaseAccountFromStripe(caseId: string): Promise<void> {
+	if (!isPaymentsConfigured()) return;
+	const account = await getPayoutAccountForCase(caseId);
+	if (!account) return;
+	try {
+		const status = await fetchAccountStatus(account.stripeAccountId);
+		await syncPayoutAccount({ userId: account.userId, caseId, ...status });
+	} catch {
+		// Leave the cached capabilities untouched — the caller renders what we have.
+	}
+}
 
 /** Human wording for each refusal `bindCasePayout` can return. */
 const REASONS: Record<string, string> = {
@@ -126,6 +157,13 @@ export async function goLiveAction(
 	const parsed = caseInput.safeParse(input);
 	if (!parsed.success) return { ok: false, error: "That case isn't valid." };
 
+	// Confirm the case is the caller's before touching Stripe, then pull the firm's
+	// live account status so the go-live check below reads Stripe's truth now rather
+	// than whatever the last webhook happened to leave cached.
+	const owned = await getCasePayoutOptions(parsed.data.caseId, session.user.id);
+	if (!owned) return { ok: false, error: "That case couldn't be found." };
+	await pullCaseAccountFromStripe(parsed.data.caseId);
+
 	const result = await goLiveCase({
 		caseId: parsed.data.caseId,
 		// From the session, never the form — otherwise a caller could publish
@@ -140,6 +178,8 @@ export async function goLiveAction(
 		};
 	}
 
+	// Now live: tell the plaintiff and every backer/follower (in-app + email).
+	await notifyStatusChange(parsed.data.caseId, "live").catch(() => {});
 	// The case is public from this moment, so everything that lists or renders it
 	// publicly is now stale, not just the owner's own view.
 	revalidatePath(`/my-cases/${parsed.data.caseId}`);
@@ -149,6 +189,127 @@ export async function goLiveAction(
 	revalidatePath("/cases");
 	revalidatePath("/home");
 	return { ok: true, recipientName: result.firmName ?? result.attorneyName };
+}
+
+export type CheckAndGoLiveResult =
+	| { ok: true; live: true; recipientName: string }
+	| {
+			ok: true;
+			live: false;
+			/** The firm's account exists but can't receive yet. */
+			hasAccount: boolean;
+			/** Details are in with Stripe and under review (vs. onboarding unfinished). */
+			detailsSubmitted: boolean;
+			reason: "no_attorney" | "attorney_no_account" | "transfers_disabled";
+	  }
+	| { ok: false; error: string };
+
+/**
+ * The plaintiff's "Check & publish" — one action that re-checks Stripe and, if the
+ * firm's account can now receive, takes the case live.
+ *
+ * This is the fix for the stuck-on-"waiting" gap. Refreshing the page only re-read
+ * a cache the webhook may never have updated; this pulls the firm's live status
+ * from Stripe first, then runs the same `goLiveCase` gate against the fresh value.
+ * When it still can't publish, it reports *where the firm's setup actually stands
+ * now* so the panel updates rather than repeating a stale "waiting on attorney".
+ */
+export async function checkAndGoLiveAction(
+	input: z.input<typeof caseInput>,
+): Promise<CheckAndGoLiveResult> {
+	const { session } = await requireRole("plaintiff");
+	const parsed = caseInput.safeParse(input);
+	if (!parsed.success) return { ok: false, error: "That case isn't valid." };
+	const { caseId } = parsed.data;
+
+	// Ownership guard, and it also scopes the Stripe pull below to the owner's case.
+	const owned = await getCasePayoutOptions(caseId, session.user.id);
+	if (!owned) return { ok: false, error: "That case couldn't be found." };
+
+	await pullCaseAccountFromStripe(caseId);
+
+	const result = await goLiveCase({ caseId, ownerId: session.user.id });
+	if (result.ok) {
+		await notifyStatusChange(caseId, "live").catch(() => {});
+		revalidatePath(`/my-cases/${caseId}`);
+		revalidatePath(`/cases/${caseId}`);
+		revalidatePath("/my-cases");
+		revalidatePath("/discover");
+		revalidatePath("/cases");
+		revalidatePath("/home");
+		return {
+			ok: true,
+			live: true,
+			recipientName: result.firmName ?? result.attorneyName,
+		};
+	}
+
+	// Couldn't publish. The reasons that aren't about the firm's readiness are real
+	// errors; the rest are a "still waiting" outcome, reported with the now-fresh
+	// state of the firm's account so the caller can update what it shows.
+	if (result.reason === "case_not_found") {
+		return { ok: false, error: GO_LIVE_REASONS.case_not_found };
+	}
+	if (result.reason === "already_live") {
+		revalidatePath(`/my-cases/${caseId}`);
+		const firm = owned.attorney;
+		return {
+			ok: true,
+			live: true,
+			recipientName: firm?.firmName ?? firm?.name ?? "your attorney's firm",
+		};
+	}
+	if (result.reason === "not_pending") {
+		return { ok: false, error: GO_LIVE_REASONS.not_pending };
+	}
+
+	// no_attorney | attorney_no_account | transfers_disabled — re-read the refreshed
+	// readiness so the panel reflects Stripe's current answer.
+	const fresh = await getCasePayoutOptions(caseId, session.user.id);
+	const a = fresh?.attorney;
+	revalidatePath(`/my-cases/${caseId}`);
+	return {
+		ok: true,
+		live: false,
+		hasAccount: !!a?.hasAccount,
+		detailsSubmitted: !!a?.detailsSubmitted,
+		reason: result.reason,
+	};
+}
+
+/**
+ * The plaintiff's "Check again" — pull the firm's account from Stripe, then return
+ * the refreshed readiness.
+ *
+ * The read-only version of `checkAndGoLiveAction`: it does not publish, only
+ * updates our cache from Stripe's truth and reports where the firm's setup now
+ * stands. This is what the case wizard's payout step calls, so pressing "Check
+ * again" reflects an attorney who just enabled payouts instead of re-reading a
+ * cache no webhook touched.
+ */
+export async function refreshCasePayoutAction(
+	input: z.input<typeof caseInput>,
+): Promise<
+	| {
+			ok: true;
+			payout: NonNullable<Awaited<ReturnType<typeof getCasePayoutOptions>>>;
+	  }
+	| { ok: false; error: string }
+> {
+	const { session } = await requireRole("plaintiff");
+	const parsed = caseInput.safeParse(input);
+	if (!parsed.success) return { ok: false, error: "That case isn't valid." };
+	const { caseId } = parsed.data;
+
+	// Ownership guard, which also scopes the Stripe pull to the caller's own case.
+	const before = await getCasePayoutOptions(caseId, session.user.id);
+	if (!before) return { ok: false, error: "Couldn't find that case." };
+
+	await pullCaseAccountFromStripe(caseId);
+	const payout = await getCasePayoutOptions(caseId, session.user.id);
+	if (!payout) return { ok: false, error: "Couldn't find that case." };
+	revalidatePath(`/my-cases/${caseId}`);
+	return { ok: true, payout };
 }
 
 /**

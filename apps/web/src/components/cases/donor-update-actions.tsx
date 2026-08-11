@@ -2,6 +2,8 @@
 
 import { cn } from "@just-us/ui/lib/utils";
 import { Bell, HandCoins, Share2 } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -64,18 +66,23 @@ export function FollowToggle({
 	);
 }
 
-/** "Give again" / "Back this case" — donations aren't wired yet, so it's an
- *  honest placeholder. */
-export function BackCaseButton({ label }: { label: string }) {
+/** "Give again" / "Back this case" — takes the donor to the case page, where the
+ *  donate flow (and the recipient disclosure) lives. */
+export function BackCaseButton({
+	label,
+	caseHref,
+}: {
+	label: string;
+	caseHref: Route;
+}) {
 	return (
-		<button
-			type="button"
-			onClick={() => toast("Donations are coming soon — check back shortly.")}
+		<Link
+			href={caseHref}
 			className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brass px-4 font-bold text-[14px] text-white transition-colors hover:bg-brass-deep"
 		>
 			<HandCoins className="size-4" aria-hidden="true" />
 			{label}
-		</button>
+		</Link>
 	);
 }
 

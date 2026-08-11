@@ -158,6 +158,7 @@ export function CaseUpdatesBoard({
 						<div className="mt-4 flex flex-col gap-2.5">
 							<BackCaseButton
 								label={hasDonated ? "Give again" : "Back this case"}
+								caseHref={`/cases/${caseId}` as Route}
 							/>
 							<ShareCaseButton sharePath={`/cases/${caseId}`} />
 						</div>

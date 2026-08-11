@@ -3,6 +3,7 @@ import {
 	markCaseUpdatesSeenByOwner,
 } from "@just-us/db/case-updates";
 import { getOwnedCase } from "@just-us/db/cases";
+import { countCaseFollowers } from "@just-us/db/follows";
 import { listMessageConversations } from "@just-us/db/messages";
 import { getCasePayoutOptions } from "@just-us/db/payouts";
 import { getAttorneyCase } from "@just-us/db/representation";
@@ -21,6 +22,7 @@ import { BackLink } from "@/components/dashboard/back-link";
 import { CasePayout } from "@/components/dashboard/case-payout";
 import { CasePayoutSetup } from "@/components/dashboard/case-payout-setup";
 import { CaseUpdateComposer } from "@/components/dashboard/case-update-composer";
+import { CloseCaseButton } from "@/components/dashboard/close-case";
 import {
 	ManageCase,
 	type ManageCaseData,
@@ -71,9 +73,10 @@ export default async function CasePage({
 	//   updates — the attorney's progress posts, shown on the overview. Marking
 	//             them seen is what clears the header bell, and it rides along
 	//             here because reaching this page *is* the owner reading them.
-	const [payout, updates] = await Promise.all([
+	const [payout, updates, followerCount] = await Promise.all([
 		getCasePayoutOptions(id, session.user.id),
-		listCaseUpdates(c.id),
+		listCaseUpdates(c.id, { includeModerated: true }),
+		countCaseFollowers(c.id),
 		markCaseUpdatesSeenByOwner(c.id, session.user.id),
 	]);
 
@@ -90,6 +93,7 @@ export default async function CasePage({
 		donorsCount: c.donorsCount,
 		viewsCount: c.viewsCount,
 		sharesCount: c.sharesCount,
+		followerCount,
 		coverImageUrl: c.coverImageUrl,
 		images: c.images ?? [],
 		thankYouNote: c.thankYouNote,
@@ -118,11 +122,17 @@ export default async function CasePage({
 							cls: "bg-gold-bright/20 text-gold-bright-ink",
 							dot: "bg-gold-bright",
 						}
-					: {
-							text: "Draft",
-							cls: "bg-surface-2 text-ink-soft",
-							dot: "bg-ink-soft",
-						};
+					: c.status === "closed"
+						? {
+								text: "Closed",
+								cls: "bg-surface-2 text-ink-soft",
+								dot: "bg-ink-soft",
+							}
+						: {
+								text: "Draft",
+								cls: "bg-surface-2 text-ink-soft",
+								dot: "bg-ink-soft",
+							};
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -178,6 +188,7 @@ export default async function CasePage({
 				updates={updates}
 				updatesHighlightSince={c.ownerUpdatesSeenAt}
 				viewerId={session.user.id}
+				viewerName={session.user.name}
 			/>
 
 			{payout && (
@@ -189,6 +200,15 @@ export default async function CasePage({
 						attorney: payout.attorney,
 						designatedEmail: payout.designatedEmail,
 					}}
+				/>
+			)}
+
+			{/* Closing is only meaningful once the case is public and raising. */}
+			{c.status === "live" && (
+				<CloseCaseButton
+					caseId={c.id}
+					title={c.title}
+					backerCount={c.donorsCount}
 				/>
 			)}
 		</div>
@@ -215,7 +235,7 @@ async function AttorneyView({
 			caseId,
 		}),
 		listMessageConversations(session.user.id),
-		listCaseUpdates(caseId),
+		listCaseUpdates(caseId, { includeModerated: true }),
 	]);
 	if (!item) notFound();
 

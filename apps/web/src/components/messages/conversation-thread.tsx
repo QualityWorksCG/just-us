@@ -8,6 +8,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@just-us/ui/components/card";
+import { cn } from "@just-us/ui/lib/utils";
 import { AlertCircle, Flag, Send, Trash2 } from "lucide-react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -30,6 +31,16 @@ type ThreadMessage = {
 	authorName: string;
 };
 
+/** What a participant can report a conversation for. Values match the report
+ *  action's schema; labels are display-only. */
+const REPORT_CATEGORIES: { value: string; label: string }[] = [
+	{ value: "spam", label: "Spam" },
+	{ value: "fraud", label: "Fraud or scam" },
+	{ value: "harassment", label: "Harassment or abuse" },
+	{ value: "inappropriate", label: "Inappropriate content" },
+	{ value: "other", label: "Something else" },
+];
+
 export function ConversationThread({
 	conversationId,
 	currentUserId,
@@ -47,6 +58,7 @@ export function ConversationThread({
 	const [conversationEmailEnabled, setConversationEmailEnabled] =
 		useState(emailEnabled);
 	const [reportOpen, setReportOpen] = useState(false);
+	const [reportCategory, setReportCategory] = useState<string | null>(null);
 	const [reportReason, setReportReason] = useState("");
 	const [reportAttempted, setReportAttempted] = useState(false);
 	const [pending, startTransition] = useTransition();
@@ -55,10 +67,11 @@ export function ConversationThread({
 	const reportDescriptionId = useId();
 	const reportReasonId = useId();
 	const reportErrorId = useId();
-	const hasValidReportReason = reportReason.trim().length >= 5;
+	// A category is all we require now — the free-text detail is optional.
+	const hasReportCategory = reportCategory !== null;
 	const reportError =
-		reportAttempted && !hasValidReportReason
-			? "Describe the issue in at least 5 characters."
+		reportAttempted && !hasReportCategory
+			? "Pick the option that best describes the issue."
 			: null;
 
 	useEffect(() => setConversationEmailEnabled(emailEnabled), [emailEnabled]);
@@ -75,6 +88,7 @@ export function ConversationThread({
 		const closeOnEscape = (event: KeyboardEvent) => {
 			if (event.key === "Escape" && !pending) {
 				setReportOpen(false);
+				setReportCategory(null);
 				setReportReason("");
 				setReportAttempted(false);
 			}
@@ -104,15 +118,17 @@ export function ConversationThread({
 	function closeReport() {
 		if (pending) return;
 		setReportOpen(false);
+		setReportCategory(null);
 		setReportReason("");
 		setReportAttempted(false);
 	}
 	function submitReport() {
 		setReportAttempted(true);
-		if (!hasValidReportReason) return;
+		if (!reportCategory) return;
 		startTransition(async () => {
 			const result = await reportConversationAction({
 				conversationId,
+				category: reportCategory,
 				reason: reportReason,
 			});
 			if (!result.ok) {
@@ -121,6 +137,7 @@ export function ConversationThread({
 			}
 			toast.success("Conversation reported for moderation.");
 			setReportOpen(false);
+			setReportCategory(null);
 			setReportReason("");
 			setReportAttempted(false);
 		});
@@ -297,29 +314,38 @@ export function ConversationThread({
 							}}
 						>
 							<div>
-								<label
-									htmlFor={reportReasonId}
-									className="block font-semibold text-base text-ink"
-								>
-									What happened?
-								</label>
-								<textarea
-									ref={reportTextareaRef}
-									id={reportReasonId}
-									value={reportReason}
-									onChange={(event) => setReportReason(event.target.value)}
-									onBlur={() => setReportAttempted(true)}
-									maxLength={1000}
-									aria-invalid={!!reportError}
-									aria-describedby={reportError ? reportErrorId : undefined}
-									placeholder="Describe the concern (at least 5 characters)"
-									className="mt-2 min-h-32 w-full resize-y rounded-[var(--radius-control)] border border-line-strong bg-surface p-3 text-base text-ink leading-relaxed outline-none focus:border-brass-deep focus:ring-1 focus:ring-brass-deep/30 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20"
-								/>
+								<span className="block font-semibold text-base text-ink">
+									What's the issue?
+								</span>
+								<div className="mt-3 flex flex-wrap gap-2">
+									{REPORT_CATEGORIES.map((cat) => {
+										const selected = reportCategory === cat.value;
+										return (
+											<button
+												key={cat.value}
+												type="button"
+												aria-pressed={selected}
+												onClick={() => {
+													setReportCategory(cat.value);
+													setReportAttempted(false);
+												}}
+												className={cn(
+													"rounded-[var(--radius-pill)] border px-3.5 py-1.5 font-semibold text-sm transition-colors",
+													selected
+														? "border-ink bg-ink text-surface"
+														: "border-line-strong bg-surface text-ink-soft hover:border-brass-deep hover:text-brass-deep",
+												)}
+											>
+												{cat.label}
+											</button>
+										);
+									})}
+								</div>
 								{reportError ? (
 									<p
 										id={reportErrorId}
 										role="alert"
-										className="mt-2 flex items-center gap-2 text-destructive text-sm"
+										className="mt-3 flex items-center gap-2 text-destructive text-sm"
 									>
 										<AlertCircle
 											className="size-4 shrink-0"
@@ -328,6 +354,27 @@ export function ConversationThread({
 										{reportError}
 									</p>
 								) : null}
+							</div>
+
+							<div>
+								<label
+									htmlFor={reportReasonId}
+									className="block font-semibold text-base text-ink"
+								>
+									Add more details{" "}
+									<span className="font-normal text-muted-foreground">
+										(optional)
+									</span>
+								</label>
+								<textarea
+									ref={reportTextareaRef}
+									id={reportReasonId}
+									value={reportReason}
+									onChange={(event) => setReportReason(event.target.value)}
+									maxLength={1000}
+									placeholder="Anything that would help our team review — what happened, when, and where."
+									className="mt-2 min-h-28 w-full resize-y rounded-[var(--radius-control)] border border-line-strong bg-surface p-3 text-base text-ink leading-relaxed outline-none focus:border-brass-deep focus:ring-1 focus:ring-brass-deep/30"
+								/>
 							</div>
 							<p className="text-base text-muted-foreground leading-relaxed">
 								Your report is visible only to JustUs moderators.
@@ -345,7 +392,7 @@ export function ConversationThread({
 								<Button
 									type="submit"
 									size="lg"
-									disabled={!hasValidReportReason || pending}
+									disabled={!hasReportCategory || pending}
 								>
 									<Flag data-icon="inline-start" aria-hidden="true" />
 									{pending ? "Sending report…" : "Send report"}

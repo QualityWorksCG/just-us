@@ -1,5 +1,10 @@
-import { getPublicCase } from "@just-us/db/cases";
-import { donorSupportForCase } from "@just-us/db/donations";
+import { getViewableCase } from "@just-us/db/cases";
+import {
+	countCaseDonations,
+	donorSupportForCase,
+	getDonationForCheckoutSession,
+	listCaseBackers,
+} from "@just-us/db/donations";
 import {
 	getFollowUpdatesSeenAt,
 	isCaseFollowing,
@@ -16,7 +21,20 @@ import type { Route } from "next";
 import { notFound } from "next/navigation";
 
 import { PublicCaseView } from "@/components/cases/public-case-view";
+import { DonationReceipt } from "@/components/donation-receipt";
 import { requireRole } from "@/lib/auth-server";
+import {
+	syncDonationBySession,
+	syncPendingDonationsForCase,
+} from "@/lib/donation-sync";
+
+function exactMoney(cents: number) {
+	return new Intl.NumberFormat("en-US", {
+		style: "currency",
+		currency: "USD",
+		minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
+	}).format(cents / 100);
+}
 
 /**
  * A live case as a signed-in donor sees it, inside the dashboard shell.
@@ -47,15 +65,35 @@ export default async function InAppCasePage({
 	searchParams,
 }: {
 	params: Promise<{ id: string }>;
-	searchParams: Promise<{ from?: string }>;
+	searchParams: Promise<{
+		from?: string;
+		donated?: string;
+		session_id?: string;
+	}>;
 }) {
 	const { session } = await requireRole("donor");
-	const [{ id }, { from }] = await Promise.all([params, searchParams]);
+	const [{ id }, sp] = await Promise.all([params, searchParams]);
+	const { from } = sp;
+
+	// Just returned from Stripe: settle this donation (and any other still-pending
+	// on the case) before rendering, so the thank-you and the totals are truthful
+	// even if the webhook is late — the same reconciliation the public page does.
+	const returningSessionId =
+		sp.donated === "1" && sp.session_id ? sp.session_id : null;
+	if (returningSessionId) await syncDonationBySession(returningSessionId);
+	await syncPendingDonationsForCase(id);
 
 	// The same predicate the public page uses: a case that isn't live 404s here
 	// too, even for a donor holding the link.
-	const c = await getPublicCase(id);
+	const c = await getViewableCase(id);
 	if (!c) notFound();
+
+	const justDonated = returningSessionId
+		? await getDonationForCheckoutSession({
+				stripeCheckoutSessionId: returningSessionId,
+				caseId: c.id,
+			})
+		: null;
 
 	// Read the follower's last-seen time BEFORE marking, so updates newer than the
 	// previous visit still highlight now; then clear this case from their bell.
@@ -75,13 +113,15 @@ export default async function InAppCasePage({
 	// one it would offer — same case, same answer.
 	const owner = c.owner?.name ?? "A plaintiff";
 	const ownerFirst = owner.split(" ")[0];
-	const [destination, mySupport] = await Promise.all([
+	const [destination, mySupport, backers, donationCount] = await Promise.all([
 		resolvePayoutDestination(c.id),
 		donorSupportForCase({
 			caseId: c.id,
 			donorId: session.user.id,
 			donorEmail: session.user.emailVerified ? session.user.email : null,
 		}),
+		listCaseBackers(c.id),
+		countCaseDonations(c.id),
 	]);
 	const BLOCKED: Record<string, string> = {
 		not_live: "This case isn't raising right now.",
@@ -108,6 +148,16 @@ export default async function InAppCasePage({
 		// Full-bleed, like the other app screens: the shell's content column already
 		// supplies the gutters.
 		<div className="w-full">
+			{returningSessionId && (
+				<div className="mb-5">
+					<DonationReceipt
+						settled={justDonated?.status === "succeeded"}
+						amountLabel={
+							justDonated ? exactMoney(justDonated.amountCents) : null
+						}
+					/>
+				</div>
+			)}
 			<PublicCaseView
 				c={c}
 				donate={{
@@ -116,11 +166,16 @@ export default async function InAppCasePage({
 					feeBps: platformFeeBps(),
 					alreadyBacked: mySupport.count > 0,
 					canDonate: destination.ok,
+					closed: c.status === "closed",
 					blockedReason: destination.ok
 						? null
-						: (BLOCKED[destination.reason] ?? null),
+						: c.status === "closed"
+							? "This case has closed. Thank you to everyone who backed it."
+							: (BLOCKED[destination.reason] ?? null),
 				}}
 				fundsNote={fundsNote}
+				backers={backers}
+				donationCount={donationCount}
 				backHref={back.href}
 				backLabel={back.label}
 				// The shell's header bar is this page's h1.

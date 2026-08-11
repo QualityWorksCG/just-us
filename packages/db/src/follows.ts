@@ -38,8 +38,29 @@ export async function countCaseFollowers(caseId: string): Promise<number> {
 	return prisma.caseFollow.count({ where: { caseId } });
 }
 
+/** The user ids following a case — a notification audience. */
+export async function listCaseFollowerUserIds(
+	caseId: string,
+): Promise<string[]> {
+	const rows = await prisma.caseFollow.findMany({
+		where: { caseId },
+		select: { userId: true },
+	});
+	return rows.map((r) => r.userId);
+}
+
 /** A user's followed cases (live, newest-followed first), with the case data +
  *  owner name — the "Following" tab. */
+/** The ids of every case a user follows — for marking follow state across a list
+ *  of cards in one query, the follow counterpart to `listSavedCaseIds`. */
+export async function listFollowedCaseIds(userId: string): Promise<string[]> {
+	const rows = await prisma.caseFollow.findMany({
+		where: { userId },
+		select: { caseId: true },
+	});
+	return rows.map((r) => r.caseId);
+}
+
 export async function listFollowedCases(userId: string) {
 	const rows = await prisma.caseFollow.findMany({
 		where: { userId, case: { deletedAt: null, status: "live" } },
