@@ -532,20 +532,34 @@ function PayoutRow({
 function NoAttorneyPanel({ view }: { view: RepresentationView }) {
 	const isSeeking = view.status === "seeking";
 	const interested = view.openInterest;
+	// Waiting on one named attorney. Told apart from "out to attorneys" because it
+	// is the opposite: while this is open the case is shown to nobody else, and a
+	// plaintiff who reads it as the queue has no way to explain the silence.
+	const invited = view.pendingInvitation;
 
-	const heading = isSeeking
-		? interested > 0
-			? `${interested} ${interested === 1 ? "attorney has" : "attorneys have"} put themselves forward`
-			: "Out to attorneys"
-		: "No attorney yet";
+	const heading = invited
+		? "Waiting on your attorney to confirm"
+		: isSeeking
+			? interested > 0
+				? `${interested} ${interested === 1 ? "attorney has" : "attorneys have"} put themselves forward`
+				: "Out to attorneys"
+			: "No attorney yet";
 
-	const body = isSeeking
-		? interested > 0
-			? "None of them can contact you. You reach out by choosing one, which sets your attorney and moves you on to agree the fee."
-			: "Bar-verified attorneys can see this case and put themselves forward. You'll see them here — and you can choose an attorney yourself at any time."
-		: "Your case needs an attorney before it can name a fee or raise anything. Browse the directory, or publish it out to attorneys and let them come to you.";
+	const body = invited
+		? `We emailed ${invited.email} an invitation to confirm they represent you. Until they answer, your case isn't shown to other attorneys — if they haven't by ${formatDate(invited.expiresAt)}, it goes in front of every bar-verified attorney automatically.`
+		: isSeeking
+			? interested > 0
+				? "None of them can contact you. You reach out by choosing one, which sets your attorney and moves you on to agree the fee."
+				: "Bar-verified attorneys can see this case and put themselves forward. You'll see them here — and you can choose an attorney yourself at any time."
+			: "Your case needs an attorney before it can name a fee or raise anything. Browse the directory, or publish it out to attorneys and let them come to you.";
 
-	const Icon = isSeeking ? (interested > 0 ? Hand : Hourglass) : Scale;
+	const Icon = invited
+		? Hourglass
+		: isSeeking
+			? interested > 0
+				? Hand
+				: Hourglass
+			: Scale;
 
 	return (
 		<div className="flex flex-col items-start gap-3 px-5 py-6 sm:flex-row sm:items-center sm:px-6">
@@ -565,7 +579,22 @@ function NoAttorneyPanel({ view }: { view: RepresentationView }) {
 					{body}
 				</p>
 			</div>
-			{isSeeking ? (
+			{invited ? (
+				// The wizard is where the invitation lives: resend it, or send it to a
+				// different address. The requests inbox cannot receive anything while
+				// this is open, so pointing there would be an empty room.
+				<Link
+					href={`/cases/new?draft=${view.id}` as Route}
+					className={cn(
+						buttonVariants({ variant: "outline", size: "lg" }),
+						ACTION,
+						"shrink-0",
+					)}
+				>
+					Manage invitation
+					<ArrowRight data-icon="inline-end" aria-hidden="true" />
+				</Link>
+			) : isSeeking ? (
 				<Link
 					href={`/my-cases/${view.id}/requests` as Route}
 					className={cn(

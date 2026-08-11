@@ -125,6 +125,11 @@ model Case {
   saves     SavedCase[]
   donations Donation[]
 
+  // Attorneys the plaintiff invited by email (the "I have an attorney" path).
+  // A pending one holds the case out of the attorney queue until it is
+  // confirmed, declined, revoked, or lapses — see CaseInvitation.
+  invitations CaseInvitation[]
+
   // The attorney representing this case, once one is matched. Its absence is
   // what puts a `seeking` case in the attorney queue — see listSeekingQueue.
   match         Match?

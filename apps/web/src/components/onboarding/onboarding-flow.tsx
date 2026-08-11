@@ -87,7 +87,15 @@ const ROLES: {
 
 const STEP2_FORM_ID = "onboarding-step-2";
 
-export function OnboardingFlow({ name }: { name: string }) {
+export function OnboardingFlow({
+	name,
+	next: returnTo,
+}: {
+	name: string;
+	/** Where they were headed before onboarding interrupted them. Already
+	 *  validated as a same-site path by the page. */
+	next?: string | null;
+}) {
 	const ids = {
 		firm: useId(),
 		bar: useId(),
@@ -163,10 +171,13 @@ export function OnboardingFlow({ name }: { name: string }) {
 			if (result.ok) {
 				toast.success("You're all set. Welcome to JustUs.");
 				// Hard navigation so the destination renders with the freshly updated
-				// session (role + onboarded), avoiding any stale client cache. New
-				// plaintiffs go straight into creating their case; everyone else lands
-				// on their dashboard.
-				window.location.assign(role === "plaintiff" ? "/cases/new" : "/home");
+				// session (role + onboarded), avoiding any stale client cache. Whatever
+				// sent them here wins — an attorney who came from a case invitation goes
+				// back to it rather than to a dashboard. Otherwise new plaintiffs go
+				// straight into creating their case and everyone else to their dashboard.
+				window.location.assign(
+					returnTo ?? (role === "plaintiff" ? "/cases/new" : "/home"),
+				);
 			} else {
 				if (result.fieldErrors) setErrors(result.fieldErrors);
 				toast.error(result.error);
