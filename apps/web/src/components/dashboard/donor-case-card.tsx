@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { toggleSaveAction } from "@/app/(app)/donor-actions";
 import { toggleFollowAction } from "@/app/(app)/follow-actions";
 import type { DonorCase } from "@/components/dashboard/donor-case";
+import { donateHref } from "@/lib/donate-link";
 
 function money(n: number) {
 	return new Intl.NumberFormat("en-US", {
@@ -317,8 +318,11 @@ export function DonorCaseCard({
 				<div
 					className={cn("flex items-center gap-2", compact ? "mt-3" : "mt-4")}
 				>
+					{/* Straight to this case's donate panel. A card can't take the amount
+					    itself — the fee has to be shown to the cent before confirming, and
+					    the case page is where that disclosure lives. */}
 					<Link
-						href={href}
+						href={donateHref(href)}
 						className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brass px-4 font-semibold text-[13.5px] text-white transition-colors hover:bg-brass-deep"
 					>
 						<HandCoins className="size-4" aria-hidden="true" />

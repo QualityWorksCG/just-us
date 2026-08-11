@@ -2,13 +2,13 @@
 
 import { cn } from "@just-us/ui/lib/utils";
 import { Bell, HandCoins, Share2 } from "lucide-react";
-import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { toggleFollowAction } from "@/app/(app)/follow-actions";
+import { donateHref } from "@/lib/donate-link";
 
 /** The Follow/Following pill in the donor updates banner. */
 export function FollowToggle({
@@ -66,18 +66,22 @@ export function FollowToggle({
 	);
 }
 
-/** "Give again" / "Back this case" — takes the donor to the case page, where the
- *  donate flow (and the recipient disclosure) lives. */
+/**
+ * "Give again" / "Back this case" — links at the case page's donate panel, which
+ * owns the amount picker and the fee breakdown (see `donateHref`). `caseHref` is
+ * the case screen matching this route: the in-app one for a signed-in donor, the
+ * public one otherwise.
+ */
 export function BackCaseButton({
 	label,
 	caseHref,
 }: {
 	label: string;
-	caseHref: Route;
+	caseHref: string;
 }) {
 	return (
 		<Link
-			href={caseHref}
+			href={donateHref(caseHref)}
 			className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brass px-4 font-bold text-[14px] text-white transition-colors hover:bg-brass-deep"
 		>
 			<HandCoins className="size-4" aria-hidden="true" />

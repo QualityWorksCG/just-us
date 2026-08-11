@@ -18,6 +18,7 @@ import { z } from "zod";
 
 import { requireRole } from "@/lib/auth-server";
 import { notifyCaseClosed, notifyStatusChange } from "@/lib/notify";
+import { THANK_YOU_MAX, THANK_YOU_TOO_LONG } from "@/lib/thank-you-note";
 
 /** How far the representing firm's Stripe setup for this case has got. */
 export type CasePayoutReadiness = NonNullable<
@@ -50,6 +51,23 @@ const imageFields = {
 	images: z.array(z.string().url()).optional(),
 };
 
+/**
+ * The plaintiff's thank-you note, as every save path accepts it.
+ *
+ * Three inputs, three outcomes, and the difference matters downstream: a string
+ * sets the note, `""` and `null` clear it to null — so the acknowledgement's "did
+ * they write one" stays a null check rather than a truthiness check on `""` — and
+ * **absent stays absent**, which is what lets `toData` leave an existing note
+ * alone. Mapping absent to null here instead would make every save that doesn't
+ * mention the note erase it.
+ */
+const thankYouNoteField = z
+	.string()
+	.trim()
+	.max(THANK_YOU_MAX, THANK_YOU_TOO_LONG)
+	.nullish()
+	.transform((v) => (v === undefined ? undefined : v || null));
+
 // Publishing is strict — the case goes live, so the essentials must be there.
 const createCaseSchema = z.object({
 	id: z.string().optional(),
@@ -62,6 +80,10 @@ const createCaseSchema = z.object({
 	payoutType: z.string().trim().optional(),
 	attorney: attorneySchema,
 	evidence: evidenceSchema,
+	// Optional even here, where everything else is strict: a case with no note
+	// still sends donors a complete confirmation, so refusing to publish over one
+	// would be a gate on nothing.
+	thankYouNote: thankYouNoteField,
 	...imageFields,
 });
 
@@ -74,6 +96,10 @@ const seekingSchema = z.object({
 	summary: z.string().trim().min(1, "Add a one-line summary."),
 	story: z.string().trim().min(10, "Tell your story."),
 	evidence: evidenceSchema,
+	// Carried on this path too, though a `seeking` case takes no donations yet: the
+	// note is written in step 1, and dropping it here would lose words the plaintiff
+	// typed before they ever reach a state that can be funded.
+	thankYouNote: thankYouNoteField,
 	...imageFields,
 });
 
@@ -89,6 +115,7 @@ const draftSchema = z.object({
 	payoutType: z.string().optional(),
 	attorney: attorneySchema,
 	evidence: evidenceSchema,
+	thankYouNote: thankYouNoteField,
 	...imageFields,
 });
 
@@ -307,14 +334,7 @@ const editCaseSchema = z.object({
 	story: z.string().trim().min(10, "Tell your story."),
 	coverImageUrl: z.string().url().nullish(),
 	images: z.array(z.string().url()).optional(),
-	// The note sent to every donor. Emptied to null rather than to "" so the
-	// acknowledgement's "did they write one" check stays a null check.
-	thankYouNote: z
-		.string()
-		.trim()
-		.max(600, "Keep your thank-you under 600 characters.")
-		.nullish()
-		.transform((v) => (v ? v : null)),
+	thankYouNote: thankYouNoteField,
 });
 
 export type EditCaseInput = z.infer<typeof editCaseSchema>;

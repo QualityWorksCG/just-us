@@ -61,6 +61,7 @@ import {
 import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
 import { CASE_CATEGORIES } from "@/lib/case-categories";
+import { THANK_YOU_MAX } from "@/lib/thank-you-note";
 
 /** A piece of evidence: a document the plaintiff uploaded, or a link they pasted.
  *  Both carry a `url` — a file's is where it is stored, a link's is the address
@@ -91,6 +92,10 @@ export type WizardInitial = {
 	evidence: EvidenceItem[];
 	coverImageUrl: string | null;
 	images: string[];
+	/** The plaintiff's thank-you to their donors. Seeded so a resumed case — which
+	 *  may have had its note written on the Manage page since — edits the note it
+	 *  actually has rather than saving an empty box over it. */
+	thankYouNote: string | null;
 	/** True when an attorney has already been matched to this case through the
 	 *  request/accept flow. The attorney is settled — the representation step shows
 	 *  them as confirmed rather than asking to invite one again. */
@@ -168,6 +173,7 @@ export function CaseWizard({
 	const ids = {
 		title: useId(),
 		story: useId(),
+		thankYouNote: useId(),
 		fee: useId(),
 		manual: useId(),
 		manualFirm: useId(),
@@ -222,6 +228,10 @@ export function CaseWizard({
 		initial?.evidence ?? [],
 	);
 	const [linkUrl, setLinkUrl] = useState("");
+	// Sent to every donor with their acknowledgement, and editable afterwards from
+	// Manage → Edit & settings. Written here so a case that never returns to that
+	// page still thanks its donors in the plaintiff's own words.
+	const [thankYouNote, setThankYouNote] = useState(initial?.thankYouNote ?? "");
 
 	// Step 2 — the basics
 	const [category, setCategory] = useState(initial?.category || "Employment");
@@ -374,6 +384,7 @@ export function CaseWizard({
 			summary: summary || story.trim().slice(0, 140),
 			story: story.trim(),
 			evidence,
+			thankYouNote: thankYouNote.trim() || null,
 			coverImageUrl: coverUrl,
 			images: moreImages,
 		});
@@ -449,6 +460,7 @@ export function CaseWizard({
 			// biome-ignore lint/style/noNonNullAssertion: missingEssential returned false
 			attorney: attorney!,
 			evidence,
+			thankYouNote: thankYouNote.trim() || null,
 			coverImageUrl: coverUrl,
 			images: moreImages,
 		});
@@ -549,6 +561,9 @@ export function CaseWizard({
 			payoutType,
 			attorney,
 			evidence,
+			// `null` rather than `undefined` when empty: clearing the box has to clear
+			// the note, and absent would mean "leave it as it is".
+			thankYouNote: thankYouNote.trim() || null,
 			coverImageUrl: coverUrl,
 			images: moreImages,
 		};
@@ -1786,6 +1801,42 @@ export function CaseWizard({
 												</div>
 											);
 										})}
+									</div>
+
+									{/* Written here, sent much later — with the acknowledgement
+									    every donor gets once the case is live. Asked for on this
+									    step because it is the one place the plaintiff is already
+									    writing in their own voice, and kept optional: a case with
+									    no note still sends a complete confirmation, and the note
+									    can be added or changed anytime from Manage. The cap is the
+									    server's, so a note that would be rejected can't be typed
+									    past here. */}
+									<div>
+										<label
+											htmlFor={ids.thankYouNote}
+											className="mb-1.5 block font-semibold text-[13px] text-ink"
+										>
+											Thank-you note to your donors{" "}
+											<span className="font-normal text-muted-foreground">
+												(optional)
+											</span>
+										</label>
+										<Textarea
+											id={ids.thankYouNote}
+											value={thankYouNote}
+											onChange={(e) =>
+												setThankYouNote(e.target.value.slice(0, THANK_YOU_MAX))
+											}
+											rows={4}
+											maxLength={THANK_YOU_MAX}
+											placeholder="Say thank you in your own words — every donor gets this with their confirmation."
+											className="bg-surface"
+										/>
+										<p className="mt-1.5 text-[12.5px] text-muted-foreground leading-relaxed">
+											{thankYouNote.trim()
+												? `Sent to every donor with their confirmation. ${THANK_YOU_MAX - thankYouNote.length} characters left.`
+												: "Skip it for now if you'd rather — donors still get a confirmation, and you can add this later from Manage."}
+										</p>
 									</div>
 
 									<p className="flex gap-2.5 rounded-[var(--radius-card-sm)] bg-green-soft px-4 py-3 text-[13px] text-green-deep leading-relaxed">

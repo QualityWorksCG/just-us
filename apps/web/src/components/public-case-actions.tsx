@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { toggleSaveAction } from "@/app/(app)/donor-actions";
 import { toggleFollowAction } from "@/app/(app)/follow-actions";
 import { startDonation } from "@/app/cases/[id]/donate-actions";
+import { DONATE_ANCHOR } from "@/lib/donate-link";
 
 export type DonateConfig = {
 	/** Quick-pick amounts in cents, already filtered to the floor by the server. */
@@ -168,7 +169,12 @@ export function PublicCaseActions({
 	}
 
 	return (
-		<div className="flex flex-col gap-2.5">
+		// The anchor every other "Back this case" button in the app points at — the
+		// donor cards on Discover/Saved/dashboard and the updates page send people
+		// here rather than opening a second amount picker, so the fee-to-the-cent
+		// disclosure below is the only place a donation can start. `scroll-mt` keeps
+		// the panel clear of the app shell's sticky header on arrival.
+		<div id={DONATE_ANCHOR} className="flex scroll-mt-24 flex-col gap-2.5">
 			{config.canDonate ? (
 				<div className="flex flex-col gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-4">
 					<div className="grid grid-cols-2 gap-2">

@@ -61,6 +61,7 @@ export default async function NewCasePage({
 					: [],
 				coverImageUrl: source.coverImageUrl,
 				images: source.images ?? [],
+				thankYouNote: source.thankYouNote,
 				attorneyConfirmed,
 				status: source.status,
 				payout,

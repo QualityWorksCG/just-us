@@ -37,6 +37,11 @@ export type CaseFields = {
 	coverImageUrl?: string | null;
 	/** Vercel Blob URLs of the gallery images. */
 	images?: string[];
+	/** The plaintiff's thank-you, sent to every donor with their acknowledgement.
+	 *
+	 *  Three states, not two: a string sets it, `null` clears it, and **absent
+	 *  leaves whatever is already there** — see `toData`. */
+	thankYouNote?: string | null;
 };
 
 function toData(f: CaseFields) {
@@ -57,6 +62,13 @@ function toData(f: CaseFields) {
 		evidence: f.evidence ?? [],
 		coverImageUrl: f.coverImageUrl ?? null,
 		images: f.images ?? [],
+		// Spread in only when the caller said something about it, unlike every field
+		// above, which is defaulted. `saveDraft` and `publishCase` update in place, so
+		// defaulting this to null would let a wizard save that never asked about the
+		// note erase one written on the Manage page — a case published, edited there,
+		// then re-run through the wizard would go public having silently dropped it.
+		// On create, absent simply leaves the column at its own null.
+		...(f.thankYouNote !== undefined ? { thankYouNote: f.thankYouNote } : {}),
 	};
 }
 

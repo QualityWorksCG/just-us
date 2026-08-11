@@ -58,8 +58,11 @@ const COPY: Record<Stage, { title: string; body: string; cta: string | null }> =
 			cta: null,
 		},
 		ready: {
+			// About the *account*, not the case. "This case can accept donations" read
+			// as a flat contradiction next to a case that is not raising yet, and the
+			// case not being open is the plaintiff's step, named below.
 			title: "Active",
-			body: "This case can accept donations, and its funds land in the account you linked for it. Moving them into your client trust account and applying them to the fee is yours to do, under your bar's rules.",
+			body: "This case's account can receive, and donated funds land in the account you linked for it. Moving them into your client trust account and applying them to the fee is yours to do, under your bar's rules.",
 			cta: null,
 		},
 	};
@@ -196,17 +199,20 @@ export function CasePayoutSetup({
 				</p>
 			)}
 			{/* The plaintiff's step, named so a fully-onboarded attorney doesn't read a
-			    still-closed case as their own failure. `pending_payout` counts too: the
-			    account is ready, and publishing is the client's to press. */}
-			{stage === "ready" &&
-				!payout.bound &&
-				(caseStatus === "live" || caseStatus === "pending_payout") && (
-					<p className="mt-2.5 text-[12.5px] text-muted-foreground leading-relaxed">
-						{caseStatus === "pending_payout"
-							? "Nothing outstanding here — your client publishes their case whenever they're ready."
-							: "Waiting on your client to open donations on their side."}
-					</p>
-				)}
+			    still-closed case as their own failure. Said for every status, not just
+			    the published ones: an "Active" account on a case with no agreed fee
+			    otherwise reads as a promise the case screen then contradicts. */}
+			{stage === "ready" && !payout.bound && (
+				<p className="mt-2.5 text-[12.5px] text-muted-foreground leading-relaxed">
+					{caseStatus === "pending_payout"
+						? "Nothing outstanding here — your client publishes their case whenever they're ready."
+						: caseStatus === "live"
+							? "Waiting on your client to open donations on their side."
+							: caseStatus === "closed"
+								? "This case is closed, so nothing further will be donated to it."
+								: "Nothing outstanding here — the case itself can't take donations until your client agrees a fee with you and publishes it."}
+				</p>
+			)}
 
 			<div className="mt-4 flex flex-wrap items-center gap-2">
 				{copy.cta && (

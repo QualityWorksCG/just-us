@@ -52,11 +52,9 @@ import {
 import { CaseUpdateComposer } from "@/components/dashboard/case-update-composer";
 
 import { CASE_CATEGORIES } from "@/lib/case-categories";
+import { THANK_YOU_MAX } from "@/lib/thank-you-note";
 
 const CATEGORIES = CASE_CATEGORIES;
-
-/** Mirrors the cap in `editCaseSchema` — the note is email copy, not an essay. */
-const THANK_YOU_MAX = 600;
 
 export type ManageCaseData = {
 	id: string;
@@ -182,6 +180,7 @@ export function ManageCase({
 	updatesHighlightSince,
 	viewerId,
 	viewerName,
+	initialTab = "overview",
 }: {
 	data: ManageCaseData;
 	/** The case's progress updates, newest first (JUS-33). */
@@ -192,6 +191,10 @@ export function ManageCase({
 	viewerId: string;
 	/** The plaintiff's display name — the byline on updates they post here. */
 	viewerName: string;
+	/** Which tab opens first. Lets the case list link straight at the editor —
+	 *  someone who clicked an edit control has already said what they came for, and
+	 *  landing them on the overview to press one more thing is a wasted step. */
+	initialTab?: "overview" | "edit";
 }) {
 	const router = useRouter();
 	const ids = {
@@ -201,7 +204,7 @@ export function ManageCase({
 		thankYouNote: useId(),
 	};
 
-	const [tab, setTab] = useState<"overview" | "edit">("overview");
+	const [tab, setTab] = useState<"overview" | "edit">(initialTab);
 
 	const [title, setTitle] = useState(data.title);
 	const [category, setCategory] = useState(data.category || CATEGORIES[0]);

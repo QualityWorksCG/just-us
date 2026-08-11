@@ -7,7 +7,10 @@ import {
 	listCaseBackers,
 } from "@just-us/db/donations";
 import { isCaseFollowing } from "@just-us/db/follows";
-import { resolvePayoutDestination } from "@just-us/db/payouts";
+import {
+	bindReadyLiveCase,
+	resolvePayoutDestination,
+} from "@just-us/db/payouts";
 import { isCaseSaved } from "@just-us/db/saves";
 import {
 	donationPresets,
@@ -74,6 +77,10 @@ export default async function PublicCasePage({
 		sp.donated === "1" && sp.session_id ? sp.session_id : null;
 	if (returningSessionId) await syncDonationBySession(returningSessionId);
 	await syncPendingDonationsForCase(id);
+	// Same idea for the destination: a live case whose firm's account has since
+	// cleared is bound here rather than waiting for its plaintiff to press a button
+	// they were never told about. No-ops unless the case is live and unbound.
+	await bindReadyLiveCase(id);
 
 	const c = await getViewableCase(id);
 	if (!c) notFound();
