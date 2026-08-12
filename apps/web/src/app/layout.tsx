@@ -5,7 +5,7 @@ import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "../index.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
-import { Userback } from "@/components/userback";
+import { UserbackWidget } from "@/components/userback";
 
 const figtree = Figtree({
 	variable: "--font-figtree",
@@ -44,7 +44,7 @@ export default function RootLayout({
 					{/* Feedback widget. Absent unless the environment sets a token, which
 					    is how it stays on in demo/QA and off in production. */}
 					{webEnv.NEXT_PUBLIC_USERBACK_TOKEN && (
-						<Userback token={webEnv.NEXT_PUBLIC_USERBACK_TOKEN} />
+						<UserbackWidget token={webEnv.NEXT_PUBLIC_USERBACK_TOKEN} />
 					)}
 				</Providers>
 			</body>
