@@ -20,7 +20,6 @@ import {
 	ScrollText,
 	Settings,
 	ShieldAlert,
-	ShieldCheck,
 	SlidersHorizontal,
 	TrendingUp,
 	Users,
@@ -156,13 +155,6 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				icon: MessageSquare,
 				title: "Messages",
 				sub: "Your conversation with your attorney.",
-			},
-			{
-				slug: "verification",
-				label: "Verification",
-				icon: ShieldCheck,
-				title: "Verification",
-				sub: "Verify your identity so your case can be listed and funded.",
 			},
 			{
 				slug: "settings",

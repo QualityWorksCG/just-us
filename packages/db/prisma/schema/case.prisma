@@ -280,6 +280,25 @@ model Donation {
   // truthful even if the case is later re-matched to a different attorney.
   stripeAccountId         String?
 
+  /// Stripe's own hosted receipt for the charge, shown to the donor on their
+  /// donations screen. Read off `latest_charge.receipt_url` at the moment the
+  /// donation settles.
+  ///
+  /// **Stored, not fetched on render.** Resolving it live would mean a Stripe
+  /// round trip per row every time the page is drawn, and would make a donor's
+  /// own giving history unreadable during a Stripe outage. It is also not
+  /// derivable from the ids we already hold — the URL carries a signature.
+  ///
+  /// Null is ordinary rather than exceptional: a donation that never settled has
+  /// no charge to receipt, and some payment methods produce no hosted receipt at
+  /// all. The screen shows a receipt link only where this is set.
+  ///
+  /// Note this is a *platform* receipt. These are destination charges, so the
+  /// charge lives on the JustUs account even though the funds transfer on to the
+  /// firm — which is why it is retrievable with the platform key and why it
+  /// describes the donation rather than the firm's payout.
+  stripeReceiptUrl        String?
+
   // Collected by Checkout. The receipt address, and for a guest donation the
   // *only* identity we hold — which is what makes `donorsCount` and later
   // account-claiming possible without an account existing at the time.

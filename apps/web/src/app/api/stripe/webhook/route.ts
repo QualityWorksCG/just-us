@@ -4,7 +4,12 @@ import {
 	markDonationSucceeded,
 } from "@just-us/db/donations";
 import { env } from "@just-us/env/server";
-import { isPaymentsConfigured, type Stripe, stripe } from "@just-us/payments";
+import {
+	fetchReceiptUrl,
+	isPaymentsConfigured,
+	type Stripe,
+	stripe,
+} from "@just-us/payments";
 import { sendDonationAcknowledgement } from "@/lib/donation-acknowledgement";
 import { notifyDonation } from "@/lib/notify";
 
@@ -60,9 +65,15 @@ export async function POST(request: Request): Promise<Response> {
 				// `payment_status` guards the one gap in Checkout: a session can complete
 				// while payment is still processing, and only `paid` means money moved.
 				if (session.payment_status !== "paid") break;
+				const paymentIntentId = idOf(session.payment_intent);
 				const { applied, donationId } = await markDonationSucceeded({
 					stripeCheckoutSessionId: session.id,
-					stripePaymentIntentId: idOf(session.payment_intent),
+					stripePaymentIntentId: paymentIntentId,
+					// Resolved here rather than on render: the URL lives on the charge and
+					// is not derivable from any id, so it has to be read once and stored.
+					// `fetchReceiptUrl` never throws — a missing receipt link must not turn
+					// a paid donation into a 500 Stripe would redeliver.
+					stripeReceiptUrl: await fetchReceiptUrl(paymentIntentId),
 					// For a guest this is the *only* identity we get, and it arrives here
 					// rather than at checkout creation — it is what makes their donation
 					// countable as a distinct donor and claimable against an account later.

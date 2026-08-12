@@ -1,7 +1,15 @@
 import { listCertificatesForUser } from "@just-us/db/certificates";
 import { donorStats, listDonations } from "@just-us/db/donations";
+import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { Award, ExternalLink, HandCoins, Scale, Trophy } from "lucide-react";
+import {
+	Award,
+	Download,
+	ExternalLink,
+	HandCoins,
+	Scale,
+	Trophy,
+} from "lucide-react";
 
 import { requireRole } from "@/lib/auth-server";
 
@@ -32,9 +40,26 @@ export default async function DonationsPage() {
 
 	return (
 		<div className="flex flex-col gap-6">
-			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				Every gift you've given, and the causes behind them.
-			</p>
+			<div className="flex flex-wrap items-start justify-between gap-3">
+				<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+					Every gift you've given, and the causes behind them.
+				</p>
+				{/* Offered only when there is something to export — a button that
+				    downloads an empty file reads as a broken feature. */}
+				{rows.length > 0 && (
+					<a
+						href="/api/donations/export"
+						download
+						className={cn(
+							buttonVariants({ variant: "outline", size: "sm" }),
+							"shrink-0",
+						)}
+					>
+						<Download className="size-4" aria-hidden="true" />
+						Export CSV
+					</a>
+				)}
+			</div>
 
 			{/* Stats */}
 			<div className="grid gap-4 sm:grid-cols-3">
@@ -128,44 +153,50 @@ export default async function DonationsPage() {
 								<th className="px-5 py-3 font-semibold">Case</th>
 								<th className="px-5 py-3 text-right font-semibold">Amount</th>
 								<th className="px-5 py-3 font-semibold">Date</th>
-								<th className="px-5 py-3 font-semibold">Status</th>
+								<th className="px-5 py-3 font-semibold">Receipt</th>
 							</tr>
 						</thead>
 						<tbody>
-							{rows.map((d) => {
-								const live = d.case.status === "live";
-								return (
-									<tr
-										key={d.id}
-										className="border-border border-b last:border-0"
-									>
-										<td className="px-5 py-4">
-											<p className="font-bold text-ink">{d.case.title}</p>
-											<p className="text-[12px] text-muted-foreground">
-												{d.case.category} · {d.case.location}
-											</p>
-										</td>
-										<td className="px-5 py-4 text-right font-bold text-ink tabular-nums">
-											{money(d.amountCents / 100)}
-										</td>
-										<td className="px-5 py-4 text-muted-foreground">
-											{formatDate(d.createdAt)}
-										</td>
-										<td className="px-5 py-4">
-											<span
-												className={cn(
-													"inline-flex rounded-[var(--radius-pill)] px-2.5 py-0.5 font-mono font-semibold text-[10px] uppercase tracking-[0.06em]",
-													live
-														? "bg-brass-wash text-brass-deep"
-														: "bg-green-soft text-green-deep",
-												)}
+							{rows.map((d) => (
+								<tr key={d.id} className="border-border border-b last:border-0">
+									<td className="px-5 py-4">
+										<p className="font-bold text-ink">{d.case.title}</p>
+										<p className="text-[12px] text-muted-foreground">
+											{d.case.category} · {d.case.location}
+										</p>
+									</td>
+									<td className="px-5 py-4 text-right font-bold text-ink tabular-nums">
+										{money(d.amountCents / 100)}
+									</td>
+									<td className="px-5 py-4 text-muted-foreground">
+										{formatDate(d.createdAt)}
+									</td>
+									<td className="px-5 py-4">
+										{/* Stripe's own receipt for the charge. Absent for gifts made
+										    before receipts were recorded, and for payment methods that
+										    produce none — so the cell degrades to a dash rather than a
+										    link that goes nowhere. */}
+										{d.stripeReceiptUrl ? (
+											<a
+												href={d.stripeReceiptUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="inline-flex items-center gap-1 font-semibold text-[12.5px] text-brass-deep transition-colors hover:text-ink"
 											>
-												{live ? "Raising" : "Closed"}
+												View
+												<ExternalLink className="size-3.5" aria-hidden="true" />
+											</a>
+										) : (
+											<span
+												className="text-muted-foreground"
+												title="No receipt was recorded for this gift."
+											>
+												—
 											</span>
-										</td>
-									</tr>
-								);
-							})}
+										)}
+									</td>
+								</tr>
+							))}
 						</tbody>
 					</table>
 				)}

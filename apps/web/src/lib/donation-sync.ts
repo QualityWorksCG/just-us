@@ -50,10 +50,21 @@ export async function syncDonationBySession(
 ): Promise<{ settled: boolean }> {
 	if (!isPaymentsConfigured()) return { settled: false };
 	try {
+		// The charge is expanded through the PaymentIntent so this path picks up the
+		// receipt URL from the retrieve it was already making, rather than adding a
+		// second Stripe read per pending row.
 		const session = await stripe().checkout.sessions.retrieve(
 			stripeCheckoutSessionId,
+			{ expand: ["payment_intent.latest_charge"] },
 		);
 		if (session.payment_status !== "paid") return { settled: false };
+
+		const intent =
+			typeof session.payment_intent === "string" ? null : session.payment_intent;
+		const charge =
+			intent && typeof intent.latest_charge !== "string"
+				? intent.latest_charge
+				: null;
 
 		const { applied, donationId } = await markDonationSucceeded({
 			stripeCheckoutSessionId: session.id,
@@ -64,6 +75,7 @@ export async function syncDonationBySession(
 			donorEmail:
 				session.customer_details?.email ?? session.customer_email ?? null,
 			donorName: session.customer_details?.name ?? null,
+			stripeReceiptUrl: charge?.receipt_url ?? null,
 		});
 		// This path is the *only* one that runs where no webhook is forwarding — every
 		// local environment, and any deployment during a delivery outage — so the
