@@ -81,6 +81,40 @@ export function isPaymentsConfigured(): boolean {
 	return Boolean(env.STRIPE_SECRET_KEY);
 }
 
+/**
+ * Stripe's hosted receipt URL for a settled payment, or null.
+ *
+ * The URL lives on the **charge**, not the PaymentIntent, and is not derivable
+ * from any id we hold — it carries a signature — so it has to be read from
+ * Stripe once and stored (`Donation.stripeReceiptUrl`).
+ *
+ * `latest_charge` is expanded rather than fetched separately: one round trip
+ * instead of two, and the charge id is not otherwise recorded.
+ *
+ * **Never throws.** This runs inside the donation-settled path, where the money
+ * has already moved and the ledger write is the thing that matters. A Stripe
+ * hiccup here must cost the donor a receipt link, not turn a paid donation into
+ * a 500 that makes Stripe redeliver the event. Returning null is also correct
+ * rather than merely safe: some payment methods produce no hosted receipt, so
+ * "absent" is an ordinary outcome the caller already handles.
+ */
+export async function fetchReceiptUrl(
+	paymentIntentId: string | null | undefined,
+): Promise<string | null> {
+	if (!paymentIntentId || !isPaymentsConfigured()) return null;
+	try {
+		const intent = await stripe().paymentIntents.retrieve(paymentIntentId, {
+			expand: ["latest_charge"],
+		});
+		const charge = intent.latest_charge;
+		if (!charge || typeof charge === "string") return null;
+		return charge.receipt_url ?? null;
+	} catch (error) {
+		console.error("[stripe:receipt]", paymentIntentId, error);
+		return null;
+	}
+}
+
 /** The configured platform fee rate in basis points (500 = 5%). */
 export function platformFeeBps(): number {
 	return env.STRIPE_PLATFORM_FEE_BPS;

@@ -1,9 +1,11 @@
+import { env as webEnv } from "@just-us/env/web";
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Figtree } from "next/font/google";
 
 import "../index.css";
 import Header from "@/components/header";
 import Providers from "@/components/providers";
+import { UserbackWidget } from "@/components/userback";
 
 const figtree = Figtree({
 	variable: "--font-figtree",
@@ -39,6 +41,11 @@ export default function RootLayout({
 						<Header />
 						{children}
 					</div>
+					{/* Feedback widget. Absent unless the environment sets a token, which
+					    is how it stays on in demo/QA and off in production. */}
+					{webEnv.NEXT_PUBLIC_USERBACK_TOKEN && (
+						<UserbackWidget token={webEnv.NEXT_PUBLIC_USERBACK_TOKEN} />
+					)}
 				</Providers>
 			</body>
 		</html>

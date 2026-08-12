@@ -118,6 +118,13 @@ export async function markDonationSucceeded(input: {
 	donorEmail: string | null;
 	/** Collected by Checkout. For a guest, the only name we will ever have. */
 	donorName?: string | null;
+	/**
+	 * Stripe's hosted receipt for the charge, when the caller could resolve one.
+	 * Written on the same transition as the totals so a settled donation and its
+	 * receipt land together — a second pass to fill it in later would leave rows
+	 * that are permanently receipt-less if it never ran.
+	 */
+	stripeReceiptUrl?: string | null;
 }): Promise<{ applied: boolean; donationId: string | null }> {
 	return prisma.$transaction(async (tx) => {
 		const donation = await tx.donation.findUnique({
@@ -141,6 +148,9 @@ export async function markDonationSucceeded(input: {
 				stripePaymentIntentId: input.stripePaymentIntentId,
 				...(input.donorEmail ? { donorEmail: input.donorEmail } : {}),
 				...(input.donorName ? { donorName: input.donorName } : {}),
+				...(input.stripeReceiptUrl
+					? { stripeReceiptUrl: input.stripeReceiptUrl }
+					: {}),
 			},
 		});
 		// Already applied by an earlier delivery of the same event.
@@ -560,11 +570,24 @@ export async function getCaseDonationSummary(
 	};
 }
 
-/** A donor's donations, newest first, with the case + owner name for display.
- *  Pass `take` to cap the list. */
+/**
+ * A donor's **completed** gifts, newest first, with the case + owner name for
+ * display. Pass `take` to cap the list.
+ *
+ * Filtered to `succeeded` because every caller is answering "what have I given"
+ * — the donations screen, the dashboard summary, and the assistant's giving
+ * tool. An abandoned checkout is not a gift, and listing one beside real
+ * donations invites a donor to believe money moved when it did not.
+ *
+ * The cost is that a donation still settling is briefly absent rather than shown
+ * as pending. That window is the webhook's delivery lag, and the donor has just
+ * come from the case page, which polls until the row settles (see
+ * `DonationReceipt`) — so the state is surfaced where it actually matters
+ * instead of as a permanent column here.
+ */
 export async function listDonations(donorId: string, take?: number) {
 	return prisma.donation.findMany({
-		where: { donorId, case: { deletedAt: null } },
+		where: { donorId, status: "succeeded", case: { deletedAt: null } },
 		orderBy: { createdAt: "desc" },
 		take,
 		include: { case: { include: { owner: { select: { name: true } } } } },
@@ -582,19 +605,28 @@ export async function listBackedCaseIds(donorId: string): Promise<string[]> {
 	return rows.map((r) => r.caseId);
 }
 
-/** Aggregate donor giving stats: total given, distinct cases, given this year. */
+/**
+ * Aggregate donor giving stats: total given, distinct cases, given this year.
+ *
+ * Every aggregate counts `succeeded` rows only. Without that filter an abandoned
+ * checkout inflates all three figures — a donor who started a $500 donation and
+ * closed the tab was shown $500 as "total donated" — and the numbers disagreed
+ * with `listBackedCaseIds`, which has always filtered, so the same account could
+ * carry a "Backed" badge and a total that contradicted it.
+ */
 export async function donorStats(donorId: string, year: number) {
+	const succeeded = { donorId, status: "succeeded" as const };
 	const [all, thisYear, cases] = await Promise.all([
 		prisma.donation.aggregate({
-			where: { donorId },
+			where: succeeded,
 			_sum: { amountCents: true },
 		}),
 		prisma.donation.aggregate({
-			where: { donorId, createdAt: { gte: new Date(year, 0, 1) } },
+			where: { ...succeeded, createdAt: { gte: new Date(year, 0, 1) } },
 			_sum: { amountCents: true },
 		}),
 		prisma.donation.findMany({
-			where: { donorId },
+			where: succeeded,
 			distinct: ["caseId"],
 			select: { caseId: true },
 		}),
