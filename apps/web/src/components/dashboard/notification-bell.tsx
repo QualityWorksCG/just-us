@@ -143,7 +143,7 @@ export function NotificationBell({
 			/>
 			<PopoverContent
 				align="end"
-				className="w-[340px] gap-0 p-0"
+				className="w-[340px] gap-0 overflow-hidden rounded-[var(--radius-card-lg)] p-0"
 				aria-label="Notifications"
 			>
 				<div className="flex items-center justify-between border-border border-b px-4 py-3">
