@@ -638,6 +638,7 @@ export type CaseFilter =
 	| "draft"
 	| "seeking"
 	| "pending"
+	| "closed"
 	| "deleted";
 
 /** Prisma `where` for a given filter — "all" and the status tabs exclude
@@ -654,6 +655,7 @@ function whereForFilter(ownerId: string, filter: CaseFilter) {
 	if (filter === "pending") {
 		return { ...base, status: "pending_payout" as const };
 	}
+	if (filter === "closed") return { ...base, status: "closed" as const };
 	return base;
 }
 
@@ -699,6 +701,7 @@ export async function caseCounts(ownerId: string) {
 		draft: by("draft"),
 		seeking: by("seeking"),
 		pending: by("pending_payout"),
+		closed: by("closed"),
 		deleted,
 	};
 }
