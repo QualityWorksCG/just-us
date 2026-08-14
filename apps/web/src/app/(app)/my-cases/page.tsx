@@ -40,6 +40,7 @@ const TABS: { key: CaseFilter; label: string }[] = [
 	// Finished and sent, held back until the firm's payout account can receive.
 	// Its own tab because these are the cases with someone to chase.
 	{ key: "pending", label: "Awaiting firm" },
+	{ key: "closed", label: "Closed" },
 	{ key: "deleted", label: "Deleted" },
 ];
 
@@ -92,6 +93,7 @@ function isFilter(v: string | undefined): v is CaseFilter {
 		v === "draft" ||
 		v === "seeking" ||
 		v === "pending" ||
+		v === "closed" ||
 		v === "deleted"
 	);
 }
