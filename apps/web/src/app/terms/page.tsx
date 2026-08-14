@@ -79,8 +79,10 @@ export default function TermsPage() {
 				<ul>
 					<li>
 						JustUs charges a single, transparent{" "}
-						<strong>5% platform fee</strong> on donations, shown to the cent
-						before you confirm. Optional tips, if offered, are always voluntary.
+						<strong>5% platform fee</strong> on donations, added on top of the
+						gift you select and shown to the cent before you confirm (so $100 to
+						the case means you pay $105). Optional tips, if offered, are always
+						voluntary.
 					</li>
 					<li>
 						<strong>JustUs never takes custody of donated funds.</strong> Funds

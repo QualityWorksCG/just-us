@@ -8,10 +8,10 @@
  * charges**: the charge is created on the platform, the full amount transfers to
  * the recipient's connected account, and `application_fee_amount` comes back to
  * us. Deliberately *without* `on_behalf_of` — setting it would move Stripe's
- * processing fee onto the connected account and break the published "$100 in →
- * $95 to the recipient" promise. The recipient is the operating account of the firm
- * representing the case, one per case — see `Case.payoutRecipient` and
- * `PayoutAccount`. See also `./fees`.
+ * processing fee onto the connected account and break the published "select
+ * $100 → $100 to the recipient" promise. The recipient is the operating account
+ * of the firm representing the case, one per case — see `Case.payoutRecipient`
+ * and `PayoutAccount`. See also `./fees`.
  */
 import { env } from "@just-us/env/server";
 import Stripe from "stripe";
@@ -120,18 +120,20 @@ export function platformFeeBps(): number {
 	return env.STRIPE_PLATFORM_FEE_BPS;
 }
 
-/** The platform fee on a donation, at the configured rate. */
-export function platformFeeCents(amountCents: number): number {
-	return feeCentsAtBps(amountCents, env.STRIPE_PLATFORM_FEE_BPS);
+/** The platform fee on a selected gift, at the configured rate. */
+export function platformFeeCents(giftCents: number): number {
+	return feeCentsAtBps(giftCents, env.STRIPE_PLATFORM_FEE_BPS);
 }
 
 /**
- * The donor-facing split of a donation, at the configured rate. Resolve this in
- * a server component and pass it to the client — don't recompute it in the
- * browser, or the number shown can drift from the number charged.
+ * The donor-facing split of a donation, at the configured rate. `giftCents` is
+ * what the donor selected (to the case); the returned `amountCents` is what
+ * Checkout charges (gift + fee). Resolve this in a server component and pass it
+ * to the client — don't recompute it in the browser, or the number shown can
+ * drift from the number charged.
  */
-export function donationBreakdown(amountCents: number): DonationBreakdown {
-	return breakdownAtBps(amountCents, env.STRIPE_PLATFORM_FEE_BPS);
+export function donationBreakdown(giftCents: number): DonationBreakdown {
+	return breakdownAtBps(giftCents, env.STRIPE_PLATFORM_FEE_BPS);
 }
 
 /** The smallest donation accepted, at the configured floor. */
@@ -177,14 +179,18 @@ export function donationPresetsDiagnostic(): {
 }
 
 /**
- * Whether an amount may be donated, at the configured floor.
+ * Whether a selected gift may be donated, at the configured floor and fee rate.
  *
  * **The checkout route must call this** before creating a Session. The amount
  * arrives from the browser, so the floor is only real if the server enforces it —
  * a client-side check is a courtesy to honest donors, not a control.
  */
 export function validateDonationAmount(
-	amountCents: number,
+	giftCents: number,
 ): DonationAmountCheck {
-	return checkDonationAmount(amountCents, env.STRIPE_MIN_DONATION_CENTS);
+	return checkDonationAmount(
+		giftCents,
+		env.STRIPE_MIN_DONATION_CENTS,
+		env.STRIPE_PLATFORM_FEE_BPS,
+	);
 }

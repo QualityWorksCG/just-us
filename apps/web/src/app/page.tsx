@@ -551,9 +551,10 @@ export default async function Home() {
 							One fee. Shown before you give, to the cent.
 						</h2>
 						<p className="mt-3.5 text-[14.5px] text-ink-soft leading-relaxed">
-							JustUs charges a 5% platform fee on donations — that's how we keep
-							the lights on. We never take a share of legal fees or settlements,
-							and tips are always optional.
+							JustUs charges a 5% platform fee on donations, added on top of the
+							gift you choose — that's how we keep the lights on. We never take
+							a share of legal fees or settlements, and tips are always
+							optional.
 						</p>
 						<p className="mt-3.5 text-[13px] text-muted-foreground leading-relaxed">
 							Donations are gifts. They carry no financial return and no share
@@ -566,21 +567,19 @@ export default async function Home() {
 							Where a $100 donation goes
 						</p>
 						<div className="flex justify-between border-border border-b py-3.5 text-[14.5px]">
-							<span className="text-ink-soft">Your donation</span>
+							<span className="text-ink-soft">To the case</span>
 							<span className="font-bold text-ink tabular-nums">$100.00</span>
 						</div>
 						<div className="flex justify-between border-border border-b py-3.5 text-[14.5px]">
 							<span className="text-ink-soft">JustUs platform fee (5%)</span>
 							<span className="text-muted-foreground tabular-nums">
-								− $5.00
+								+ $5.00
 							</span>
 						</div>
 						<div className="flex justify-between py-4 text-[14.5px]">
-							<span className="font-semibold text-ink">
-								Straight to the plaintiff
-							</span>
+							<span className="font-semibold text-ink">You pay</span>
 							<span className="font-extrabold text-[18px] text-brass-deep tabular-nums">
-								$95.00
+								$105.00
 							</span>
 						</div>
 						<p className="mt-2 flex gap-2 rounded-[var(--radius-card-sm)] bg-brass-wash px-3.5 py-3 text-[13px] text-brass-deep leading-relaxed">

@@ -73,10 +73,10 @@ const daysAgo = (n: number, hour = 12) => {
 	return d;
 };
 
-/** 5% platform fee — STRIPE_PLATFORM_FEE_BPS, matching `feeCentsAtBps`. */
+/** 5% platform fee on the selected gift — matching `feeCentsAtBps` / fee-on-top. */
 const FEE_BPS = 500;
-const feeCents = (amountCents: number) =>
-	Math.min(Math.round((amountCents * FEE_BPS) / 10_000), amountCents);
+const feeCents = (giftCents: number) =>
+	Math.min(Math.round((giftCents * FEE_BPS) / 10_000), giftCents);
 
 const token = () => randomBytes(24).toString("hex");
 const serial = () =>
@@ -931,9 +931,10 @@ async function createDonations(
 				donorId: s.donorId ?? null,
 				donorEmail: s.donorEmail,
 				donorName: s.donorName,
-				amountCents: s.amountCents,
+				// Spec amount is the gift to the case; charge = gift + fee.
+				amountCents: s.amountCents + fee,
 				feeCents: fee,
-				netCents: s.amountCents - fee,
+				netCents: s.amountCents,
 				status: s.status,
 				stripeCheckoutSessionId: `cs_demo_${i}_${token().slice(0, 16)}`,
 				stripePaymentIntentId:

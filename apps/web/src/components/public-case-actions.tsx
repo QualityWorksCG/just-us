@@ -49,7 +49,8 @@ function exactUsd(cents: number) {
  * Back / Share on the public case page.
  *
  * The fee is shown **to the cent before confirming**, which the landing page and
- * terms §4 both promise — so it is a requirement, not decoration. The split is
+ * terms §4 both promise — so it is a requirement, not decoration. The amount the
+ * donor picks is what goes to the case; the fee is added on top. The split is
  * computed with the same pure function the server uses to build the Checkout
  * Session, and the rate comes from the server rather than being hardcoded here, so
  * the number a donor reads is the number they are charged.
@@ -100,7 +101,7 @@ export function PublicCaseActions({
 	const check =
 		amountCents === null
 			? null
-			: checkDonationAmount(amountCents, config.minCents);
+			: checkDonationAmount(amountCents, config.minCents, config.feeBps);
 	const breakdown =
 		amountCents !== null && check?.ok
 			? breakdownAtBps(amountCents, config.feeBps)
@@ -220,13 +221,13 @@ export function PublicCaseActions({
 						</span>
 					</label>
 
-					{/* "5% shown to the cent" — exact formatting, never rounded to dollars. */}
+					{/* Fee added on top of the selected gift — shown to the cent. */}
 					{breakdown ? (
 						<dl className="flex flex-col gap-1 rounded-[var(--radius-card-sm)] bg-surface-2 px-3.5 py-3 text-[12.5px]">
 							<div className="flex justify-between">
-								<dt className="text-ink-soft">Your donation</dt>
+								<dt className="text-ink-soft">To this case</dt>
 								<dd className="font-semibold text-ink tabular-nums">
-									{exactUsd(breakdown.amountCents)}
+									{exactUsd(breakdown.netCents)}
 								</dd>
 							</div>
 							<div className="flex justify-between">
@@ -234,13 +235,13 @@ export function PublicCaseActions({
 									JustUs fee ({breakdown.feeBps / 100}%)
 								</dt>
 								<dd className="text-muted-foreground tabular-nums">
-									−{exactUsd(breakdown.feeCents)}
+									+{exactUsd(breakdown.feeCents)}
 								</dd>
 							</div>
 							<div className="flex justify-between border-border border-t pt-1">
-								<dt className="font-semibold text-ink">To this case</dt>
+								<dt className="font-semibold text-ink">You pay</dt>
 								<dd className="font-extrabold text-brass-deep tabular-nums">
-									{exactUsd(breakdown.netCents)}
+									{exactUsd(breakdown.amountCents)}
 								</dd>
 							</div>
 						</dl>

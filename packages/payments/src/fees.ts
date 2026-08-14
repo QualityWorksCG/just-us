@@ -13,46 +13,62 @@
  * donation row are all the same number by construction. The public copy promises
  * the fee "shown to the cent" before confirming (terms §4, the landing-page fee
  * breakdown), which is only true if one function produces all three.
+ *
+ * **Product model:** the amount the donor picks is what goes to the case. The
+ * platform fee is added on top, so "$100" means $100 to the firm and the donor
+ * pays $100 + fee. Stripe's card processing fee is still taken from JustUs's
+ * application fee (destination charge without `on_behalf_of`), not from the
+ * firm's transfer.
  */
 
 const BPS_DIVISOR = 10_000;
 
 export type DonationBreakdown = {
-	/** What the donor is charged. */
+	/** What the donor is charged (gift + platform fee). */
 	amountCents: number;
 	/** JustUs's platform fee, sent to Stripe as `application_fee_amount`. */
 	feeCents: number;
-	/** What lands in the connected account. */
+	/** What lands in the connected account — the amount the donor selected. */
 	netCents: number;
 	/** The rate used, so a stored breakdown stays explainable after a rate change. */
 	feeBps: number;
 };
 
 /**
- * The platform fee on `amountCents` at `feeBps` basis points.
+ * The platform fee on a gift of `giftCents` at `feeBps` basis points.
  *
- * Rounds half-up to the cent, and never exceeds the donation itself — Stripe
+ * Rounds half-up to the cent, and never exceeds the gift itself — Stripe
  * rejects an `application_fee_amount` larger than the charge, and a fee that ate
  * the whole gift would be wrong long before Stripe complained.
  */
-export function feeCentsAtBps(amountCents: number, feeBps: number): number {
-	assertWholeCents(amountCents, "amountCents");
+export function feeCentsAtBps(giftCents: number, feeBps: number): number {
+	assertWholeCents(giftCents, "giftCents");
 	if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > BPS_DIVISOR) {
 		throw new RangeError(
 			`feeBps must be an integer between 0 and ${BPS_DIVISOR}, got ${feeBps}`,
 		);
 	}
-	const fee = Math.round((amountCents * feeBps) / BPS_DIVISOR);
-	return Math.min(fee, amountCents);
+	const fee = Math.round((giftCents * feeBps) / BPS_DIVISOR);
+	return Math.min(fee, giftCents);
 }
 
-/** The full donor-facing split of a donation at `feeBps`. */
+/**
+ * The full donor-facing split when the donor selects a gift of `giftCents`.
+ *
+ * `netCents` is the selected gift (to the case). `feeCents` is added on top.
+ * `amountCents` is what Checkout charges.
+ */
 export function breakdownAtBps(
-	amountCents: number,
+	giftCents: number,
 	feeBps: number,
 ): DonationBreakdown {
-	const feeCents = feeCentsAtBps(amountCents, feeBps);
-	return { amountCents, feeCents, netCents: amountCents - feeCents, feeBps };
+	const feeCents = feeCentsAtBps(giftCents, feeBps);
+	return {
+		amountCents: giftCents + feeCents,
+		feeCents,
+		netCents: giftCents,
+		feeBps,
+	};
 }
 
 /**
@@ -61,10 +77,11 @@ export function breakdownAtBps(
  *
  * Worth surfacing rather than burying: on a Connect destination charge without
  * `on_behalf_of`, Stripe's fee is deducted from *our* application fee, not from
- * the connected account's transfer. That is what makes the published "$100 in →
- * $95 to the attorney" math true — but it also means every donation below this
+ * the connected account's transfer. That is what makes "select $100 → $100 to
+ * the attorney" hold for the firm — but it also means every donation below this
  * threshold costs JustUs more to process than the fee collects. At 5% against
- * 2.9% + 30¢ the break-even is $14.29.
+ * 2.9% + 30¢ the break-even gift is a little above $14 (fee is on the gift;
+ * Stripe is on gift + fee).
  *
  * Returns `Infinity` when the platform rate can never cover the processor rate.
  */
@@ -72,9 +89,17 @@ export function feeBreakEvenCents(
 	feeBps: number,
 	processor: { percentBps: number; fixedCents: number },
 ): number {
-	const marginBps = feeBps - processor.percentBps;
-	if (marginBps <= 0) return Number.POSITIVE_INFINITY;
-	return Math.ceil((processor.fixedCents * BPS_DIVISOR) / marginBps);
+	// Solve fee(gift) >= stripe(gift + fee(gift)) for the smallest whole-cent gift.
+	// fee = round(gift * feeBps / 10000); charge = gift + fee;
+	// stripe ≈ charge * processor.percentBps / 10000 + fixed.
+	// Approximate with continuous math, then ceil — callers use this as a floor check.
+	const feeRate = feeBps / BPS_DIVISOR;
+	const procRate = processor.percentBps / BPS_DIVISOR;
+	// gift * feeRate >= (gift * (1 + feeRate)) * procRate + fixed
+	// gift * (feeRate - (1 + feeRate) * procRate) >= fixed
+	const margin = feeRate - (1 + feeRate) * procRate;
+	if (margin <= 0) return Number.POSITIVE_INFINITY;
+	return Math.ceil(processor.fixedCents / margin);
 }
 
 /** Stripe's standard US card pricing, for use with `feeBreakEvenCents`. */
@@ -84,7 +109,7 @@ export const STRIPE_US_CARD_PRICING = {
 } as const;
 
 /**
- * Ceiling on a single donation, in cents — Stripe's own per-charge limit for
+ * Ceiling on a single donation charge, in cents — Stripe's own per-charge limit for
  * card payments ($999,999.99). Not a product policy: a validator that only
  * checks the floor lets a fat-fingered or hostile amount through to Stripe and
  * turns a clear rejection into an opaque API error.
@@ -101,7 +126,8 @@ export type DonationAmountCheck =
 	| { ok: false; reason: DonationAmountRejection; message: string };
 
 /**
- * Whether an amount may be donated, given the configured floor.
+ * Whether a selected gift amount may be donated, given the configured floor and
+ * the fee rate (so gift + fee cannot exceed Stripe's charge ceiling).
  *
  * Returns a result rather than throwing, because both callers want to *render*
  * the outcome: the amount form shows it inline as the donor types, and the
@@ -110,27 +136,29 @@ export type DonationAmountCheck =
  * the authority on the amount, and the copy should come from the same place as
  * the rule.
  *
- * Pure: the caller supplies `minCents` (the server reads it from
- * `STRIPE_MIN_DONATION_CENTS`), so this stays importable from client components.
+ * Pure: the caller supplies `minCents` and `feeBps`, so this stays importable
+ * from client components.
  */
 export function checkDonationAmount(
-	amountCents: number,
+	giftCents: number,
 	minCents: number,
+	feeBps = 0,
 ): DonationAmountCheck {
-	if (!Number.isInteger(amountCents) || amountCents < 0) {
+	if (!Number.isInteger(giftCents) || giftCents < 0) {
 		return {
 			ok: false,
 			reason: "not_whole_cents",
 			message: "Enter a whole dollar-and-cents amount.",
 		};
 	}
-	if (amountCents < minCents) {
+	if (giftCents < minCents) {
 		return {
 			ok: false,
 			reason: "below_minimum",
 			message: `The minimum donation is ${formatUsd(minCents)}.`,
 		};
 	}
+	const { amountCents } = breakdownAtBps(giftCents, feeBps);
 	if (amountCents > MAX_DONATION_CENTS) {
 		return {
 			ok: false,
@@ -146,12 +174,11 @@ export function checkDonationAmount(
  *
  * A floor and a fee rate that were consistent when chosen stop being consistent
  * the moment either moves, and the relationship is far more sensitive than it
- * looks: drop the platform fee from 5% to 3% and break-even leaps from $14.29 to
- * **$300.00**, because the margin over Stripe's 2.9% collapses from 2.1 points to
- * 0.1. At or below 2.9% no donation of any size covers the fixed 30¢, and this
- * returns `Infinity`. This makes that drift detectable instead of silent — surface
- * it on an admin screen or assert it at startup rather than rediscovering it in a
- * reconciliation report.
+ * looks: drop the platform fee from 5% to 3% and break-even leaps, because the
+ * margin over Stripe's 2.9% collapses. At or below ~2.9% no donation of any size
+ * covers the fixed 30¢, and this returns `Infinity`. This makes that drift
+ * detectable instead of silent — surface it on an admin screen or assert it at
+ * startup rather than rediscovering it in a reconciliation report.
  */
 export function minimumCoversProcessorFee(
 	minCents: number,

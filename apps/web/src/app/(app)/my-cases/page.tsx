@@ -242,6 +242,7 @@ export default async function MyCasesPage({
 						// offering "Continue draft" would send them looking for work that
 						// isn't theirs.
 						const isPending = !isDeleted && c.status === "pending_payout";
+						const isClosed = !isDeleted && c.status === "closed";
 						const readiness = readinessOf(c);
 						const meta = [c.category, c.location].filter(Boolean).join(" · ");
 						const resume = `/cases/new?draft=${c.id}` as Route;
@@ -252,13 +253,15 @@ export default async function MyCasesPage({
 							? { text: "Deleted", dot: "bg-danger" }
 							: isLive
 								? { text: "Live", dot: "bg-success" }
-								: invite
-									? { text: "Invitation sent", dot: "bg-gold-bright" }
-									: isSeeking
-										? { text: "Seeking", dot: "bg-brass-deep" }
-										: isPending
-											? { text: "Awaiting firm", dot: "bg-gold-bright" }
-											: { text: "Draft", dot: "bg-ink-soft" };
+								: isClosed
+									? { text: "Closed", dot: "bg-ink-soft" }
+									: invite
+										? { text: "Invitation sent", dot: "bg-gold-bright" }
+										: isSeeking
+											? { text: "Seeking", dot: "bg-brass-deep" }
+											: isPending
+												? { text: "Awaiting firm", dot: "bg-gold-bright" }
+												: { text: "Draft", dot: "bg-ink-soft" };
 						const hasNewUpdate = !isDeleted && casesWithNewUpdate.has(c.id);
 
 						return (
@@ -310,12 +313,13 @@ export default async function MyCasesPage({
 									</p>
 
 									<div className="mt-3 flex-1">
-										{isLive ? (
+										{isLive || isClosed ? (
 											<>
 												<ProgressBar pct={pct} />
 												<p className="mt-2 font-medium text-[13px] text-ink tabular-nums">
 													{money(raised)} of {money(goal)} · {c.donorsCount}{" "}
 													donors
+													{isClosed ? " · resolved" : ""}
 												</p>
 											</>
 										) : invite ? (
@@ -386,12 +390,12 @@ export default async function MyCasesPage({
 												<Trash2 className="size-4" aria-hidden="true" />
 												Permanently deleted
 											</span>
-										) : isLive ? (
+										) : isLive || isClosed ? (
 											<Link
 												href={`/my-cases/${c.id}` as Route}
 												className="inline-flex items-center gap-1.5 font-semibold text-[13px] text-brass-deep hover:underline"
 											>
-												Manage campaign
+												{isClosed ? "View case" : "Manage campaign"}
 												<ArrowRight className="size-3.5" aria-hidden="true" />
 											</Link>
 										) : invite ? (
@@ -452,7 +456,10 @@ export default async function MyCasesPage({
 												>
 													<Settings2 className="size-4" aria-hidden="true" />
 												</Link>
-												{!isLive && !isSeeking && !isPending && (
+												{!isLive &&
+													!isSeeking &&
+													!isPending &&
+													!isClosed && (
 													<DeleteDraftButton
 														id={c.id}
 														title={c.title || undefined}

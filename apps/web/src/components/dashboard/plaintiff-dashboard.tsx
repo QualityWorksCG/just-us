@@ -716,6 +716,8 @@ function CasesOverview({ cases }: { cases: CaseSummary[] }) {
 function CaseRow({ c }: { c: CaseSummary }) {
 	const isLive = c.status === "live";
 	const isSeeking = c.status === "seeking";
+	const isClosed = c.status === "closed";
+	const isPending = c.status === "pending_payout";
 	const goal = c.goalCents / 100;
 	const raised = c.raisedCents / 100;
 	const pct = goal > 0 ? Math.round((raised / goal) * 100) : 0;
@@ -728,39 +730,53 @@ function CaseRow({ c }: { c: CaseSummary }) {
 				cls: "bg-green-soft text-green-deep",
 				dot: "bg-success",
 			}
-		: isSeeking
+		: isClosed
 			? {
-					// The count is on the badge because it's the one thing on this row
-					// that needs the plaintiff, and the row is otherwise inert.
-					text:
-						c.interestCount > 0
-							? `${c.interestCount} interested`
-							: "Seeking attorney",
-					cls: "bg-brass-wash text-brass-deep",
-					dot: "bg-brass-deep",
+					text: "Closed",
+					cls: "bg-surface-2 text-ink-soft",
+					dot: "bg-ink-soft",
 				}
-			: c.status === "pending_payout"
+			: isSeeking
 				? {
-						text: "Awaiting firm",
-						cls: "bg-gold-bright/20 text-gold-bright-ink",
-						dot: "bg-gold-bright",
+						// The count is on the badge because it's the one thing on this row
+						// that needs the plaintiff, and the row is otherwise inert.
+						text:
+							c.interestCount > 0
+								? `${c.interestCount} interested`
+								: "Seeking attorney",
+						cls: "bg-brass-wash text-brass-deep",
+						dot: "bg-brass-deep",
 					}
-				: {
-						text: "Draft",
-						cls: "bg-surface-2 text-ink-soft",
-						dot: "bg-ink-soft",
-					};
+				: isPending
+					? {
+							text: "Awaiting firm",
+							cls: "bg-gold-bright/20 text-gold-bright-ink",
+							dot: "bg-gold-bright",
+						}
+					: {
+							text: "Draft",
+							cls: "bg-surface-2 text-ink-soft",
+							dot: "bg-ink-soft",
+						};
 
-	// Drafts resume in the wizard; live cases open Manage; seeking opens requests.
+	// Drafts resume in the wizard; live/closed open Manage; seeking opens requests.
 	const href = (
-		isLive
+		isLive || isClosed
 			? `/my-cases/${c.id}`
 			: isSeeking
 				? `/my-cases/${c.id}/requests`
-				: `/cases/new?draft=${c.id}`
+				: isPending
+					? `/cases/new?draft=${c.id}`
+					: `/cases/new?draft=${c.id}`
 	) as Route;
 
-	const cta = isLive ? "Manage" : isSeeking ? "Requests" : "Continue";
+	const cta = isLive
+		? "Manage"
+		: isClosed
+			? "View"
+			: isSeeking
+				? "Requests"
+				: "Continue";
 
 	return (
 		<li>
@@ -785,7 +801,7 @@ function CaseRow({ c }: { c: CaseSummary }) {
 					</p>
 					<p className="truncate text-[12px] text-muted-foreground">
 						{meta}
-						{isLive
+						{isLive || isClosed
 							? ` · ${money(raised)} of ${money(goal)} · ${pct}%`
 							: isSeeking
 								? c.newInterestCount > 0
