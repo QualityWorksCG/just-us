@@ -124,12 +124,14 @@ export function AuthScreen({
 	// Sign-in form state
 	const [siEmail, setSiEmail] = useState("");
 	const [siPassword, setSiPassword] = useState("");
+	const [siErrors, setSiErrors] = useState<Record<string, string>>({});
 
 	const inputClass =
 		"h-10 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]";
 
 	function resetErrors() {
 		setErrors({});
+		setSiErrors({});
 	}
 
 	async function handleCreate(e: React.FormEvent) {
@@ -139,9 +141,11 @@ export function AuthScreen({
 		// Client-side pre-validation for fast feedback (server re-validates).
 		const next: Record<string, string> = {};
 		if (name.trim().length < 2) next.name = "Please enter your full name";
-		if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+		if (!email.trim()) next.email = "Email is required";
+		else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
 			next.email = "Enter a valid email address";
-		if (password.length < 8)
+		if (!password) next.password = "Password is required";
+		else if (password.length < 8)
 			next.password = "Password must be at least 8 characters";
 		else if (!/[0-9!@#$%^&*(),.?":{}|<>]/.test(password))
 			next.password = "Include at least one number or symbol";
@@ -178,6 +182,16 @@ export function AuthScreen({
 
 	async function handleSignIn(e: React.FormEvent) {
 		e.preventDefault();
+		const next: Record<string, string> = {};
+		if (!siEmail.trim()) next.email = "Email is required";
+		else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(siEmail.trim()))
+			next.email = "Enter a valid email address";
+		if (!siPassword) next.password = "Password is required";
+		if (Object.keys(next).length) {
+			setSiErrors(next);
+			return;
+		}
+		setSiErrors({});
 		setPending(true);
 		await authClient.signIn.email(
 			{
@@ -439,6 +453,8 @@ export function AuthScreen({
 									onChange={(e) => setEmail(e.target.value)}
 									placeholder="you@example.com"
 									autoComplete="email"
+									required
+									aria-required="true"
 									aria-invalid={!!errors.email}
 								/>
 							</Field>
@@ -457,6 +473,8 @@ export function AuthScreen({
 									onChange={(e) => setPassword(e.target.value)}
 									placeholder="Create a password"
 									autoComplete="new-password"
+									required
+									aria-required="true"
 									aria-invalid={!!errors.password}
 								/>
 							</Field>
@@ -474,6 +492,8 @@ export function AuthScreen({
 									onChange={(e) => setConfirm(e.target.value)}
 									placeholder="Re-enter your password"
 									autoComplete="new-password"
+									required
+									aria-required="true"
 									aria-invalid={!!errors.confirm}
 								/>
 							</Field>
@@ -536,7 +556,12 @@ export function AuthScreen({
 							className="flex flex-col gap-4"
 							noValidate
 						>
-							<Field label="Email" htmlFor={ids.siEmail} required>
+							<Field
+								label="Email"
+								htmlFor={ids.siEmail}
+								required
+								error={siErrors.email}
+							>
 								<Input
 									id={ids.siEmail}
 									className={inputClass}
@@ -545,17 +570,28 @@ export function AuthScreen({
 									onChange={(e) => setSiEmail(e.target.value)}
 									placeholder="you@example.com"
 									autoComplete="email"
+									required
+									aria-required="true"
+									aria-invalid={!!siErrors.email}
 								/>
 							</Field>
-							<Field label="Password" htmlFor={ids.siPassword} required>
+							<Field
+								label="Password"
+								htmlFor={ids.siPassword}
+								required
+								error={siErrors.password}
+							>
 								<Input
 									id={ids.siPassword}
 									className={inputClass}
 									type="password"
 									value={siPassword}
 									onChange={(e) => setSiPassword(e.target.value)}
-									placeholder="••••••••"
+									placeholder="Enter your password"
 									autoComplete="current-password"
+									required
+									aria-required="true"
+									aria-invalid={!!siErrors.password}
 								/>
 							</Field>
 							<button
