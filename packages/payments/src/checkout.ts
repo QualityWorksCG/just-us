@@ -7,9 +7,9 @@
  *
  * `on_behalf_of` is deliberately **not** set. Setting it would make the connected
  * account the merchant of record and move Stripe's processing fee onto them,
- * turning the published "$100 in → $95 to the recipient" into ~$92.10. It is also
- * why the connected account carries the `recipient` configuration rather than
- * `merchant` — see `./connect`.
+ * turning "select $100 → $100 to the recipient" into ~$97 (Stripe eaten from the
+ * transfer). It is also why the connected account carries the `recipient`
+ * configuration rather than `merchant` — see `./connect`.
  */
 import { env } from "@just-us/env/server";
 
@@ -47,6 +47,10 @@ export async function createDonationCheckout(input: {
 	 * identifier that lets them claim it against an account later.
 	 */
 	donorEmail: string | null;
+	/**
+	 * The gift the donor selected — what goes to the case. The charge (gift +
+	 * platform fee) is derived here via `donationBreakdown`.
+	 */
 	amountCents: number;
 	/**
 	 * The case's **bound** destination, passed in by the caller. Deliberately not

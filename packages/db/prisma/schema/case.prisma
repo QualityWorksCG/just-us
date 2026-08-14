@@ -261,8 +261,9 @@ model Donation {
   case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseId String
 
-  // What the donor was charged, the platform fee taken from it, and what reached
-  // the firm's connected account. amountCents = feeCents + netCents.
+  // What the donor was charged (gift + fee), the platform fee added on top of the
+  // selected gift, and what reached the firm's connected account (the gift).
+  // amountCents = feeCents + netCents.
   amountCents Int
   feeCents    Int @default(0)
   netCents    Int @default(0)

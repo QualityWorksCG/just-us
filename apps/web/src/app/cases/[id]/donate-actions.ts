@@ -21,9 +21,10 @@ import { getSession } from "@/lib/auth-server";
  * Stripe collects, and attaches to an account if they later make one with that
  * address (see `claimGuestDonations`).
  *
- * The amount arrives from the browser, so **every** rule about it is enforced
- * here: the floor, the ceiling, and that it is whole cents. A client-side check is
- * a courtesy to honest donors, not a control.
+ * The amount arrives from the browser as the **gift to the case**; the platform
+ * fee is added on top when Checkout is built. **Every** rule about the gift is
+ * enforced here: the floor, the ceiling (gift + fee), and that it is whole
+ * cents. A client-side check is a courtesy to honest donors, not a control.
  *
  * Not `requireRole` — that redirects, and a redirect out of a fetch from the
  * donate button reads as a silent failure. Every refusal below is returned so the

@@ -39,9 +39,9 @@ const COLUMNS = [
 	"Case",
 	"Category",
 	"Location",
-	"Amount (USD)",
+	"To the case (USD)",
 	"Platform fee (USD)",
-	"To the firm (USD)",
+	"You paid (USD)",
 	"Transaction reference",
 	"Receipt",
 ] as const;
@@ -60,9 +60,9 @@ export async function GET(): Promise<Response> {
 				field(d.case.title),
 				field(d.case.category),
 				field(d.case.location),
-				field(amount(d.amountCents)),
-				field(amount(d.feeCents)),
 				field(amount(d.netCents)),
+				field(amount(d.feeCents)),
+				field(amount(d.amountCents)),
 				// The PaymentIntent id is the reference support can trace a gift by.
 				field(d.stripePaymentIntentId),
 				field(d.stripeReceiptUrl),

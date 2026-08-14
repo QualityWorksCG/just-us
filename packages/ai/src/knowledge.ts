@@ -44,7 +44,7 @@ export const HELP_SECTIONS: HelpSection[] = [
 	{
 		slug: "donations-and-funding",
 		title: "How donations and funding work",
-		body: "Donations on JustUs are gifts. They carry no financial return and no share of any settlement or judgment. The funding goal is the fee the plaintiff and attorney agreed, and nothing beyond that is raised. JustUs charges a single 5% platform fee on donations, shown to the cent before a donor confirms, and takes no share of legal fees or settlements; tips, where offered, are voluntary. JustUs never takes custody of donated funds — they route through a third-party payment processor into a case-specific account outside JustUs. Donors can give anonymously: a donor's name is never shown publicly unless they choose to share it, and they still receive every case update.",
+		body: "Donations on JustUs are gifts. They carry no financial return and no share of any settlement or judgment. The funding goal is the fee the plaintiff and attorney agreed, and nothing beyond that is raised. JustUs charges a single 5% platform fee on donations, added on top of the gift you select and shown to the cent before you confirm (so $100 to the case means you pay $105), and takes no share of legal fees or settlements; tips, where offered, are voluntary. JustUs never takes custody of donated funds — they route through a third-party payment processor into a case-specific account outside JustUs. Donors can give anonymously: a donor's name is never shown publicly unless they choose to share it, and they still receive every case update.",
 	},
 	{
 		slug: "when-funding-falls-short",

@@ -70,7 +70,7 @@ export async function listCaseBackersForCertificate(
 			donorId: true,
 			donorEmail: true,
 			donorName: true,
-			amountCents: true,
+			netCents: true,
 		},
 	});
 
@@ -82,7 +82,7 @@ export async function listCaseBackersForCertificate(
 		if (!key) continue; // no account and no email — unreachable, so uncertifiable
 		const existing = byKey.get(key);
 		if (existing) {
-			existing.amountCents += d.amountCents;
+			existing.amountCents += d.netCents;
 			// Prefer any non-empty name we see.
 			if (!existing.recipientName && d.donorName) {
 				existing.recipientName = d.donorName;
@@ -92,7 +92,7 @@ export async function listCaseBackersForCertificate(
 				donorId: d.donorId,
 				donorEmail: d.donorEmail,
 				recipientName: d.donorName?.trim() || "",
-				amountCents: d.amountCents,
+				amountCents: d.netCents,
 			});
 		}
 	}

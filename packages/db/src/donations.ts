@@ -134,7 +134,7 @@ export async function markDonationSucceeded(input: {
 				caseId: true,
 				donorId: true,
 				donorEmail: true,
-				amountCents: true,
+				netCents: true,
 			},
 		});
 		// No row means this session was not created by us — nothing to apply.
@@ -173,10 +173,12 @@ export async function markDonationSucceeded(input: {
 				})
 			: 0;
 
+		// Progress tracks what reached the case (the selected gift), not the
+		// donor's gross charge — fees are added on top and never fund the goal.
 		await tx.case.update({
 			where: { id: donation.caseId },
 			data: {
-				raisedCents: { increment: donation.amountCents },
+				raisedCents: { increment: donation.netCents },
 				...(priorFromDonor === 0 ? { donorsCount: { increment: 1 } } : {}),
 			},
 		});
@@ -207,23 +209,30 @@ export async function listCaseBackerUserIds(caseId: string): Promise<string[]> {
 
 /** Minimal donation + case facts for the donor's in-app donation notification. */
 export async function getDonationNotifyInfo(donationId: string) {
-	return prisma.donation.findUnique({
+	const row = await prisma.donation.findUnique({
 		where: { id: donationId },
 		select: {
 			id: true,
 			donorId: true,
-			amountCents: true,
+			netCents: true,
 			case: { select: { id: true, title: true } },
 		},
 	});
+	if (!row) return null;
+	return {
+		id: row.id,
+		donorId: row.donorId,
+		amountCents: row.netCents,
+		case: row.case,
+	};
 }
 
 export async function getDonationForAcknowledgement(donationId: string) {
-	return prisma.donation.findFirst({
+	const row = await prisma.donation.findFirst({
 		where: { id: donationId, status: "succeeded" },
 		select: {
 			id: true,
-			amountCents: true,
+			netCents: true,
 			donorEmail: true,
 			donorName: true,
 			case: {
@@ -236,6 +245,14 @@ export async function getDonationForAcknowledgement(donationId: string) {
 			},
 		},
 	});
+	if (!row) return null;
+	return {
+		id: row.id,
+		amountCents: row.netCents,
+		donorEmail: row.donorEmail,
+		donorName: row.donorName,
+		case: row.case,
+	};
 }
 
 /**
@@ -325,7 +342,7 @@ export async function markDonationRefunded(
 				caseId: true,
 				donorId: true,
 				donorEmail: true,
-				amountCents: true,
+				netCents: true,
 			},
 		});
 		if (!donation) return { applied: false };
@@ -350,7 +367,7 @@ export async function markDonationRefunded(
 		await tx.case.update({
 			where: { id: donation.caseId },
 			data: {
-				raisedCents: { decrement: donation.amountCents },
+				raisedCents: { decrement: donation.netCents },
 				...(stillStanding === 0 ? { donorsCount: { decrement: 1 } } : {}),
 			},
 		});
@@ -381,9 +398,12 @@ export async function getDonationForCheckoutSession(input: {
 			stripeCheckoutSessionId: input.stripeCheckoutSessionId,
 			caseId: input.caseId,
 		},
-		select: { status: true, amountCents: true },
+		// Thank-you copy talks about the selected gift (to the case), not the
+		// gross charge — return netCents as `amountCents` for those callers.
+		select: { status: true, netCents: true },
 	});
-	return donation ?? null;
+	if (!donation) return null;
+	return { status: donation.status, amountCents: donation.netCents };
 }
 
 /**
@@ -463,7 +483,7 @@ export async function listCaseBackers(
 			id: true,
 			donorId: true,
 			donorName: true,
-			amountCents: true,
+			netCents: true,
 			succeededAt: true,
 		},
 	});
@@ -489,7 +509,7 @@ export async function listCaseBackers(
 				id: r.id,
 				displayName: anon ? "Anonymous" : u?.name?.trim() || "A supporter",
 				anonymous: anon,
-				amountCents: r.amountCents,
+				amountCents: r.netCents,
 				at: r.succeededAt,
 			};
 		}
@@ -499,7 +519,7 @@ export async function listCaseBackers(
 			id: r.id,
 			displayName: name || "Anonymous",
 			anonymous: !name,
-			amountCents: r.amountCents,
+			amountCents: r.netCents,
 			at: r.succeededAt,
 		};
 	});
@@ -539,11 +559,11 @@ export async function donorSupportForCase(input: {
 					: []),
 			],
 		},
-		_sum: { amountCents: true },
+		_sum: { netCents: true },
 		_count: { _all: true },
 	});
 	return {
-		totalCents: result._sum.amountCents ?? 0,
+		totalCents: result._sum.netCents ?? 0,
 		count: result._count._all,
 	};
 }
@@ -559,13 +579,13 @@ export async function getCaseDonationSummary(
 ): Promise<{ totalCents: number; latestAt: Date } | null> {
 	const agg = await prisma.donation.aggregate({
 		where: { donorId, caseId },
-		_sum: { amountCents: true },
+		_sum: { netCents: true },
 		_max: { createdAt: true },
 		_count: { _all: true },
 	});
 	if (agg._count._all === 0 || !agg._max.createdAt) return null;
 	return {
-		totalCents: agg._sum.amountCents ?? 0,
+		totalCents: agg._sum.netCents ?? 0,
 		latestAt: agg._max.createdAt,
 	};
 }
@@ -619,11 +639,11 @@ export async function donorStats(donorId: string, year: number) {
 	const [all, thisYear, cases] = await Promise.all([
 		prisma.donation.aggregate({
 			where: succeeded,
-			_sum: { amountCents: true },
+			_sum: { netCents: true },
 		}),
 		prisma.donation.aggregate({
 			where: { ...succeeded, createdAt: { gte: new Date(year, 0, 1) } },
-			_sum: { amountCents: true },
+			_sum: { netCents: true },
 		}),
 		prisma.donation.findMany({
 			where: succeeded,
@@ -632,8 +652,8 @@ export async function donorStats(donorId: string, year: number) {
 		}),
 	]);
 	return {
-		totalCents: all._sum.amountCents ?? 0,
-		thisYearCents: thisYear._sum.amountCents ?? 0,
+		totalCents: all._sum.netCents ?? 0,
+		thisYearCents: thisYear._sum.netCents ?? 0,
 		casesBacked: cases.length,
 	};
 }
@@ -644,7 +664,7 @@ export async function listBackedCases(donorId: string, take?: number) {
 	const grouped = await prisma.donation.groupBy({
 		by: ["caseId"],
 		where: { donorId, case: { deletedAt: null } },
-		_sum: { amountCents: true },
+		_sum: { netCents: true },
 		orderBy: { _max: { createdAt: "desc" } },
 		take,
 	});
@@ -657,7 +677,7 @@ export async function listBackedCases(donorId: string, take?: number) {
 	return grouped
 		.map((g) => {
 			const c = byId.get(g.caseId);
-			return c ? { case: c, givenCents: g._sum.amountCents ?? 0 } : null;
+			return c ? { case: c, givenCents: g._sum.netCents ?? 0 } : null;
 		})
 		.filter(
 			(x): x is { case: (typeof cases)[number]; givenCents: number } => !!x,

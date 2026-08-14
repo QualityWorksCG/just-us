@@ -151,7 +151,11 @@ export default async function DonationsPage() {
 						<thead>
 							<tr className="border-border border-b text-[11px] text-muted-foreground uppercase tracking-[0.06em]">
 								<th className="px-5 py-3 font-semibold">Case</th>
-								<th className="px-5 py-3 text-right font-semibold">Amount</th>
+								<th className="px-5 py-3 font-semibold">Type & location</th>
+								<th className="px-5 py-3 text-right font-semibold">
+									To the case
+								</th>
+								<th className="px-5 py-3 text-right font-semibold">You paid</th>
 								<th className="px-5 py-3 font-semibold">Date</th>
 								<th className="px-5 py-3 font-semibold">Receipt</th>
 							</tr>
@@ -159,14 +163,22 @@ export default async function DonationsPage() {
 						<tbody>
 							{rows.map((d) => (
 								<tr key={d.id} className="border-border border-b last:border-0">
-									<td className="px-5 py-4">
-										<p className="font-bold text-ink">{d.case.title}</p>
-										<p className="text-[12px] text-muted-foreground">
-											{d.case.category} · {d.case.location}
-										</p>
+									<td className="px-5 py-4 font-bold text-ink">
+										{d.case.title}
+									</td>
+									<td className="px-5 py-4 text-muted-foreground">
+										{d.case.category} · {d.case.location}
 									</td>
 									<td className="px-5 py-4 text-right font-bold text-ink tabular-nums">
+										{money(d.netCents / 100)}
+									</td>
+									<td className="px-5 py-4 text-right text-muted-foreground tabular-nums">
 										{money(d.amountCents / 100)}
+										{d.feeCents > 0 ? (
+											<span className="mt-0.5 block text-[11px]">
+												incl. {money(d.feeCents / 100)} fee
+											</span>
+										) : null}
 									</td>
 									<td className="px-5 py-4 text-muted-foreground">
 										{formatDate(d.createdAt)}

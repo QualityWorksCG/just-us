@@ -15,7 +15,7 @@
  * set." That is exactly our model — JustUs is the merchant of record, the
  * recipient only receives. Requesting `merchant` instead would make them the
  * merchant of record and change who bears Stripe's fee, breaking the published
- * "$100 in → $95 to the recipient" math.
+ * "select $100 → $100 to the recipient" math.
  *
  * `fees_collector` and `losses_collector` are both `application` (us), which is
  * the v2 equivalent of the old Express controller properties and what keeps
