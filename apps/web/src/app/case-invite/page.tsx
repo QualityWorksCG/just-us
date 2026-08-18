@@ -4,7 +4,7 @@ import { isBlocked } from "@just-us/auth/user-status";
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import {
 	caseInvitationStatus,
-	findCaseInvitationByTokenHash,
+	findCaseInvitation,
 	invitedEmailHasAccount,
 } from "@just-us/db/case-invitations";
 import {
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { CaseInviteAccountForm } from "@/components/case-invite/case-invite-account-form";
 import {
@@ -31,19 +32,27 @@ import { CaseInviteShell } from "@/components/case-invite/case-invite-shell";
 import { SignOutAndReturnButton } from "@/components/case-invite/case-invite-sign-out";
 import { CaseInviteSummary } from "@/components/case-invite/case-invite-summary";
 import { getSession } from "@/lib/auth-server";
+import { caseInviteHref, parseCaseInviteRef } from "@/lib/case-invite-ref";
 import { withNext } from "@/lib/next-path";
 
 /**
  * The one screen behind every bring-your-own-attorney invitation link.
  *
  * A plaintiff named an attorney by email when they published; this is where
- * that attorney answers. It is deliberately a single hub rather than a set of
- * routes, because the link in the email is fixed and the state behind it is
- * not: by the time it is opened the invitation may have lapsed, the plaintiff
- * may have withdrawn it, the case may already have an attorney, and the person
- * opening it may have no account, the wrong account, or the right account with
- * unfinished onboarding. Each of those needs its own words and its own next
- * step, and all of them arrive at the same URL.
+ * that attorney answers. Two things lead here — the emailed `token`, and the
+ * `invitation` id on the card an invited attorney sees on their own dashboard,
+ * which exists because only the token's hash is stored and nothing in the
+ * product can rebuild the link. The id is not a credential: it is honoured only
+ * for a signed-in account holding the invited address, and reveals nothing
+ * before that is established.
+ *
+ * It is deliberately a single hub rather than a set of routes, because the way
+ * in is fixed and the state behind it is not: by the time it is opened the
+ * invitation may have lapsed, the plaintiff may have withdrawn it, the case may
+ * already have an attorney, and the person opening it may have no account, the
+ * wrong account, or the right account with unfinished onboarding. Each of those
+ * needs its own words and its own next step, and all of them arrive at the same
+ * URL.
  *
  * Nothing here is a permission check. Every gate the page draws is re-applied
  * inside `confirmCaseInvitation`'s transaction — this screen only decides what
@@ -73,16 +82,32 @@ function maskEmail(email: string) {
 export default async function CaseInvitePage({
 	searchParams,
 }: {
-	searchParams: Promise<{ token?: string; declined?: string }>;
+	searchParams: Promise<{
+		token?: string;
+		invitation?: string;
+		declined?: string;
+	}>;
 }) {
-	const { token, declined } = await searchParams;
+	const {
+		token: rawToken,
+		invitation: rawInvitation,
+		declined,
+	} = await searchParams;
+	const ref = parseCaseInviteRef({
+		token: rawToken,
+		invitation: rawInvitation,
+	});
 	// Only the hash is stored, so an unknown link and a tampered one are
 	// indistinguishable here — both land on "invalid".
-	const invitation = token
-		? await findCaseInvitationByTokenHash(hashInviteToken(token))
+	const invitation = ref
+		? await findCaseInvitation(
+				"token" in ref
+					? { tokenHash: hashInviteToken(ref.token) }
+					: { invitationId: ref.invitationId },
+			)
 		: null;
 
-	if (!token || !invitation) {
+	if (!ref || !invitation) {
 		return (
 			<CaseInviteShell
 				icon={TriangleAlert}
@@ -99,6 +124,47 @@ export default async function CaseInvitePage({
 
 	const status = caseInvitationStatus(invitation);
 	const c = invitation.case;
+
+	const session = await getSession();
+	const viaToken = "token" in ref;
+	/** The raw token, when that is how they arrived. Only the screen that cannot
+	 *  work without it reads this — creating an account, which has no session to
+	 *  be identified by — and that screen is on the token route alone. */
+	const token = "token" in ref ? ref.token : null;
+
+	// The id route, gated before a word about the case is drawn. An id names a row;
+	// it says nothing about who is holding it. So a signed-out visitor is sent to
+	// sign in and brought back, and a signed-in stranger is told only that the
+	// invitation isn't theirs — not whose it is, or what it is about. The token
+	// route needs none of this: holding the token is the proof.
+	if (!viaToken) {
+		if (!session?.user) {
+			redirect(withNext("/login?mode=signin", caseInviteHref(ref)) as Route);
+		}
+		if (
+			session.user.email.trim().toLowerCase() !==
+			invitation.email.trim().toLowerCase()
+		) {
+			return (
+				<CaseInviteShell
+					icon={UserRoundX}
+					tone="danger"
+					title="This invitation isn't on this account"
+					description="It was sent to a different email address, so there's nothing here for you to answer."
+				>
+					<div className="flex flex-col gap-4">
+						<p className="text-[13px] text-muted-foreground leading-relaxed">
+							If the invitation is yours, sign in with the address it was sent
+							to and open it from your dashboard, or use the link in the email.
+						</p>
+						<Link href={"/home" as Route} className={secondaryLinkClass}>
+							Go to my dashboard
+						</Link>
+					</div>
+				</CaseInviteShell>
+			);
+		}
+	}
 
 	// The decline that just happened, told as an outcome rather than as an error.
 	// The `declined` flag comes from our own redirect; the status is what makes it
@@ -162,16 +228,20 @@ export default async function CaseInvitePage({
 		/>
 	);
 
-	const session = await getSession();
-
 	// Every gate below sends them somewhere else to fix something, and each of
 	// those destinations ends in a fixed redirect to /home. Carrying this back
 	// means the round trip ends on the decision they came here to make, instead of
 	// on a dashboard where the only route back is finding the email again.
-	const returnHere = `/case-invite?token=${encodeURIComponent(token)}`;
+	const returnHere = caseInviteHref(ref);
 
 	// ── Nobody signed in ────────────────────────────────────────────────────────
 	if (!session?.user) {
+		// Unreachable on the id route, which sent a signed-out visitor to sign in
+		// before any of this. Restated as a redirect rather than an assertion so the
+		// worst case is a trip through the login screen, not a crash.
+		if (!token) {
+			redirect(withNext("/login?mode=signin", returnHere) as Route);
+		}
 		const hasAccount = await invitedEmailHasAccount(invitation.email);
 
 		if (hasAccount) {
@@ -195,7 +265,7 @@ export default async function CaseInvitePage({
 							ready once we can see it's you.
 						</p>
 						<DeclineInviteButton
-							token={token}
+							invite={ref}
 							label="I don't represent this case"
 						/>
 					</div>
@@ -219,7 +289,7 @@ export default async function CaseInvitePage({
 					/>
 					<div className="border-line-strong border-t pt-4">
 						<DeclineInviteButton
-							token={token}
+							invite={ref}
 							label="I don't represent this case"
 						/>
 					</div>
@@ -246,7 +316,7 @@ export default async function CaseInvitePage({
 						yours and you can't get into it, ask the plaintiff to re-send the
 						invitation to one you can.
 					</p>
-					<SignOutAndReturnButton token={token} />
+					<SignOutAndReturnButton invite={ref} />
 				</div>
 			</CaseInviteShell>
 		);
@@ -279,7 +349,7 @@ export default async function CaseInvitePage({
 						front of other attorneys straight away.
 					</p>
 					<DeclineInviteButton
-						token={token}
+						invite={ref}
 						label="I don't represent this case"
 					/>
 				</div>
@@ -297,11 +367,14 @@ export default async function CaseInvitePage({
 			>
 				<div className="flex flex-col gap-4">
 					{summary}
-					<Link href={"/verify-email" as Route} className={primaryLinkClass}>
+					<Link
+						href={withNext("/verify-email", returnHere) as Route}
+						className={primaryLinkClass}
+					>
 						Verify my email
 					</Link>
 					<p className="text-[12px] text-muted-foreground">
-						Then come back to this link to confirm.
+						The link in that email brings you back here to confirm.
 					</p>
 				</div>
 			</CaseInviteShell>
@@ -329,7 +402,7 @@ export default async function CaseInvitePage({
 						when asked — we'll bring you back here as soon as you're done.
 					</p>
 					<DeclineInviteButton
-						token={token}
+						invite={ref}
 						label="I don't represent this case"
 					/>
 				</div>
@@ -351,9 +424,9 @@ export default async function CaseInvitePage({
 						this link again from that one. Otherwise, ask the plaintiff to
 						invite the address you use as an attorney.
 					</p>
-					<SignOutAndReturnButton token={token} />
+					<SignOutAndReturnButton invite={ref} />
 					<DeclineInviteButton
-						token={token}
+						invite={ref}
 						label="I don't represent this case"
 					/>
 				</div>
@@ -378,17 +451,21 @@ export default async function CaseInvitePage({
 			>
 				<div className="flex flex-col gap-4">
 					{summary}
-					<Link href={"/profile" as Route} className={primaryLinkClass}>
+					<Link
+						href={withNext("/profile", returnHere) as Route}
+						className={primaryLinkClass}
+					>
 						{verification === "pending" || verification === "needs_review"
 							? "Check my verification"
 							: "Verify my bar standing"}
 					</Link>
 					<p className="text-[12px] text-muted-foreground leading-relaxed">
 						This invitation is held open for you in the meantime — the case
-						stays off the attorney queue until you answer or the link expires.
+						stays off the attorney queue until you answer or it expires. You can
+						come back to it from your dashboard at any time.
 					</p>
 					<DeclineInviteButton
-						token={token}
+						invite={ref}
 						label="I don't represent this case"
 					/>
 				</div>
@@ -406,7 +483,7 @@ export default async function CaseInvitePage({
 		>
 			<div className="flex flex-col gap-5">
 				{summary}
-				<CaseInviteDecision token={token} />
+				<CaseInviteDecision invite={ref} />
 			</div>
 		</CaseInviteShell>
 	);

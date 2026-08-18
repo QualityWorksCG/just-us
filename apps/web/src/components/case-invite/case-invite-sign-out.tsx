@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { type CaseInviteRef, caseInviteHref } from "@/lib/case-invite-ref";
 
 /**
  * Sign out and come straight back to the invitation.
@@ -16,14 +17,14 @@ import { authClient } from "@/lib/auth-client";
  * about it. Landing back here signed out turns it into one, because this page
  * signed out is the "sign in to confirm" screen.
  */
-export function SignOutAndReturnButton({ token }: { token: string }) {
+export function SignOutAndReturnButton({ invite }: { invite: CaseInviteRef }) {
 	const router = useRouter();
 	const [pending, setPending] = useState(false);
 
 	async function signOut() {
 		setPending(true);
 		await authClient.signOut();
-		router.replace(`/case-invite?token=${encodeURIComponent(token)}` as Route);
+		router.replace(caseInviteHref(invite) as Route);
 		router.refresh();
 	}
 

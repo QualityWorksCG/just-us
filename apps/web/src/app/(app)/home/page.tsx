@@ -1,5 +1,6 @@
 import type { Role } from "@just-us/auth";
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
+import { pendingInvitationsForEmail } from "@just-us/db/case-invitations";
 import { listUpdatesForBacker } from "@just-us/db/case-updates";
 import { listOwnedCases } from "@just-us/db/cases";
 import { donorStats, listBackedCases } from "@just-us/db/donations";
@@ -17,6 +18,7 @@ import { interestCountsByCase } from "@just-us/db/requests";
 import { countSavedCases, listSavedCases } from "@just-us/db/saves";
 
 import { AdminOverview } from "@/components/dashboard/admin-overview";
+import { AttorneyInvitations } from "@/components/dashboard/attorney-invitations";
 import { toDonorCase } from "@/components/dashboard/donor-case";
 import { DonorDashboard } from "@/components/dashboard/donor-dashboard";
 import { MatchedCasesPanel } from "@/components/dashboard/matched-cases-panel";
@@ -142,6 +144,7 @@ export default async function DashboardHome({
 			profile,
 			payout,
 			matched,
+			invitations,
 		] = await Promise.all([
 			listSeekingQueue(session.user.id, {
 				category: filters.category,
@@ -162,10 +165,22 @@ export default async function DashboardHome({
 			// Matched cases for the dashboard panel — gated to this attorney's own
 			// cases (account activity + update posting are scoped by this).
 			listAttorneyCases({ userId: session.user.id, email: session.user.email }),
+			// Invitations sent to this address and not yet answered. Read by email,
+			// because that is what the plaintiff named and the row can predate the
+			// account — and read here at all because the emailed link was otherwise
+			// the only way back to the decision.
+			pendingInvitationsForEmail(session.user.email),
 		]);
 
 		return (
 			<div>
+				{/* Before the payout nudge: an unanswered invitation is a plaintiff
+				    waiting on a decision only this attorney can make, and their case is
+				    off the queue until it comes. */}
+				<AttorneyInvitations
+					invitations={invitations}
+					verification={profile?.verificationStatus ?? "unverified"}
+				/>
 				<PayoutNudge
 					waitingCases={payout.waitingCases}
 					unstartedCases={payout.unstartedCases}

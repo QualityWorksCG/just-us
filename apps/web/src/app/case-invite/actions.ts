@@ -4,6 +4,7 @@ import { auth } from "@just-us/auth";
 import { hashInviteToken } from "@just-us/auth/invite-token";
 import { isBlocked } from "@just-us/auth/user-status";
 import {
+	type CaseInvitationRef,
 	type CaseInvitationTokenErrorCode,
 	type ConfirmCaseInvitationErrorCode,
 	confirmCaseInvitation,
@@ -16,16 +17,22 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getSession } from "@/lib/auth-server";
+import { type CaseInviteRef, caseInviteHref } from "@/lib/case-invite-ref";
 
 /**
  * The three things the invited attorney can do with their link: create the
  * account they need to answer, say yes, or say no.
  *
- * Every one of them re-derives the token hash here and hands it to the data
- * layer, which re-checks the invitation, the identity, and the case inside its
- * own transaction. Nothing on the page that rendered the button is trusted —
- * the screen was drawn from a read that may be seconds stale, and confirming is
- * the act that binds an attorney to a matter.
+ * Every one of them resolves the caller's ref here — hashing the raw token, or
+ * passing the invitation id through — and hands it to the data layer, which
+ * re-checks the invitation, the identity, and the case inside its own
+ * transaction. Nothing on the page that rendered the button is trusted: the
+ * screen was drawn from a read that may be seconds stale, and confirming is the
+ * act that binds an attorney to a matter.
+ *
+ * Account creation stays token-only. Someone with no account has no session to
+ * be identified by, so the emailed token is the only thing they can offer, and
+ * an id must never be enough to make an account for somebody else's address.
  */
 
 /** Terminal-token wording, shared by all three actions. Expiry and decline say
@@ -68,11 +75,34 @@ const accountSchema = z.object({
 		),
 });
 
+/**
+ * The ref, as it arrives from the browser.
+ *
+ * A server action is a public endpoint, so what a client passes is an argument
+ * and not a fact — and both members of this union end up in a database lookup.
+ * Shape-checked here so junk is answered with "this invitation is no longer
+ * valid" rather than by a thrown query, and `strict` so nothing rides along
+ * beside the one field each route is allowed to carry.
+ */
+const refSchema = z.union([
+	z.strictObject({ token: z.string().min(1).max(256) }),
+	z.strictObject({
+		invitationId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
+	}),
+]);
+
 /** Where a link-holder is sent back to after signing in or declining — the same
  *  page, which re-reads everything and decides what to show next. */
-function inviteUrl(token: string, params?: Record<string, string>) {
-	const query = new URLSearchParams({ token, ...params });
-	return `/case-invite?${query.toString()}` as Route;
+function inviteUrl(ref: CaseInviteRef, params?: Record<string, string>) {
+	return caseInviteHref(ref, params) as Route;
+}
+
+/** The web app's ref in the data layer's terms. The token is hashed here, in the
+ *  one place that knows the raw value, so nothing below ever sees it. */
+function dbRef(ref: CaseInviteRef): CaseInvitationRef {
+	return "token" in ref
+		? { tokenHash: hashInviteToken(ref.token) }
+		: { invitationId: ref.invitationId };
 }
 
 /**
@@ -144,7 +174,7 @@ export async function createCaseInviteAccountAction(
 	}
 
 	// redirect() throws NEXT_REDIRECT, so it has to stay outside the try above.
-	redirect(signedIn ? inviteUrl(token) : "/login?mode=signin");
+	redirect(signedIn ? inviteUrl({ token }) : "/login?mode=signin");
 }
 
 /**
@@ -152,8 +182,14 @@ export async function createCaseInviteAccountAction(
  * the payout account they now have to open is waiting for them.
  */
 export async function confirmCaseInviteAction(
-	token: string,
+	input: CaseInviteRef,
 ): Promise<CaseInviteActionResult> {
+	const parsedRef = refSchema.safeParse(input);
+	if (!parsedRef.success) {
+		return { ok: false, error: TOKEN_ERRORS.invalid };
+	}
+	const ref = parsedRef.data;
+
 	const session = await getSession();
 	if (!session?.user) {
 		return {
@@ -190,7 +226,7 @@ export async function confirmCaseInviteAction(
 	let result: Awaited<ReturnType<typeof confirmCaseInvitation>>;
 	try {
 		result = await confirmCaseInvitation({
-			tokenHash: hashInviteToken(token),
+			ref: dbRef(ref),
 			attorneyId: session.user.id,
 		});
 	} catch {
@@ -207,21 +243,42 @@ export async function confirmCaseInviteAction(
 /**
  * The attorney says no.
  *
- * Takes no session: declining is not a privileged act, and the person who was
- * emailed the link should not have to make an account to say they aren't
- * taking the case. A signed-in decline is recorded as theirs; an anonymous one
- * still settles the invitation and puts the case back in the queue.
+ * The token route takes no session: declining is not a privileged act, and the
+ * person who was emailed the link should not have to make an account to say they
+ * aren't taking the case. A signed-in decline is recorded as theirs; an anonymous
+ * one still settles the invitation and puts the case back in the queue.
+ *
+ * The id route is the opposite — an id proves nothing on its own — so the signed-in
+ * address has to match the invited one, enforced inside the data layer's
+ * transaction. Without that, a guessed id would let a stranger throw somebody
+ * else's case back into the queue.
  */
 export async function declineCaseInviteAction(
-	token: string,
+	input: CaseInviteRef,
 ): Promise<CaseInviteActionResult> {
+	const parsedRef = refSchema.safeParse(input);
+	if (!parsedRef.success) {
+		return { ok: false, error: TOKEN_ERRORS.invalid };
+	}
+	const ref = parsedRef.data;
+
 	const session = await getSession();
+
+	if (!("token" in ref) && !session?.user) {
+		return {
+			ok: false,
+			error: "Sign in with the invited email address to decline.",
+		};
+	}
 
 	let result: Awaited<ReturnType<typeof declineCaseInvitation>>;
 	try {
 		result = await declineCaseInvitation({
-			tokenHash: hashInviteToken(token),
+			ref: dbRef(ref),
 			actorId: session?.user.id ?? null,
+			// Only sent on the id route. `undefined` is what tells the data layer this
+			// caller held the token and needs no address of its own.
+			...("token" in ref ? {} : { requireEmail: session?.user.email ?? null }),
 		});
 	} catch {
 		return { ok: false, error: "Couldn't record that. Please try again." };
@@ -231,5 +288,5 @@ export async function declineCaseInviteAction(
 
 	// Back to this page, which now reads the invitation as declined and says so
 	// — one screen owns every state of this link, including its last one.
-	redirect(inviteUrl(token, { declined: "1" }));
+	redirect(inviteUrl(ref, { declined: "1" }));
 }

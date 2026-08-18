@@ -5,8 +5,8 @@ import { MapPin, Tag, UserRound, Wallet } from "lucide-react";
  *
  * Enough to recognise the matter and the person asking, and no more — the
  * story, the evidence, and any way to reach the plaintiff are absent by
- * construction (see `findCaseInvitationByTokenHash`). Whoever opened this link
- * has proved only that they received it.
+ * construction (see `findCaseInvitation`). Whoever opened this invitation has
+ * proved only that they were sent it.
  */
 export function CaseInviteSummary({
 	title,
