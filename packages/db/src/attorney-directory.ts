@@ -20,7 +20,8 @@ export type DirectorySort = "name" | "rating" | "availability";
 export type DirectoryFilters = {
 	/** One of PRACTICE_AREAS, or undefined for all. */
 	practiceArea?: string;
-	/** A US state, matched against the attorney's licensing jurisdiction. */
+	/** A US state. Matched against the states the attorney is *admitted* in, so an
+	 *  attorney licensed in three states is found under all three. */
 	state?: string;
 	/** Free text over name, firm, and practice areas. */
 	keyword?: string;
@@ -37,9 +38,25 @@ function listableWhere(filters: DirectoryFilters) {
 		...(filters.practiceArea
 			? { practiceAreas: { has: filters.practiceArea } }
 			: {}),
-		// The state filter is labelled "Licensed in", so it matches the licensing
-		// jurisdiction on the account, not the office address.
-		...(filters.state ? { user: { is: { jurisdiction: filters.state } } } : {}),
+		// The filter is labelled "Licensed in", so it matches an admission rather than
+		// the office address — and `some`, because a licence is per state and an
+		// attorney holding several must be findable under each. Only their verified
+		// admissions count: the directory's whole promise is that a listed attorney
+		// can actually take the work, and a state they have merely claimed cannot.
+		...(filters.state
+			? {
+					user: {
+						is: {
+							admissions: {
+								some: {
+									state: filters.state,
+									verificationStatus: "verified" as const,
+								},
+							},
+						},
+					},
+				}
+			: {}),
 		...(keyword
 			? {
 					OR: [
@@ -67,7 +84,19 @@ const listSelect = {
 	virtualConsultation: true,
 	feeApproach: true,
 	bio: true,
-	user: { select: { id: true, jurisdiction: true } },
+	user: {
+		select: {
+			id: true,
+			jurisdiction: true,
+			// Verified only — see `listableWhere`. These are the states a plaintiff can
+			// actually engage this attorney in.
+			admissions: {
+				where: { verificationStatus: "verified" as const },
+				select: { state: true },
+				orderBy: { state: "asc" as const },
+			},
+		},
+	},
 	reviews: {
 		where: { published: true },
 		select: { rating: true, quote: true, byline: true },
@@ -94,7 +123,11 @@ export type DirectoryAttorney = {
 	id: string;
 	legalName: string;
 	firmName: string | null;
+	/** The primary state — the one the card leads with. */
 	state: string | null;
+	/** Every state this attorney is verified in, alphabetically. Includes the
+	 *  primary; empty only for a legacy row with no admissions. */
+	states: string[];
 	headshotUrl: string | null;
 	practiceAreas: string[];
 	bio: string | null;
@@ -135,7 +168,11 @@ export async function listDirectoryAttorneys(
 		// Non-null by the `legalName: { not: null }` filter above.
 		legalName: row.legalName ?? "",
 		firmName: row.firmName,
+		// The primary state leads, for a card that has room for one. `states` carries
+		// the rest, because "licensed in New York" about an attorney admitted in three
+		// is a third of the truth.
 		state: row.user.jurisdiction ?? row.officeState,
+		states: row.user.admissions.map((a) => a.state),
 		headshotUrl: row.headshotUrl,
 		practiceAreas: row.practiceAreas,
 		bio: row.bio,
@@ -212,17 +249,19 @@ export async function listedPracticeAreas(): Promise<string[]> {
 	return [...new Set(rows.flatMap((r) => r.practiceAreas))].sort();
 }
 
-/** States that actually have a listed attorney. */
+/** States that actually have a listed attorney — every state any listed attorney
+ *  is verified in, not just the one their card leads with. */
 export async function listedStates(): Promise<string[]> {
-	const rows = await prisma.attorneyProfile.findMany({
-		where: { verificationStatus: "verified" },
-		select: { officeState: true, user: { select: { jurisdiction: true } } },
+	const rows = await prisma.attorneyAdmission.findMany({
+		where: {
+			verificationStatus: "verified",
+			user: {
+				is: { attorneyProfile: { is: { verificationStatus: "verified" } } },
+			},
+		},
+		distinct: ["state"],
+		select: { state: true },
+		orderBy: { state: "asc" },
 	});
-	return [
-		...new Set(
-			rows
-				.map((r) => r.user.jurisdiction ?? r.officeState)
-				.filter((s): s is string => !!s),
-		),
-	].sort();
+	return rows.map((row) => row.state);
 }

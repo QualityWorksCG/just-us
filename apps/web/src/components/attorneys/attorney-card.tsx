@@ -116,8 +116,19 @@ export function AttorneyCard({
 }) {
 	const years = yearsLicensed(attorney.admittedYear);
 
+	// Where they practise, which is a list now. The office city pairs with the
+	// primary state as the address line; the rest are named after it, because
+	// "New York" about an attorney also licensed in New Jersey and Connecticut sends
+	// a plaintiff in either of those looking elsewhere.
+	const otherStates = attorney.states.filter(
+		(state) => state !== attorney.state,
+	);
+
 	const details = [
 		[attorney.officeCity, attorney.state].filter(Boolean).join(", "),
+		otherStates.length > 0
+			? `Also licensed in ${otherStates.join(", ")}`
+			: null,
 		attorney.languages.length > 0 ? attorney.languages.join(", ") : null,
 		attorney.feeApproach
 			? (FEE_APPROACHES.find((f) => f.value === attorney.feeApproach)?.label ??

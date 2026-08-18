@@ -72,7 +72,8 @@ export function SeekingQueue({
 	cases,
 	categories,
 	states,
-	jurisdiction,
+	admittedStates,
+	verifiedStates,
 	filtered,
 	tally,
 	interests,
@@ -81,7 +82,17 @@ export function SeekingQueue({
 	cases: QueueCase[];
 	categories: string[];
 	states: string[];
-	jurisdiction: string | null;
+	/** Every state this attorney is admitted in. The queue is scoped to these
+	 *  server-side (see `queueWhere`), so this is here to explain what they are
+	 *  looking at rather than to filter it — and to say something useful when the
+	 *  list is empty, which is the one case where the queue is empty by
+	 *  construction rather than because nobody has published. */
+	admittedStates: string[];
+	/** The subset of those with a verified bar check. Expressing interest is gated
+	 *  per state, so a case in a claimed-but-unchecked state is listed and its
+	 *  button is not offered — the queue shows what they may look at, and this
+	 *  decides what they may act on. */
+	verifiedStates: string[];
 	/** Whether any filter is active, which changes the empty-state wording. */
 	filtered: boolean;
 	tally: InterestTally;
@@ -91,13 +102,48 @@ export function SeekingQueue({
 	 *  queue either way, but cannot put themselves forward (JUS-24). */
 	canExpressInterest: boolean;
 }) {
-	const disabledReason = canExpressInterest
-		? undefined
-		: "Your bar standing has to be verified first.";
+	const nowhereAdmitted = admittedStates.length === 0;
+
+	/**
+	 * Why this particular case can't be put forward for, if it can't.
+	 *
+	 * Per case, because the gate is per state: an attorney verified in New York
+	 * browsing a New Jersey case they have claimed but not yet had checked would
+	 * otherwise be shown a live button and refused by the action behind it.
+	 */
+	function reasonFor(state: string): string | undefined {
+		if (verifiedStates.includes(state)) return undefined;
+		if (!canExpressInterest) {
+			return "Your bar standing has to be verified first.";
+		}
+		return `Your ${state} bar standing has to be verified first.`;
+	}
 
 	return (
 		<div className="flex flex-col gap-6">
-			{!canExpressInterest && (
+			{nowhereAdmitted ? (
+				<div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-danger/30 bg-danger/5 px-5 py-4">
+					<ShieldAlert
+						className="size-5 shrink-0 text-danger"
+						aria-hidden="true"
+					/>
+					<p className="min-w-[20ch] flex-1 text-[13.5px] text-ink leading-relaxed">
+						<span className="font-bold">
+							Add the states you're admitted in.
+						</span>{" "}
+						Cases are only shown to attorneys licensed where the case is, so
+						until you add a state there's nothing here for you to see.
+					</p>
+					<Link
+						href={"/profile" as Route}
+						className={cn(buttonVariants({ size: "sm" }), "h-9 shrink-0")}
+					>
+						Add your states
+					</Link>
+				</div>
+			) : null}
+
+			{!canExpressInterest && !nowhereAdmitted && (
 				<div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-brass/40 bg-brass-wash px-5 py-4">
 					<ShieldAlert
 						className="size-5 shrink-0 text-brass-deep"
@@ -107,9 +153,9 @@ export function SeekingQueue({
 						<span className="font-bold">
 							Verify your bar standing to put yourself forward.
 						</span>{" "}
-						You can browse every case here now — expressing interest needs a
-						verified licence, so plaintiffs only ever see attorneys who can
-						actually take the work.
+						You can browse the cases in your states now — expressing interest
+						needs a verified licence there, so plaintiffs only ever see
+						attorneys who can actually take the work.
 					</p>
 					<Link
 						href={"/profile" as Route}
@@ -179,11 +225,7 @@ export function SeekingQueue({
 			)}
 
 			<section className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)] sm:p-6">
-				<QueueControls
-					categories={categories}
-					states={states}
-					jurisdiction={jurisdiction}
-				/>
+				<QueueControls categories={categories} states={states} />
 
 				<div className="mt-5 flex items-center justify-between border-border border-t pt-4">
 					<span className="font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
@@ -200,14 +242,18 @@ export function SeekingQueue({
 							<Inbox className="size-5" aria-hidden="true" />
 						</span>
 						<p className="font-bold text-[15px] text-ink">
-							{filtered
-								? "No cases match those filters"
-								: "No cases seeking representation"}
+							{nowhereAdmitted
+								? "No states added yet"
+								: filtered
+									? "No cases match those filters"
+									: "No cases seeking representation"}
 						</p>
 						<p className="max-w-[46ch] text-[13.5px] text-muted-foreground leading-relaxed">
-							{filtered
-								? "Try a broader category or another state — the queue turns over as plaintiffs publish."
-								: "Cases appear here the moment a plaintiff publishes one out to attorneys."}
+							{nowhereAdmitted
+								? "The queue is scoped to the states you're admitted in. Add yours on your directory profile and the cases from them appear here."
+								: filtered
+									? "Try a broader category or another state — the queue turns over as plaintiffs publish."
+									: `Cases appear here the moment a plaintiff in ${admittedStates.length === 1 ? admittedStates[0] : "one of your states"} publishes one out to attorneys.`}
 						</p>
 					</div>
 				) : (
@@ -216,7 +262,7 @@ export function SeekingQueue({
 							<QueueCard
 								key={item.id}
 								item={item}
-								disabledReason={disabledReason}
+								disabledReason={reasonFor(item.state)}
 							/>
 						))}
 					</div>

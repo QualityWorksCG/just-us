@@ -5,9 +5,15 @@ import {
 	JURISDICTION_MESSAGE,
 } from "@just-us/auth/jurisdiction";
 import {
+	addAdmission,
+	listAdmissions,
+	removeAdmission,
+	setPrimaryJurisdiction,
+} from "@just-us/db/admissions";
+import {
 	getAttorneyProfile,
+	lastVerificationForState,
 	recordVerification,
-	updateAttorneyJurisdiction,
 } from "@just-us/db/attorney-profile";
 import { env } from "@just-us/env/server";
 import { revalidatePath } from "next/cache";
@@ -195,36 +201,78 @@ function toSources(
 	return [...byUrl.values()];
 }
 
-export type UpdateJurisdictionResult =
-	| { ok: true; badgeCleared: boolean }
-	| { ok: false; error: string };
+export type AdmissionActionResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Change the licensing jurisdiction a check runs against.
+ * The three things an attorney can do to the list of states they practise in.
  *
- * Lives here rather than with the profile autosave because it isn't profile
- * data — it's on the account from sign-up, and it's the input that decides which
- * state's bar records get searched.
+ * These live here rather than with the profile autosave because they are not
+ * profile data: an admission decides which cases reach this attorney and which
+ * they may take on, so it is written deliberately rather than swept up by a
+ * draft save. Each one revalidates `/home` as well as `/profile`, because the
+ * queue is scoped by exactly this list and would otherwise keep showing the
+ * shape it had a moment ago.
  */
-export async function updateJurisdictionAction(
-	jurisdiction: string,
-): Promise<UpdateJurisdictionResult> {
+export async function addAdmissionAction(
+	state: string,
+): Promise<AdmissionActionResult> {
 	const { session } = await requireRole("attorney");
 
 	// The Select constrains the choice, but the action can be called directly and
-	// the stored string is matched exactly downstream.
-	if (!isValidJurisdiction(jurisdiction)) {
+	// the stored string is matched exactly against `Case.location` downstream.
+	if (!isValidJurisdiction(state)) {
 		return { ok: false, error: JURISDICTION_MESSAGE };
 	}
 
 	try {
-		const res = await updateAttorneyJurisdiction(session.user.id, jurisdiction);
+		const res = await addAdmission(session.user.id, state);
+		if (!res.ok) {
+			return { ok: false, error: `You've already added ${state}.` };
+		}
 		revalidatePath("/profile");
-		return { ok: true, badgeCleared: res.badgeCleared };
+		revalidatePath("/home");
+		return { ok: true };
+	} catch {
+		return { ok: false, error: "Couldn't add that state. Please try again." };
+	}
+}
+
+export async function removeAdmissionAction(
+	state: string,
+): Promise<AdmissionActionResult> {
+	const { session } = await requireRole("attorney");
+
+	try {
+		await removeAdmission(session.user.id, state);
+		revalidatePath("/profile");
+		revalidatePath("/home");
+		return { ok: true };
 	} catch {
 		return {
 			ok: false,
-			error: "Couldn't update your jurisdiction. Please try again.",
+			error: "Couldn't remove that state. Please try again.",
+		};
+	}
+}
+
+/** Which admission the directory leads with. Moves a label, nothing more — see
+ *  `setPrimaryJurisdiction`. */
+export async function setPrimaryAdmissionAction(
+	state: string,
+): Promise<AdmissionActionResult> {
+	const { session } = await requireRole("attorney");
+
+	try {
+		const res = await setPrimaryJurisdiction(session.user.id, state);
+		if (!res.ok) {
+			return { ok: false, error: `Add ${state} to your states first.` };
+		}
+		revalidatePath("/profile");
+		return { ok: true };
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't update your primary state. Please try again.",
 		};
 	}
 }
@@ -234,17 +282,22 @@ export type VerifyResult =
 	| { ok: false; error: string };
 
 /**
- * Run a check for the signed-in attorney and record the outcome.
+ * Run a check for one of the attorney's states and record the outcome.
+ *
+ * Per state, because a licence is per state: a bar record in New York says
+ * nothing about New Jersey, and it is the admission for the state checked that
+ * the matching gates read. `state` defaults to the primary one, which is what a
+ * single-state attorney will always mean.
  *
  * Administrators can trigger one for another attorney by passing `userId`; an
  * attorney can only ever check themselves.
  */
 export async function verifyAttorneyAction(
-	userId?: string,
+	input: { state?: string; userId?: string } = {},
 ): Promise<VerifyResult> {
 	const { session, role } = await requireRole("attorney", "administrator");
 	const targetId =
-		role === "administrator" && userId ? userId : session.user.id;
+		role === "administrator" && input.userId ? input.userId : session.user.id;
 
 	if (!env.OPENAI_API_KEY) {
 		// Named only in the server log: the attorney can't act on a missing env var,
@@ -267,18 +320,31 @@ export async function verifyAttorneyAction(
 		};
 	}
 
-	// The licensing state lives on the account from sign-up, not on the profile,
-	// and decides whose records get searched.
-	const account = profile.user;
-	if (!account.jurisdiction) {
+	// Which state's records to search. Only ever one the attorney has actually
+	// claimed: a check against a state they hold no admission in has nowhere to
+	// record its result, and would read as verification of something they never
+	// asserted.
+	const admissions = await listAdmissions(targetId);
+	if (admissions.length === 0) {
 		return {
 			ok: false,
-			error: "Choose your licensing jurisdiction before running a check.",
+			error: "Add the states you're admitted in before running a check.",
 		};
 	}
-	// Web search costs money per call, so a completed check has a cooldown. A
-	// result that needs human attention is exempt: re-running it won't help.
-	const last = profile.verifications[0];
+	const primary = admissions.find((row) => row.primary) ?? admissions[0];
+	const state = input.state ?? primary?.state;
+	if (!state || !admissions.some((row) => row.state === state)) {
+		return {
+			ok: false,
+			error: "Add that state to your profile before checking it.",
+		};
+	}
+
+	// Web search costs money per call, so a completed check has a cooldown — held
+	// per state rather than per profile, or checking a second state would be
+	// refused because the first was just checked. A result that needs human
+	// attention is exempt: re-running it won't help.
+	const last = await lastVerificationForState(profile.id, state);
 	if (
 		last &&
 		last.status !== "needs_review" &&
@@ -298,7 +364,7 @@ export async function verifyAttorneyAction(
 	const question = [
 		"Is this person a licensed attorney in good standing?",
 		`Name: ${profile.legalName}`,
-		`Licensing jurisdiction: ${account.jurisdiction}`,
+		`Licensing jurisdiction: ${state}`,
 		// Firm and website help identify the right person among namesakes. The
 		// office city is deliberately withheld — registries list a bar address of
 		// record, and narrowing by city loses real licensees.
@@ -383,7 +449,9 @@ export async function verifyAttorneyAction(
 		officialRecordUrl: parsed.officialRecordUrl,
 		sources,
 		checkedName: profile.legalName,
-		checkedJurisdiction: account.jurisdiction,
+		// The state this result belongs to. `recordVerification` reads it back to
+		// decide which admission the outcome lands on, so it is not decoration.
+		checkedJurisdiction: state,
 		model: MODEL,
 		triggeredBy: session.user.id,
 	});

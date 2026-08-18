@@ -20,10 +20,16 @@ model User {
   // which is what most donors expect and what makes the supporter list feel human.
   donationsAnonymous Boolean @default(false)
 
-  // Licensing jurisdiction (US state) — where an attorney is admitted to
-  // practice. Captured at sign-up for attorneys only (JUS-12) — see
-  // JURISDICTION_ROLES in the auth package. Gates bar verification and the
-  // directory.
+  // The attorney's *primary* licensing jurisdiction (US state) — the first state
+  // they were admitted in, and the one the directory leads with. Captured at
+  // sign-up for attorneys only (JUS-12) — see JURISDICTION_ROLES in the auth
+  // package.
+  //
+  // NOT the authority on where they may act. An attorney can be admitted in
+  // several states, and each admission carries its own bar number and its own
+  // bar check, so that lives in AttorneyAdmission — which every matching gate
+  // reads. This column is kept pointing at one of those rows (see
+  // `setAdmissions` in src/admissions.ts); it is a label, not a permission.
   //
   // Not a plaintiff field: a plaintiff's jurisdiction belongs to the case, not
   // the person, and lives on `Case.location`. Null for every non-attorney role —
@@ -55,6 +61,10 @@ model User {
   // Public directory profile. Only attorneys have one, and only once they've
   // filled it in — see AttorneyProfile.
   attorneyProfile AttorneyProfile?
+
+  // Every state this attorney is admitted in, each with its own bar standing.
+  // This is what decides which cases they may take — see AttorneyAdmission.
+  admissions AttorneyAdmission[]
 
   // Attorney side of representation (JUS-25). Seeking cases this attorney has
   // expressed interest in, and the cases they were matched to.

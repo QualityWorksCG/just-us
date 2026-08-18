@@ -1,6 +1,5 @@
 "use client";
 
-import { US_STATES } from "@just-us/auth/jurisdiction";
 import { requiresJurisdiction } from "@just-us/auth/rbac";
 import { Button, buttonVariants } from "@just-us/ui/components/button";
 import { Input } from "@just-us/ui/components/input";
@@ -25,6 +24,7 @@ import {
 	ShieldCheck,
 	Trash2,
 } from "lucide-react";
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -123,7 +123,15 @@ function AccountDetail({
 }
 
 /** Self-service JUS-65 profile settings form for every dashboard role. */
-export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
+export function ProfileSettings({
+	profile,
+	admittedStates = [],
+}: {
+	profile: SettingsProfile;
+	/** The states this attorney is admitted in — the only valid primaries. Empty
+	 *  for every other role, which never sees this control. */
+	admittedStates?: string[];
+}) {
 	const router = useRouter();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const displayNameId = useId();
@@ -411,8 +419,13 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 									htmlFor={stateId}
 									className="font-semibold text-[13px] text-ink"
 								>
-									State
+									Primary state
 								</Label>
+								{/* Only the states this attorney is admitted in. Where they
+								    practise is managed on the directory profile, alongside each
+								    state's bar check — offering all fifty here would let settings
+								    name a state no admission backs, and that value is the one the
+								    directory would show. */}
 								<Select
 									value={jurisdiction || null}
 									onValueChange={(value) => {
@@ -420,7 +433,7 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 										clearFieldError("jurisdiction");
 										setSuccessMessage(null);
 									}}
-									disabled={pending}
+									disabled={pending || admittedStates.length === 0}
 								>
 									<SelectTrigger
 										id={stateId}
@@ -430,11 +443,17 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 										}
 										className="mt-2 h-11 text-[14px]"
 									>
-										<SelectValue placeholder="Select a state" />
+										<SelectValue
+											placeholder={
+												admittedStates.length === 0
+													? "No states added yet"
+													: "Select a state"
+											}
+										/>
 									</SelectTrigger>
 									<SelectContent>
 										<SelectGroup>
-											{US_STATES.map((state) => (
+											{admittedStates.map((state) => (
 												<SelectItem key={state} value={state}>
 													{state}
 												</SelectItem>
@@ -448,9 +467,15 @@ export function ProfileSettings({ profile }: { profile: SettingsProfile }) {
 									</InlineError>
 								) : (
 									<p className="mt-1.5 text-[12px] text-ink-soft leading-relaxed">
-										{jurisdiction
-											? "Use the state where you seek or provide legal representation."
-											: "You can leave this blank and save other changes."}
+										The state your directory listing leads with.{" "}
+										<Link
+											href={"/profile" as Route}
+											className="font-semibold text-brass-deep underline-offset-2 hover:underline"
+										>
+											Add or remove states
+										</Link>{" "}
+										on your directory profile — that list is what decides which
+										cases reach you.
 									</p>
 								)}
 							</div>

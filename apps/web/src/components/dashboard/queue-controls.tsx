@@ -9,7 +9,7 @@ import {
 	ComboboxList,
 } from "@just-us/ui/components/combobox";
 import { cn } from "@just-us/ui/lib/utils";
-import { MapPin, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useId } from "react";
@@ -19,11 +19,15 @@ import { useId } from "react";
  * same approach as the attorney directory's controls, so a filtered queue is
  * shareable and the server does the filtering.
  *
- * Nothing is filtered unless the attorney asks for it. The queue could plausibly
- * default to their own jurisdiction, but a filter applied on their behalf hides
- * cases they were never told about, and an attorney licensed in more than one
- * state would silently lose half the queue. The "Licensed in" shortcut makes it
- * one click instead, and it is visible in the URL when it's on.
+ * The state dropdown only narrows: the queue is already scoped server-side to the
+ * states this attorney is admitted in (see `queueWhere`), and `states` is drawn
+ * from that same scope, so there is nothing here that can widen it.
+ *
+ * There used to be a "Licensed in" one-click shortcut, for a queue that showed
+ * every state's cases to everyone and could not default to the attorney's own
+ * without an attorney licensed in several silently losing half of it. Admissions
+ * settled both halves of that: the queue is scoped to their licences by
+ * construction, and it can hold as many as they hold.
  */
 
 const CONTROL_CLASS =
@@ -37,14 +41,11 @@ const SORTS = [
 export function QueueControls({
 	categories,
 	states,
-	jurisdiction,
 }: {
-	/** Only categories and states that actually have a queued case. */
+	/** Only categories and states that actually have a queued case *and* that this
+	 *  attorney is admitted in. */
 	categories: string[];
 	states: string[];
-	/** The attorney's own licensing jurisdiction, for the one-click shortcut.
-	 *  Null when their account has none on record. */
-	jurisdiction: string | null;
 }) {
 	const router = useRouter();
 	const pathname = usePathname();
@@ -66,10 +67,6 @@ export function QueueControls({
 	}
 
 	const hasFilters = !!(category || state);
-	// Only offered when there is actually something to find there — a shortcut
-	// that returns an empty queue reads as a bug.
-	const showJurisdiction = !!jurisdiction && states.includes(jurisdiction);
-	const jurisdictionActive = !!jurisdiction && state === jurisdiction;
 
 	return (
 		<div className="flex flex-col gap-5">
@@ -120,25 +117,6 @@ export function QueueControls({
 						</button>
 					);
 				})}
-
-				{showJurisdiction && (
-					<button
-						type="button"
-						aria-pressed={jurisdictionActive}
-						onClick={() =>
-							apply({ state: jurisdictionActive ? null : jurisdiction })
-						}
-						className={cn(
-							"inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 py-1.5 font-semibold text-[13px] transition-colors",
-							jurisdictionActive
-								? "border-brass-deep bg-brass-wash text-brass-deep"
-								: "border-border bg-surface text-ink-soft hover:border-brass-deep hover:text-ink",
-						)}
-					>
-						<MapPin className="size-3.5" aria-hidden="true" />
-						Licensed in {jurisdiction}
-					</button>
-				)}
 
 				{hasFilters && (
 					<button

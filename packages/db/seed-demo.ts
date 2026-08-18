@@ -229,6 +229,23 @@ async function createUsers() {
 				onboarded: true,
 				role: u.role,
 				jurisdiction: u.jurisdiction ?? null,
+				// The admission is what decides which cases reach an attorney — the
+				// column above is only the primary label — so a demo attorney seeded
+				// without one would sign in to an empty queue. Verified here because
+				// these accounts are meant to be walked through, and an unverified
+				// admission can browse but not act.
+				...(u.role === "attorney" && u.jurisdiction
+					? {
+							admissions: {
+								create: {
+									state: u.jurisdiction,
+									barNumber: u.barNumber ?? null,
+									verificationStatus: "verified" as const,
+									verifiedAt: daysAgo(u.createdDaysAgo),
+								},
+							},
+						}
+					: {}),
 				firmName: u.firmName ?? null,
 				barNumber: u.barNumber ?? null,
 				donationsAnonymous: u.donationsAnonymous ?? false,

@@ -3,6 +3,12 @@ import type {
 	FeeApproach,
 	VerificationStatus,
 } from "../prisma/generated/enums";
+import {
+	clearAdmissionStandings,
+	currentBadge,
+	ensureAdmission,
+	recordAdmissionCheck,
+} from "./admissions";
 import { writeAudit } from "./audit";
 import prisma from "./index";
 
@@ -133,12 +139,21 @@ export type VerificationRecord = {
 };
 
 /**
- * Record a check and move the profile's badge to match, in one transaction.
+ * Record a check and move both badges it decides to match, in one transaction.
  *
- * The two writes are inseparable: `AttorneyProfile.verificationStatus` is a cache
- * of the newest check, and a badge that disagreed with its own evidence would be
- * worse than no badge. `verifiedAt` is only ever advanced, never cleared, so a
- * later downgrade still leaves a record of when the profile was last trusted.
+ * A check runs against one state, so it settles two things. The admission for
+ * `checkedJurisdiction` takes the status directly — that is the record every
+ * matching gate reads, and it is what says whether this attorney may act on a
+ * case in that state. The profile badge is then re-derived from *all* the
+ * attorney's admissions rather than set to this result: an attorney verified in
+ * New York and refused in New Jersey is still a verified attorney, and a badge
+ * that downgraded on the second check would say otherwise. See
+ * `badgeFromAdmissions`.
+ *
+ * All of it in one transaction, because a badge that disagreed with its own
+ * evidence would be worse than no badge. `verifiedAt` is only ever advanced,
+ * never cleared, so a later downgrade still leaves a record of when this attorney
+ * was last trusted.
  */
 export async function recordVerification(
 	profileId: string,
@@ -148,11 +163,26 @@ export async function recordVerification(
 		const created = await tx.attorneyVerification.create({
 			data: { profileId, ...record },
 		});
+		const profile = await tx.attorneyProfile.findUnique({
+			where: { id: profileId },
+			select: { userId: true },
+		});
+		if (profile && record.checkedJurisdiction) {
+			await recordAdmissionCheck(
+				tx,
+				profile.userId,
+				record.checkedJurisdiction,
+				record.status,
+			);
+		}
+		const badge = profile
+			? await currentBadge(tx, profile.userId)
+			: record.status;
 		await tx.attorneyProfile.update({
 			where: { id: profileId },
 			data: {
-				verificationStatus: record.status,
-				...(record.status === "verified" ? { verifiedAt: new Date() } : {}),
+				verificationStatus: badge,
+				...(badge === "verified" ? { verifiedAt: new Date() } : {}),
 			},
 		});
 		return created;
@@ -196,6 +226,20 @@ export async function adminSetVerification(
 	const verified = status === "verified";
 
 	await prisma.$transaction(async (tx) => {
+		// An administrator vouching for an attorney is vouching for one bar record,
+		// so a grant reaches the primary state alone — the state the evidence row
+		// below names. Withdrawing trust is a judgement about the person, so it
+		// clears every state: leaving the others verified would keep a side door
+		// open onto cases in them.
+		if (verified) {
+			if (user.jurisdiction) {
+				await ensureAdmission(tx, userId, user.jurisdiction);
+				await recordAdmissionCheck(tx, userId, user.jurisdiction, "verified");
+			}
+		} else {
+			await clearAdmissionStandings(tx, userId);
+		}
+
 		const profile = await tx.attorneyProfile.upsert({
 			where: { userId },
 			// No bio to review on a bare row, so `approved` matches the "no bio =
@@ -246,38 +290,21 @@ export async function adminSetVerification(
 }
 
 /**
- * Change the attorney's licensing jurisdiction (held on `User` from sign-up).
+ * The newest check that ran against one state.
  *
- * Any existing badge is dropped in the same transaction. A `verified` status
- * earned against a Georgia bar record says nothing about a California claim, so
- * carrying it across a jurisdiction change would leave the badge asserting
- * something no check ever established. `verifiedAt` is left alone — it records
- * when the profile was last trusted, which remains true of the old jurisdiction.
- *
- * Past `verifications` rows are kept: they name the jurisdiction they ran
- * against, so they stay meaningful as history.
+ * The cooldown is held per state — an attorney adding New Jersey should not be
+ * told to wait because New York was checked ten minutes ago — and this is what
+ * that reads. Matched on `checkedJurisdiction`, which every check records for
+ * exactly this reason.
  */
-export async function updateAttorneyJurisdiction(
-	userId: string,
-	jurisdiction: string,
+export async function lastVerificationForState(
+	profileId: string,
+	state: string,
 ) {
-	return prisma.$transaction(async (tx) => {
-		const before = await tx.user.findUnique({
-			where: { id: userId },
-			select: { jurisdiction: true },
-		});
-		if (before?.jurisdiction === jurisdiction) {
-			return { changed: false, badgeCleared: false };
-		}
-
-		await tx.user.update({ where: { id: userId }, data: { jurisdiction } });
-
-		// updateMany so a profile that doesn't exist yet is a no-op, not a throw.
-		const cleared = await tx.attorneyProfile.updateMany({
-			where: { userId, verificationStatus: { not: "unverified" } },
-			data: { verificationStatus: "unverified" },
-		});
-		return { changed: true, badgeCleared: cleared.count > 0 };
+	return prisma.attorneyVerification.findFirst({
+		where: { profileId, checkedJurisdiction: state },
+		orderBy: { createdAt: "desc" },
+		select: { status: true, createdAt: true },
 	});
 }
 

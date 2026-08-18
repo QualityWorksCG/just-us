@@ -2,16 +2,17 @@
  * The US states the platform recognises (JUS-12).
  *
  * One allowlist, two callers with different notions of what a jurisdiction is:
- * an attorney's licensing state, held on `User.jurisdiction` (see
- * `JURISDICTION_ROLES` in `rbac`), and the state a *case* falls under, held on
- * `Case.location` and chosen per case. Both match the stored string exactly —
- * attorney availability, the seeking queue and the browse filters all compare
- * one against the other — so the two must keep drawing from this same list.
+ * the states an attorney is admitted in, held as `AttorneyAdmission` rows (with
+ * the primary mirrored on `User.jurisdiction`), and the state a *case* falls
+ * under, held on `Case.location` and chosen per case. Both match the stored
+ * string exactly — the seeking queue, the browse filters, and every gate that
+ * decides whether an attorney may take a case compare one against the other — so
+ * the two must keep drawing from this same list.
  *
  * Framework-agnostic and safe to import from client components.
  */
 
-export const JURISDICTION_MESSAGE = "Select your state";
+export const JURISDICTION_MESSAGE = "Select at least one state";
 
 export const US_STATES = [
 	"Alabama",

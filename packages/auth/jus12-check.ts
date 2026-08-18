@@ -54,7 +54,7 @@ for (const role of ROLES) {
 
 	await completeUserOnboarding(user.id, {
 		role,
-		jurisdiction: "Georgia",
+		jurisdictions: ["Georgia"],
 		firmName: role === "attorney" ? "Bell & Associates" : undefined,
 		barNumber: role === "attorney" ? "GA #338114" : undefined,
 	});
@@ -72,6 +72,26 @@ for (const role of ROLES) {
 		saved.jurisdiction === expected,
 		`expected ${JSON.stringify(expected)}, got ${JSON.stringify(saved.jurisdiction)}`,
 	);
+	// The primary label is only half of it: admissions are what every matching gate
+	// reads, so a role that carries no jurisdiction must carry no admission either.
+	const admissions = await prisma.attorneyAdmission.findMany({
+		where: { userId: user.id },
+		select: { state: true, verificationStatus: true },
+	});
+	check(
+		`${role}: admissions ${expected === null ? "dropped" : "written"}`,
+		expected === null
+			? admissions.length === 0
+			: admissions.length === 1 && admissions[0]?.state === "Georgia",
+		`got ${JSON.stringify(admissions.map((a) => a.state))}`,
+	);
+	if (expected !== null) {
+		check(
+			`${role}: admission starts unverified`,
+			admissions[0]?.verificationStatus === "unverified",
+			`got ${admissions[0]?.verificationStatus}`,
+		);
+	}
 	check(`${role}: role persisted`, saved.role === role, `got ${saved.role}`);
 	check(`${role}: onboarded set`, saved.onboarded, "still false");
 	// Firm stays attorney-only — widening jurisdiction must not widen these.
@@ -95,7 +115,7 @@ const sneaky = await prisma.user.create({
 });
 await completeUserOnboarding(sneaky.id, {
 	role: "administrator",
-	jurisdiction: "Georgia",
+	jurisdictions: ["Georgia"],
 });
 const escalated = await prisma.user.findUniqueOrThrow({
 	where: { id: sneaky.id },
@@ -169,6 +189,76 @@ check(
 	"every case state is on the allowlist",
 	cases.every((c) => isValidJurisdiction(c.location)),
 	`got ${JSON.stringify(cases.map((c) => c.location))}`,
+);
+
+// The attorney half of the same problem: a licence is per state, and one attorney
+// can hold several. This is what the single `User.jurisdiction` could not express
+// — and while it could not, nothing on the platform could enforce it either.
+console.log("\n--- an attorney can be admitted in several states ---");
+
+const multiAttorney = await prisma.user.create({
+	data: {
+		id: `${TAG}-multi-attorney`,
+		name: "Check multi-admitted",
+		email: `${TAG}+multi-attorney@example.com`,
+		emailVerified: true,
+	},
+});
+await completeUserOnboarding(multiAttorney.id, {
+	role: "attorney",
+	jurisdictions: ["Georgia", "Texas"],
+	firmName: "Bell & Associates",
+	barNumber: "GA #338114",
+});
+const multiRow = await prisma.user.findUniqueOrThrow({
+	where: { id: multiAttorney.id },
+	select: { jurisdiction: true },
+});
+const multiAdmissions = await prisma.attorneyAdmission.findMany({
+	where: { userId: multiAttorney.id },
+	select: { state: true, verificationStatus: true },
+	orderBy: { state: "asc" },
+});
+check(
+	"both states are recorded as admissions",
+	multiAdmissions.map((a) => a.state).join(",") === "Georgia,Texas",
+	`got ${JSON.stringify(multiAdmissions.map((a) => a.state))}`,
+);
+check(
+	"the first state picked becomes the primary",
+	multiRow.jurisdiction === "Georgia",
+	`got ${JSON.stringify(multiRow.jurisdiction)}`,
+);
+check(
+	"neither admission is verified by declaring it",
+	multiAdmissions.every((a) => a.verificationStatus === "unverified"),
+	`got ${JSON.stringify(multiAdmissions.map((a) => a.verificationStatus))}`,
+);
+
+// Re-running onboarding with one state dropped must take the admission with it,
+// or a state given up would keep letting its cases through.
+await completeUserOnboarding(multiAttorney.id, {
+	role: "attorney",
+	jurisdictions: ["Texas"],
+	firmName: "Bell & Associates",
+});
+const afterDrop = await prisma.attorneyAdmission.findMany({
+	where: { userId: multiAttorney.id },
+	select: { state: true },
+});
+const afterDropRow = await prisma.user.findUniqueOrThrow({
+	where: { id: multiAttorney.id },
+	select: { jurisdiction: true },
+});
+check(
+	"a dropped state loses its admission",
+	afterDrop.length === 1 && afterDrop[0]?.state === "Texas",
+	`got ${JSON.stringify(afterDrop.map((a) => a.state))}`,
+);
+check(
+	"the primary follows the surviving admission",
+	afterDropRow.jurisdiction === "Texas",
+	`got ${JSON.stringify(afterDropRow.jurisdiction)}`,
 );
 
 await prisma.case.deleteMany({ where: { id: { startsWith: `${TAG}-case-` } } });

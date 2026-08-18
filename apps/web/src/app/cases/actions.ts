@@ -3,6 +3,7 @@
 import { generateInviteToken } from "@just-us/auth/invite-token";
 import { sendCaseInviteEmail } from "@just-us/auth/lib/email";
 import prisma from "@just-us/db";
+import { admittedStatesForEmail } from "@just-us/db/admissions";
 import {
 	CASE_INVITATION_TTL_DAYS,
 	countRecentCaseInvitationsBy,
@@ -312,6 +313,11 @@ const ACCEPT_INTEREST_ERRORS = {
 	// hasn't done anything wrong, and the attorney may well be verified later.
 	not_verified:
 		"This attorney's bar standing isn't verified, so they can't take your case yet.",
+	// Said plainly, and without blaming the plaintiff: an attorney's admissions can
+	// change after they put themselves forward, and the plaintiff had no way to see
+	// it. Their case stays in the queue for someone who can take it.
+	not_admitted:
+		"This attorney isn't admitted in your case's state, so they can't take it on. Your case stays open to other attorneys.",
 	already_matched: "You've already chosen an attorney for this case.",
 } as const;
 
@@ -545,6 +551,12 @@ export type CommitCaseWithInviteResult =
 			fieldErrors?: Record<string, string>;
 	  };
 
+/** "New York", "New York and Texas", "New York, Texas and Utah". */
+function formatStates(states: string[]): string {
+	if (states.length <= 1) return states[0] ?? "";
+	return `${states.slice(0, -1).join(", ")} and ${states.at(-1)}`;
+}
+
 /**
  * Whether an account already holds the invited address (case-insensitive).
  *
@@ -644,6 +656,37 @@ export async function commitCaseWithInviteAction(
 			const committed = await commitCaseAction(parsed.data);
 			return committed.ok ? { ...committed, kind: "matched" } : committed;
 		}
+	}
+
+	// Jurisdiction, before anything is written and before an email goes out.
+	//
+	// Confirming re-checks this against the attorney's own admissions, which is the
+	// authority — but leaving it to confirm alone would cost the plaintiff a week:
+	// a pending invitation holds their case out of the attorney queue for seven
+	// days, and an invitation that can never be confirmed holds it for nothing.
+	//
+	// Two things are checked, in order of how much they are worth. What the
+	// plaintiff typed into the wizard is only a claim about somebody else, so it is
+	// caught as a mistake in the form. If the address already belongs to an attorney
+	// account, their admissions are the real answer and are checked instead.
+	const claimed = attorney.location?.trim();
+	if (claimed && claimed !== rest.location) {
+		return {
+			ok: false,
+			caseId: id,
+			error: `${attorney.name} is listed as practising in ${claimed}, but this case is in ${rest.location}. An attorney can only take a case in a state they're admitted in.`,
+		};
+	}
+
+	const inviteeStates = await admittedStatesForEmail(attorney.email);
+	if (inviteeStates && !inviteeStates.includes(rest.location)) {
+		return {
+			ok: false,
+			caseId: id,
+			error: inviteeStates.length
+				? `That attorney is admitted in ${formatStates(inviteeStates)}, not ${rest.location}, so they couldn't confirm this case. Check the address, or choose an attorney admitted in ${rest.location}.`
+				: `That attorney hasn't recorded any states they're admitted in yet, so they couldn't confirm a case in ${rest.location}. Ask them to add ${rest.location} to their JustUs profile first.`,
+		};
 	}
 
 	// Counted before anything is written, so a refusal costs nothing.

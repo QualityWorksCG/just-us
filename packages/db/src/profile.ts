@@ -67,6 +67,26 @@ export async function updateOwnProfile(input: ProfileUpdate) {
 			);
 		}
 
+		// The primary state has to be one the attorney actually holds an admission
+		// in. This used to be a free text column that settings could set to any state
+		// on the list, which is now a way to make `User.jurisdiction` disagree with the
+		// admissions every matching gate reads — and the disagreeing value is the one
+		// the directory would show. Where they practise is managed on the directory
+		// profile; this only chooses which of those states leads.
+		if (input.jurisdiction) {
+			const admission = await tx.attorneyAdmission.findUnique({
+				where: {
+					userId_state: { userId: input.userId, state: input.jurisdiction },
+				},
+				select: { id: true },
+			});
+			if (!admission) {
+				throw new ProfileAccessError(
+					`Add ${input.jurisdiction} to the states you practise in first — you can do that on your directory profile.`,
+				);
+			}
+		}
+
 		const profile = await tx.user.update({
 			where: { id: input.userId },
 			data: {

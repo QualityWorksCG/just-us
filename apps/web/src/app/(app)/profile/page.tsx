@@ -1,3 +1,4 @@
+import { listAdmissions } from "@just-us/db/admissions";
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import type { Route } from "next";
 import {
@@ -44,7 +45,12 @@ export default async function AttorneyProfilePage({
 	const back = safeNextPath(next);
 
 	const screen = findScreen("attorney", "profile");
-	const saved = await getAttorneyProfile(user.id);
+	// Read alongside the profile: the states an attorney claims are the authority on
+	// which cases can reach them, and the badge below is only a summary of them.
+	const [saved, admissions] = await Promise.all([
+		getAttorneyProfile(user.id),
+		listAdmissions(user.id),
+	]);
 
 	const profile: AttorneyProfileData | null = saved
 		? {
@@ -120,6 +126,7 @@ export default async function AttorneyProfilePage({
 						jurisdiction: user.jurisdiction ?? null,
 					}}
 					verification={verification}
+					admissions={admissions}
 				/>
 			</div>
 		</div>
