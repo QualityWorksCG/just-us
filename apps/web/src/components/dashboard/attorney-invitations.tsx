@@ -1,9 +1,9 @@
+import type { Admission } from "@just-us/db/admissions";
 import type { PendingInvitationForAttorney } from "@just-us/db/case-invitations";
 import { Handshake, MapPin, Tag, Wallet } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 
-import type { VerificationStatus } from "@/lib/attorney-verification";
 import { caseInviteHref } from "@/lib/case-invite-ref";
 import { withNext } from "@/lib/next-path";
 
@@ -23,19 +23,23 @@ import { money } from "./attorney-cases";
  * invitation is what holds it out), and the plaintiff's week ran down.
  *
  * So the invitation is stated here, with the reason they can't answer it yet
- * spelled out rather than left to be discovered on the invitation screen. An
- * unverified attorney is sent to the directory profile that owns the bar check,
- * carrying a way back; a verified one goes straight to the decision.
+ * spelled out rather than left to be discovered on the invitation screen. And the
+ * reason is read per state, because that is how representation is gated: being
+ * named by a plaintiff in California means nothing without a verified California
+ * licence, and an attorney verified in New York would otherwise be told they are
+ * "verified" and then refused at the last step.
  *
  * Nothing here is a permission check — `confirmCaseInvitation` re-applies every
  * one of these conditions in its own transaction. This only decides what to say.
  */
 export function AttorneyInvitations({
 	invitations,
-	verification,
+	admissions,
 }: {
 	invitations: PendingInvitationForAttorney[];
-	verification: VerificationStatus;
+	/** Every state this attorney is admitted in, with its bar standing. Each
+	 *  invitation is judged against the entry for its own case's state. */
+	admissions: Admission[];
 }) {
 	if (invitations.length === 0) return null;
 
@@ -56,7 +60,10 @@ export function AttorneyInvitations({
 					<InvitationCard
 						key={invitation.id}
 						invitation={invitation}
-						verification={verification}
+						admission={
+							admissions.find((row) => row.state === invitation.location) ??
+							null
+						}
 					/>
 				))}
 			</div>
@@ -74,17 +81,20 @@ function daysLeft(expiresAt: Date) {
 
 function InvitationCard({
 	invitation,
-	verification,
+	admission,
 }: {
 	invitation: PendingInvitationForAttorney;
-	verification: VerificationStatus;
+	/** This attorney's standing in the case's own state. Null when they have never
+	 *  claimed it, which is a different problem with a different first step. */
+	admission: Admission | null;
 }) {
 	const href = caseInviteHref({ invitationId: invitation.id });
-	const verified = verification === "verified";
-	// A check already under way needs no second run; an unverified or rejected one
-	// is the attorney's move, and the profile is where that move is made.
+	const verified = admission?.verificationStatus === "verified";
+	// A check already under way needs no second run; an unclaimed, unverified or
+	// rejected state is the attorney's move, and the profile is where it is made.
 	const awaitingCheck =
-		verification === "pending" || verification === "needs_review";
+		admission?.verificationStatus === "pending" ||
+		admission?.verificationStatus === "needs_review";
 	const left = daysLeft(invitation.expiresAt);
 
 	return (
@@ -114,9 +124,11 @@ function InvitationCard({
 					    blocker is what they need to know from their dashboard. */}
 					{!verified && (
 						<p className="mt-2.5 text-[13px] text-ink-soft leading-relaxed">
-							{awaitingCheck
-								? "Your bar standing is still being checked. As soon as it clears you'll be able to confirm — nothing else is needed from you."
-								: "Every attorney is checked against their state bar before taking on a case, including one they were invited to. Complete yours to unlock this."}
+							{!admission
+								? `This case is in ${invitation.location}, and you haven't added that state to your profile. A case can only be taken by an attorney admitted where it is.`
+								: awaitingCheck
+									? `Your ${invitation.location} bar standing is still being checked. As soon as it clears you'll be able to confirm — nothing else is needed from you.`
+									: `Every attorney is checked against the state bar where the case is, including one they were invited to. Verify your ${invitation.location} licence to unlock this.`}
 						</p>
 					)}
 
@@ -131,7 +143,9 @@ function InvitationCard({
 									href={withNext("/profile", href) as Route}
 									className={primaryClass}
 								>
-									Complete verification
+									{admission
+										? `Verify ${invitation.location}`
+										: `Add ${invitation.location}`}
 								</Link>
 								<Link href={href as Route} className={secondaryClass}>
 									Review the invitation

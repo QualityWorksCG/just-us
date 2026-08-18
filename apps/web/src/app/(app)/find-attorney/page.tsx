@@ -35,7 +35,15 @@ export default async function DashboardAttorneysPage({
 	const screen = findScreen("plaintiff", "attorneys");
 	const params = await searchParams;
 	const filters = readDirectoryParams(params);
-	const defaultState = (session.user as { jurisdiction?: string }).jurisdiction;
+	// Where to look first, until the plaintiff chooses otherwise.
+	//
+	// Their own `User.jurisdiction` used to fill this, which was wrong twice over:
+	// the column is documented as not-a-plaintiff-field and may hold a stale value
+	// from before jurisdiction became per case, and a plaintiff's own state is not
+	// necessarily their case's. The case they arrived from is the honest default —
+	// an attorney can only take a case in the state it falls under, so a directory
+	// scoped to anything else lists attorneys they cannot engage. Resolved below,
+	// once the draft has been read.
 
 	// Arrived from the case wizard's "Search and reach out yourself". Their draft
 	// was saved on the way out, so the only thing missing is the road back — and
@@ -46,6 +54,7 @@ export default async function DashboardAttorneysPage({
 	// stranger's id simply yields no banner.
 	const draftId = Array.isArray(params.draft) ? params.draft[0] : params.draft;
 	const draft = draftId ? await getOwnedCase(draftId, session.user.id) : null;
+	const defaultState = draft?.location || undefined;
 
 	const [attorneys, practiceAreas, states] = await Promise.all([
 		listDirectoryAttorneys({

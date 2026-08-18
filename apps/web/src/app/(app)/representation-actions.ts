@@ -62,6 +62,11 @@ export async function expressInterestAction(
 const FAILURE_MESSAGES = {
 	not_verified:
 		"Your bar standing has to be verified before you can express interest.",
+	// The queue already withholds other states' cases, so this is only reached from
+	// a stale tab or a hand-made request — but it says what to do about it anyway,
+	// because the honest fix is a real one.
+	not_admitted:
+		"You can only take cases in a state you're admitted in. Add the state on your directory profile and verify your bar standing there.",
 	unavailable: "That case is no longer seeking representation.",
 	already_expressed: "You've already expressed interest in this case.",
 } as const;

@@ -70,6 +70,7 @@ import {
 	PHONE_MESSAGE,
 	reformatPhone,
 } from "@/lib/validation";
+import { type AdmissionView, AttorneyAdmissions } from "./attorney-admissions";
 
 /**
  * The saved profile, or null when the attorney hasn't started one.
@@ -463,10 +464,15 @@ export function AttorneyProfileForm({
 	profile,
 	account,
 	verification,
+	admissions,
 }: {
 	profile: AttorneyProfileData | null;
 	account: AttorneyAccount;
 	verification: VerificationView;
+	/** The states this attorney claims, each with its own bar standing. Rendered
+	 *  above the badge because it is the more consequential of the two: it decides
+	 *  which cases reach them and which they may take. */
+	admissions: AdmissionView[];
 }) {
 	const ids = {
 		legalName: useId(),
@@ -1495,9 +1501,15 @@ export function AttorneyProfileForm({
 				<Section
 					icon={ShieldCheck}
 					title="Bar verification"
-					sub="We check your licence against public bar records. Verified listings carry a badge plaintiffs can see."
+					sub="We check your licence against public bar records, one state at a time. Verified listings carry a badge plaintiffs can see."
 				>
-					<AttorneyVerification data={verification} />
+					<div className="flex flex-col gap-5">
+						<AttorneyAdmissions
+							admissions={admissions}
+							canRunChecks={!!profile?.legalName?.trim()}
+						/>
+						<AttorneyVerification data={verification} />
+					</div>
 				</Section>
 			)}
 

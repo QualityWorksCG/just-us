@@ -1,7 +1,7 @@
 import type { Role } from "@just-us/auth";
 import { hashInviteToken } from "@just-us/auth/invite-token";
 import { isBlocked } from "@just-us/auth/user-status";
-import { getAttorneyProfile } from "@just-us/db/attorney-profile";
+import { getAdmission } from "@just-us/db/admissions";
 import {
 	caseInvitationStatus,
 	findCaseInvitation,
@@ -14,6 +14,7 @@ import {
 	Handshake,
 	LogIn,
 	MailCheck,
+	MapPin,
 	Scale,
 	TriangleAlert,
 	UserRoundCog,
@@ -434,19 +435,58 @@ export default async function CaseInvitePage({
 		);
 	}
 
-	const profile = await getAttorneyProfile(user.id);
-	const verification = profile?.verificationStatus ?? "unverified";
+	// Bar standing in *this case's* state, not the account's overall badge. An
+	// attorney verified in New York is still not able to act on a California
+	// matter, and telling them they are verified and then refusing the confirm
+	// would be the worst of both.
+	const admission = await getAdmission(user.id, c.location);
+
+	// Never claimed the state at all: a different problem from an unverified claim,
+	// and a different first step. Said before the bar check is mentioned, because
+	// "verify your licence" is meaningless advice for a state they hold none in.
+	if (!admission) {
+		return (
+			<CaseInviteShell
+				icon={MapPin}
+				width="wide"
+				title={`You aren't admitted in ${c.location}`}
+				description={`${c.owner.name}'s case falls under ${c.location} law, and your JustUs profile doesn't list ${c.location} among the states you practise in. A case can only be taken on by an attorney admitted where it is.`}
+			>
+				<div className="flex flex-col gap-4">
+					{summary}
+					<Link
+						href={withNext("/profile", returnHere) as Route}
+						className={primaryLinkClass}
+					>
+						Add {c.location} to my states
+					</Link>
+					<p className="text-[12px] text-muted-foreground leading-relaxed">
+						If you are admitted there, add the state and run its bar check —
+						we'll bring you back here. If you aren't, decline so {c.owner.name}
+						's case goes in front of attorneys who are, rather than waiting out
+						the week.
+					</p>
+					<DeclineInviteButton
+						invite={ref}
+						label="I don't represent this case"
+					/>
+				</div>
+			</CaseInviteShell>
+		);
+	}
+
+	const verification = admission.verificationStatus;
 
 	if (verification !== "verified") {
 		return (
 			<CaseInviteShell
 				icon={BadgeCheck}
 				width="wide"
-				title="Verify your bar standing to continue"
+				title={`Verify your ${c.location} bar standing to continue`}
 				description={
 					verification === "pending" || verification === "needs_review"
-						? "Your bar check is still being reviewed. Once it clears, come back to this link and you'll be able to confirm."
-						: "Every attorney on JustUs is checked against their state bar before they can take on a case — including one they were invited to."
+						? `Your ${c.location} bar check is still being reviewed. Once it clears, come back to this link and you'll be able to confirm.`
+						: `Every attorney on JustUs is checked against the bar of the state a case falls under — including one they were invited to. This case is in ${c.location}.`
 				}
 			>
 				<div className="flex flex-col gap-4">
@@ -457,7 +497,7 @@ export default async function CaseInvitePage({
 					>
 						{verification === "pending" || verification === "needs_review"
 							? "Check my verification"
-							: "Verify my bar standing"}
+							: `Verify my ${c.location} licence`}
 					</Link>
 					<p className="text-[12px] text-muted-foreground leading-relaxed">
 						This invitation is held open for you in the meantime — the case

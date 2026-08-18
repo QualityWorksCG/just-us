@@ -1,3 +1,4 @@
+import { admittedStates } from "@just-us/db/admissions";
 import { getNotificationPreference } from "@just-us/db/notifications";
 import { attorneyPayoutReadiness } from "@just-us/db/payouts";
 import { getOwnProfile } from "@just-us/db/profile";
@@ -12,9 +13,12 @@ import { requireOnboarded } from "@/lib/auth-server";
 
 export default async function SettingsPage() {
 	const session = await requireOnboarded();
-	const [profile, notificationPref] = await Promise.all([
+	const [profile, notificationPref, admitted] = await Promise.all([
 		getOwnProfile(session.user.id),
 		getNotificationPreference(session.user.id),
+		// The primary state can only be one they hold an admission in, so the control
+		// offers exactly those. Empty for every other role, which never sees it.
+		admittedStates(session.user.id),
 	]);
 
 	if (!profile) redirect("/login");
@@ -46,6 +50,7 @@ export default async function SettingsPage() {
 					jurisdiction: profile.jurisdiction,
 					createdAt: profile.createdAt.toISOString(),
 				}}
+				admittedStates={admitted}
 			/>
 			<NotificationSettings emailEnabled={notificationPref.emailEnabled} />
 			<DonationPrivacySettings anonymous={profile.donationsAnonymous} />

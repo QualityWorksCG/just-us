@@ -219,10 +219,6 @@ export function CaseWizard({
 		if (initial.status === "pending_payout") return 6;
 		return 5;
 	})();
-	const attorneyState = knownState(initial?.attorney?.location)
-		? (initial?.attorney?.location ?? seedState)
-		: seedState;
-
 	const [view, setView] = useState<View>("wizard");
 	const [step, setStep] = useState(seedStep);
 
@@ -284,7 +280,6 @@ export function CaseWizard({
 	// tried to move on — a required-field error on an untouched form is noise.
 	const [atEmailTouched, setAtEmailTouched] = useState(false);
 	const [atPhone, setAtPhone] = useState(initial?.attorney?.phone ?? "");
-	const [atState, setAtState] = useState(attorneyState);
 
 	// Step 4 — the agreed fee
 	const [fee, setFee] = useState(
@@ -404,7 +399,10 @@ export function CaseWizard({
 			name: atName.trim(),
 			firm: atFirm.trim() || "Independent",
 			area: category,
-			location: atState || state,
+			// The case's own state, always: representation is gated on the attorney
+			// being admitted where the case is, and `commitCaseWithInviteAction`
+			// refuses anything else.
+			location: state,
 			email: atEmail.trim().toLowerCase(),
 			phone: atPhone.trim() || undefined,
 		});
@@ -2270,37 +2268,26 @@ export function CaseWizard({
 											</div>
 										</div>
 										<div className="grid gap-4 sm:grid-cols-2">
+											{/* Not a choice. Your attorney has to be admitted where the
+											    case is, so this states the case's own jurisdiction rather
+											    than asking — a mismatch here used to be collectable and
+											    then refused at the point the attorney tried to confirm,
+											    a week later. */}
 											<div className="flex flex-col gap-1.5">
-												<label
-													htmlFor={ids.manualState}
+												<span
+													id={ids.manualState}
 													className="font-semibold text-[13px] text-ink"
 												>
 													Jurisdiction
-												</label>
-												<Select
-													value={atState}
-													onValueChange={(v: string | null) =>
-														setAtState(v ?? "")
-													}
-												>
-													<SelectTrigger
-														id={ids.manualState}
-														className="h-11 bg-surface text-[14px]"
-													>
-														<SelectValue placeholder="Select a state" />
-													</SelectTrigger>
-													<SelectContent className="max-h-[300px]">
-														{US_STATES.map((s) => (
-															<SelectItem
-																key={s}
-																value={s}
-																className="text-[14px]"
-															>
-																{s}
-															</SelectItem>
-														))}
-													</SelectContent>
-												</Select>
+												</span>
+												<p className="flex h-11 items-center rounded-[var(--radius-control)] border border-line-strong bg-paper px-3 text-[14px] text-ink-soft">
+													{state || "Set your case's state first"}
+												</p>
+												<p className="text-[12.5px] text-muted-foreground">
+													{state
+														? `Your attorney must be admitted in ${state} to take this case.`
+														: "Taken from your case — go back and choose its state."}
+												</p>
 											</div>
 											<div className="flex flex-col gap-1.5">
 												<label

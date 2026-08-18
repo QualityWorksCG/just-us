@@ -1,10 +1,6 @@
 "use client";
 
-import {
-	JURISDICTION_MESSAGE,
-	type Jurisdiction,
-	US_STATES,
-} from "@just-us/auth/jurisdiction";
+import { JURISDICTION_MESSAGE } from "@just-us/auth/jurisdiction";
 import { requiresJurisdiction } from "@just-us/auth/rbac";
 import { Button } from "@just-us/ui/components/button";
 import { Input } from "@just-us/ui/components/input";
@@ -31,6 +27,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { completeOnboardingAction } from "@/app/onboarding/actions";
+import { AdmittedStatesField } from "@/components/attorneys/admitted-states-field";
 import { Brandmark } from "@/components/brandmark";
 import { authClient } from "@/lib/auth-client";
 import { BAR_NUMBER_MESSAGE, isValidBarNumber } from "@/lib/validation";
@@ -111,8 +108,11 @@ export function OnboardingFlow({
 	const [step, setStep] = useState<1 | 2>(1);
 	const [role, setRole] = useState<Role | null>(null);
 
-	// Licensing jurisdiction (US state) — attorneys only (JUS-12).
-	const [jurisdiction, setJurisdiction] = useState<Jurisdiction | "">("");
+	// The states they are admitted in — attorneys only (JUS-12). A list, because a
+	// licence is per state and an attorney can hold several; the first is the
+	// primary. These become `AttorneyAdmission` rows, unverified until a bar check
+	// clears each one, and they are what decide which cases reach this attorney.
+	const [jurisdictions, setJurisdictions] = useState<string[]>([]);
 
 	// Attorney — practice details.
 	const [firmName, setFirmName] = useState("");
@@ -145,8 +145,8 @@ export function OnboardingFlow({
 		setErrors({});
 
 		const next: Record<string, string> = {};
-		if (needsJurisdiction && !jurisdiction)
-			next.jurisdiction = JURISDICTION_MESSAGE;
+		if (needsJurisdiction && jurisdictions.length === 0)
+			next.jurisdictions = JURISDICTION_MESSAGE;
 		if (role === "attorney") {
 			if (!firmName.trim()) next.firmName = "Enter your firm";
 			if (!barNumber.trim()) next.barNumber = "Enter your bar number";
@@ -162,9 +162,9 @@ export function OnboardingFlow({
 		try {
 			const result = await completeOnboardingAction({
 				role,
-				// Dropped for roles that don't collect it, so switching lanes after
-				// picking a state can't smuggle a stale value through.
-				jurisdiction: needsJurisdiction ? jurisdiction : undefined,
+				// Dropped for roles that don't collect them, so switching lanes after
+				// picking states can't smuggle stale values through.
+				jurisdictions: needsJurisdiction ? jurisdictions : undefined,
 				firmName: firmName.trim() || undefined,
 				barNumber: barNumber.trim() || undefined,
 			});
@@ -349,36 +349,22 @@ export function OnboardingFlow({
 												htmlFor={ids.jurisdiction}
 												className="font-semibold text-[13px] text-ink"
 											>
-												Jurisdiction
+												Where are you admitted to practise?
 											</label>
-											<Select
-												value={jurisdiction}
-												onValueChange={(v: string | null) =>
-													setJurisdiction((v ?? "") as Jurisdiction | "")
-												}
-											>
-												<SelectTrigger
-													id={ids.jurisdiction}
-													className="h-11 bg-surface text-[14px]"
-													aria-invalid={!!errors.jurisdiction}
-												>
-													<SelectValue placeholder="Select your state…" />
-												</SelectTrigger>
-												<SelectContent className="max-h-[300px]">
-													{US_STATES.map((s) => (
-														<SelectItem
-															key={s}
-															value={s}
-															className="text-[14px]"
-														>
-															{s}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-											{errors.jurisdiction && (
+											<p className="text-[12.5px] text-muted-foreground leading-relaxed">
+												Add every state you hold a licence in — you'll only be
+												shown cases from these. We check each one against its
+												bar records before you can take a case there.
+											</p>
+											<AdmittedStatesField
+												addId={ids.jurisdiction}
+												value={jurisdictions}
+												onChange={setJurisdictions}
+												invalid={!!errors.jurisdictions}
+											/>
+											{errors.jurisdictions && (
 												<p className="text-[12px] text-danger">
-													{errors.jurisdiction}
+													{errors.jurisdictions}
 												</p>
 											)}
 										</div>

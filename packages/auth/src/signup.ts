@@ -39,10 +39,16 @@ export async function signUpBasic(input: SignUpInput, requestHeaders: Headers) {
 export type OnboardingInput = {
 	role: string;
 	/**
-	 * Required for the roles in `JURISDICTION_ROLES` (plaintiff, attorney) and
-	 * ignored for the rest — the caller validates it against the state allowlist.
+	 * Every state the attorney says they are admitted in — at least one for the
+	 * roles in `JURISDICTION_ROLES`, ignored for the rest. The caller validates each
+	 * against the state allowlist.
+	 *
+	 * A list rather than a single value because a licence is per state and an
+	 * attorney can hold several. The first becomes the primary
+	 * (`User.jurisdiction`), and all of them become `AttorneyAdmission` rows — which
+	 * is what every matching gate reads.
 	 */
-	jurisdiction?: string;
+	jurisdictions?: string[];
 	firmName?: string;
 	barNumber?: string;
 };
@@ -51,9 +57,18 @@ export type OnboardingInput = {
  * Persist a user's one-time onboarding choices. The role is validated against
  * the self-selectable allowlist here (server-side) so onboarding can never grant
  * administrator or an unknown role. Attorney profile fields (firm, bar number)
- * are only stored when the chosen role is attorney, and jurisdiction only for the
- * roles that need it, so a role switch can never leave a stale value behind.
+ * are only stored when the chosen role is attorney, and jurisdictions only for the
+ * roles that need them, so a role switch can never leave a stale value behind.
  * (JUS-12)
+ *
+ * The states are written twice on purpose, and to different ends: an
+ * `AttorneyAdmission` row each, which is what decides the cases they may take, and
+ * the first of them onto `User.jurisdiction`, which is the label the directory
+ * leads with. All in one transaction — an attorney who is onboarded but holds no
+ * admissions can see no queue at all, so the two must not be able to come apart.
+ *
+ * Every admission starts unverified. Onboarding is where an attorney tells us
+ * where they practise; the bar check is what establishes it.
  */
 export async function completeUserOnboarding(
 	userId: string,
@@ -65,18 +80,44 @@ export async function completeUserOnboarding(
 			? input.role
 			: DEFAULT_ROLE;
 	const isAttorney = role === "attorney";
+	// Deduplicated and order-preserving, so "the first one" is the first one they
+	// picked and a double-submitted state cannot break the unique index.
+	const states = requiresJurisdiction(role)
+		? [...new Set((input.jurisdictions ?? []).filter(Boolean))]
+		: [];
 
-	await prisma.user.update({
-		where: { id: userId },
-		data: {
-			role,
-			onboarded: true,
-			jurisdiction: requiresJurisdiction(role)
-				? (input.jurisdiction ?? null)
-				: null,
-			firmName: isAttorney ? (input.firmName ?? null) : null,
-			barNumber: isAttorney ? (input.barNumber ?? null) : null,
-		},
+	await prisma.$transaction(async (tx) => {
+		await tx.user.update({
+			where: { id: userId },
+			data: {
+				role,
+				onboarded: true,
+				jurisdiction: states[0] ?? null,
+				firmName: isAttorney ? (input.firmName ?? null) : null,
+				barNumber: isAttorney ? (input.barNumber ?? null) : null,
+			},
+		});
+
+		// A role switch must not leave admissions behind for a role that has none,
+		// and re-running onboarding must not duplicate rows.
+		await tx.attorneyAdmission.deleteMany({
+			where: { userId, state: { notIn: states } },
+		});
+		for (const state of states) {
+			const existing = await tx.attorneyAdmission.findUnique({
+				where: { userId_state: { userId, state } },
+				select: { id: true },
+			});
+			if (!existing) {
+				await tx.attorneyAdmission.create({
+					data: {
+						userId,
+						state,
+						barNumber: isAttorney ? (input.barNumber ?? null) : null,
+					},
+				});
+			}
+		}
 	});
 
 	return { role };

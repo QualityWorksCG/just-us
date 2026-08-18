@@ -1,4 +1,5 @@
 import type { Role } from "@just-us/auth";
+import { listAdmissions } from "@just-us/db/admissions";
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import { pendingInvitationsForEmail } from "@just-us/db/case-invitations";
 import { listUpdatesForBacker } from "@just-us/db/case-updates";
@@ -145,14 +146,15 @@ export default async function DashboardHome({
 			payout,
 			matched,
 			invitations,
+			admissions,
 		] = await Promise.all([
 			listSeekingQueue(session.user.id, {
 				category: filters.category,
 				state: filters.state,
 				sort: toQueueSort(filters.sort),
 			}),
-			queueCategories(),
-			queueStates(),
+			queueCategories(session.user.id),
+			queueStates(session.user.id),
 			interestCounts(session.user.id),
 			listMyInterests(session.user.id),
 			getAttorneyProfile(session.user.id),
@@ -170,6 +172,12 @@ export default async function DashboardHome({
 			// account — and read here at all because the emailed link was otherwise
 			// the only way back to the decision.
 			pendingInvitationsForEmail(session.user.email),
+			// The states this attorney is admitted in, each with its bar standing. The
+			// queue is already scoped to them server-side, so this is here to explain
+			// the screen rather than to filter it — an empty list is the one case where
+			// an empty queue is about the attorney rather than about the platform, and
+			// each invitation below needs the standing of its own case's state.
+			listAdmissions(session.user.id),
 		]);
 
 		return (
@@ -179,7 +187,7 @@ export default async function DashboardHome({
 				    off the queue until it comes. */}
 				<AttorneyInvitations
 					invitations={invitations}
-					verification={profile?.verificationStatus ?? "unverified"}
+					admissions={admissions}
 				/>
 				<PayoutNudge
 					waitingCases={payout.waitingCases}
@@ -205,7 +213,10 @@ export default async function DashboardHome({
 						cases={cases}
 						categories={categories}
 						states={states}
-						jurisdiction={profile?.user.jurisdiction ?? null}
+						admittedStates={admissions.map((row) => row.state)}
+						verifiedStates={admissions
+							.filter((row) => row.verificationStatus === "verified")
+							.map((row) => row.state)}
 						filtered={filters.filtered}
 						tally={tally}
 						interests={interests}

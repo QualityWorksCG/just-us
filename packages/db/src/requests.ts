@@ -4,6 +4,7 @@ import type {
 	RequestStatus,
 	VerificationStatus,
 } from "../prisma/generated/enums";
+import { isAdmittedIn } from "./admissions";
 import { averageRating } from "./attorney-directory";
 import { pendingInvitationsForCases } from "./case-invitations";
 import prisma from "./index";
@@ -267,7 +268,10 @@ export async function markCaseInterestsViewed(
 
 export type AcceptInterestResult =
 	| { ok: true; caseId: string }
-	| { ok: false; reason: "not_found" | "not_verified" | "already_matched" };
+	| {
+			ok: false;
+			reason: "not_found" | "not_verified" | "not_admitted" | "already_matched";
+	  };
 
 /**
  * Take an attorney forward: the plaintiff has decided, so record the match and
@@ -294,7 +298,7 @@ export async function acceptInterest(
 			id: true,
 			caseId: true,
 			attorneyId: true,
-			case: { select: { match: { select: { id: true } } } },
+			case: { select: { location: true, match: { select: { id: true } } } },
 			attorney: {
 				select: {
 					name: true,
@@ -320,6 +324,16 @@ export async function acceptInterest(
 	const profile = interest.attorney.attorneyProfile;
 	if (profile?.verificationStatus !== "verified") {
 		return { ok: false, reason: "not_verified" };
+	}
+
+	// Admission in the case's own state, re-read now rather than trusted from when
+	// the interest was expressed. An attorney can drop a state, or have one
+	// downgraded by a re-check, between putting themselves forward and a plaintiff
+	// deciding — and this is the write that makes them attorney of record.
+	if (
+		!(await isAdmittedIn(prisma, interest.attorneyId, interest.case.location))
+	) {
+		return { ok: false, reason: "not_admitted" };
 	}
 
 	await prisma.$transaction([

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { isAdmittedIn } from "./admissions";
 import { writeAudit } from "./audit";
 import prisma from "./index";
 
@@ -585,6 +586,7 @@ export type ConfirmCaseInvitationErrorCode =
 	| "email_mismatch"
 	| "not_attorney"
 	| "not_verified"
+	| "not_admitted"
 	| "case_unavailable";
 
 export type ConfirmCaseInvitationResult =
@@ -668,9 +670,19 @@ export async function confirmCaseInvitation(input: {
 					status: "seeking",
 					match: { is: null },
 				},
-				select: { id: true },
+				select: { id: true, location: true },
 			});
 			if (!target) return { ok: false, code: "case_unavailable" };
+
+			// Being named by a plaintiff is not a licence. The invitation says who
+			// they want; whether this attorney may act on a matter in this state is a
+			// fact about their admissions, and it is checked here in the same
+			// transaction as every other condition — the plaintiff typed a
+			// jurisdiction into the wizard, and what they typed is a claim about
+			// somebody else.
+			if (!(await isAdmittedIn(tx, attorney.id, target.location))) {
+				return { ok: false, code: "not_admitted" };
+			}
 
 			// Claim the invitation *first*, with the pending predicate in the `where`
 			// rather than in the code above it. The status read is a snapshot — two

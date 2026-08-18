@@ -3,6 +3,7 @@ import type {
 	MatchOrigin,
 	RequestStatus,
 } from "../prisma/generated/enums";
+import { admittedStates, isAdmittedIn } from "./admissions";
 import { pendingCaseInvitationWhere } from "./case-invitations";
 import {
 	type CaseEvidence,
@@ -109,7 +110,7 @@ const detailSelect = {
  * returns here on its own with no write to the case at all. See
  * `pendingCaseInvitationWhere`.
  */
-function queueWhere(filters: QueueFilters = {}) {
+function queueWhere(filters: QueueFilters = {}, states?: string[]) {
 	return {
 		status: "seeking" as const,
 		deletedAt: null,
@@ -119,7 +120,24 @@ function queueWhere(filters: QueueFilters = {}) {
 		match: { is: null },
 		invitations: { none: pendingCaseInvitationWhere(new Date()) },
 		...(filters.category ? { category: filters.category } : {}),
-		...(filters.state ? { location: filters.state } : {}),
+		...locationWhere(filters.state, states),
+	};
+}
+
+/**
+ * The two things that decide which states' cases are in scope, resolved together.
+ *
+ * `states` is where the attorney is admitted and is not negotiable — a case they
+ * cannot take has no business being offered to them. `filters.state` is the
+ * attorney's own choice from the dropdown, which can only ever narrow that set.
+ * Asking for a state they are not admitted in yields `in: []`, which matches
+ * nothing: the honest answer, and the same one an attorney with no admissions at
+ * all gets for the whole queue.
+ */
+function locationWhere(filter: string | undefined, states?: string[]) {
+	if (!states) return filter ? { location: filter } : {};
+	return {
+		location: { in: filter ? states.filter((s) => s === filter) : states },
 	};
 }
 
@@ -158,8 +176,12 @@ export async function listSeekingQueue(
 	attorneyId: string,
 	filters: QueueFilters = {},
 ): Promise<QueueCase[]> {
+	// Read here rather than taken as an argument, so no caller can render the queue
+	// without the constraint. An attorney who has claimed no state sees nothing —
+	// see `locationWhere`.
+	const states = await admittedStates(attorneyId);
 	const rows = await prisma.case.findMany({
-		where: queueWhere(filters),
+		where: queueWhere(filters, states),
 		select: {
 			...cardSelect,
 			requests: {
@@ -214,8 +236,11 @@ export async function getQueueCase(
 	caseId: string,
 	attorneyId: string,
 ): Promise<QueueCaseDetail | null> {
+	// Scoped exactly as the list is: a case outside this attorney's admissions is
+	// not theirs to read in full, link or no link.
+	const states = await admittedStates(attorneyId);
 	const row = await prisma.case.findFirst({
-		where: { ...queueWhere(), id: caseId },
+		where: { ...queueWhere({}, states), id: caseId },
 		select: {
 			...detailSelect,
 			requests: {
@@ -244,10 +269,11 @@ export async function getQueueCase(
 /** Categories that actually have a queued case, so the filter never offers a
  *  choice that returns nothing. Derived from the queue rather than a hardcoded
  *  list, which is also what keeps it in step with whatever the wizard offers. */
-export async function queueCategories(): Promise<string[]> {
+export async function queueCategories(attorneyId: string): Promise<string[]> {
+	const states = await admittedStates(attorneyId);
 	const rows = await prisma.case.groupBy({
 		by: ["category"],
-		where: queueWhere(),
+		where: queueWhere({}, states),
 	});
 	return rows
 		.map((row) => row.category)
@@ -255,11 +281,13 @@ export async function queueCategories(): Promise<string[]> {
 		.sort();
 }
 
-/** States that actually have a queued case. */
-export async function queueStates(): Promise<string[]> {
+/** States that actually have a queued case *and* that this attorney is admitted
+ *  in — the dropdown must not offer a state whose cases the queue withholds. */
+export async function queueStates(attorneyId: string): Promise<string[]> {
+	const states = await admittedStates(attorneyId);
 	const rows = await prisma.case.groupBy({
 		by: ["location"],
-		where: queueWhere(),
+		where: queueWhere({}, states),
 	});
 	return rows
 		.map((row) => row.location)
@@ -275,6 +303,7 @@ export async function queueStates(): Promise<string[]> {
  */
 export type ExpressInterestFailure =
 	| "not_verified"
+	| "not_admitted"
 	| "unavailable"
 	| "already_expressed";
 
@@ -296,6 +325,12 @@ export type ExpressInterestResult =
  * that check exists. Checking here as well is the stricter reading, and it keeps
  * a plaintiff from being shown an expression of interest they would not be
  * allowed to accept.
+ *
+ * Admission in the case's own state is required for the same reason, and is the
+ * same rule the queue draws: an attorney cannot act on a matter in a state they
+ * hold no verified licence in. The queue already withholds those cases, so
+ * reaching this with `not_admitted` means the id came from somewhere else — a
+ * stale tab, or a hand-made request.
  */
 export async function expressInterest(
 	caseId: string,
@@ -311,12 +346,18 @@ export async function expressInterest(
 
 	// Re-checked against the queue predicate rather than trusting the id the
 	// client sent: the case may have been matched, funded, or withdrawn since the
-	// page rendered, and a stale button must not be able to reach it.
+	// page rendered, and a stale button must not be able to reach it. Unscoped by
+	// state here so that a case in the wrong jurisdiction is refused as
+	// `not_admitted` — the truthful reason — rather than as `unavailable`, which
+	// would read as "somebody else got it".
 	const target = await prisma.case.findFirst({
 		where: { ...queueWhere(), id: caseId },
-		select: { id: true },
+		select: { id: true, location: true },
 	});
 	if (!target) return { ok: false, reason: "unavailable" };
+
+	const admitted = await isAdmittedIn(prisma, attorneyId, target.location);
+	if (!admitted) return { ok: false, reason: "not_admitted" };
 
 	const existing = await prisma.attorneyRequest.findUnique({
 		where: { caseId_attorneyId: { caseId, attorneyId } },

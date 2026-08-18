@@ -56,6 +56,8 @@ const CONFIRM_ERRORS: Record<ConfirmCaseInvitationErrorCode, string> = {
 		"Only an attorney account can confirm representation. Finish attorney onboarding first.",
 	not_verified:
 		"Your bar standing has to be verified before you can take on a case.",
+	not_admitted:
+		"You aren't admitted in this case's state, so you can't confirm representation on it. Add the state on your directory profile and verify your bar standing there.",
 	case_unavailable:
 		"This case is no longer available — the plaintiff may have withdrawn it or already have an attorney.",
 };

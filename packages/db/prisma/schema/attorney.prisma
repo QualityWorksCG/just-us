@@ -34,6 +34,56 @@ enum VerificationStatus {
   rejected
 }
 
+/// Where an attorney is admitted to practise — one row per jurisdiction.
+///
+/// A licence is per state, and so is the check behind it: an attorney admitted in
+/// New York and New Jersey holds two licences, two bar numbers, and has two bar
+/// records to be verified against. A single column could not say that, which is
+/// why this replaced `User.jurisdiction` as the authority on where an attorney
+/// may act. That column remains, as the primary state (see `auth.prisma`), and is
+/// kept pointing at one of these rows.
+///
+/// **This is the record every matching gate reads.** A case may only be taken by
+/// an attorney holding a `verified` admission in the case's own `location`: the
+/// queue shows nothing else, and `expressInterest`, `acceptInterest` and
+/// `confirmCaseInvitation` each re-check it inside their own transaction. An
+/// unverified admission is a claim rather than a licence — it earns the state's
+/// cases a place in that attorney's queue and nothing more.
+model AttorneyAdmission {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// A US_STATES value (see @just-us/auth/jurisdiction), held as the same string
+  /// `Case.location` holds so the two compare directly — the same contract
+  /// `User.jurisdiction` and `AttorneyProfile.officeState` already keep.
+  state String
+
+  /// The licence number in this state. Per-jurisdiction by nature: the number
+  /// that identifies an attorney in New York says nothing about New Jersey.
+  /// Optional because the bar check searches on name and state rather than on the
+  /// number (see `AttorneyVerification.checkedName`).
+  barNumber String?
+
+  /// Bar standing in *this* state — a cache of the newest check that ran against
+  /// it, written in the same transaction, exactly as
+  /// `AttorneyProfile.verificationStatus` caches the profile-wide badge.
+  verificationStatus VerificationStatus @default(unverified)
+  /// When this admission last reached `verified`. Kept when a later re-check
+  /// downgrades it, so "was verified until X" stays answerable.
+  verifiedAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One row per state per attorney: "admitted in New York" is a fact about them,
+  /// not a list of attempts at it.
+  @@unique([userId, state])
+  @@index([userId])
+  @@index([state])
+  @@map("attorney_admission")
+}
+
 /// The attorney's public directory profile — everything the attorney enters
 /// themselves and can edit at will ("Group A"). Separate from `User` because it
 /// is public-facing, moderated, and only exists for attorneys; the account

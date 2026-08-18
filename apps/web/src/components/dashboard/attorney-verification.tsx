@@ -1,14 +1,6 @@
 "use client";
 
-import { US_STATES } from "@just-us/auth/jurisdiction";
 import { Button } from "@just-us/ui/components/button";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@just-us/ui/components/select";
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	BadgeCheck,
@@ -20,13 +12,10 @@ import {
 	ShieldQuestion,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import {
-	updateJurisdictionAction,
-	verifyAttorneyAction,
-} from "@/app/(app)/profile/verification-actions";
+import { verifyAttorneyAction } from "@/app/(app)/profile/verification-actions";
 import {
 	STATUS_COPY,
 	type VerificationSource,
@@ -52,11 +41,15 @@ export type VerificationCheck = {
 };
 
 export type VerificationView = {
+	/** The profile-wide badge: the best standing across every admission, so one
+	 *  verified licence makes a verified attorney (see `badgeFromAdmissions`). */
 	status: VerificationStatus;
 	verifiedAt: Date | null;
 	latest: VerificationCheck | null;
-	/** From the account, captured at sign-up — the check can't run without them. */
+	/** From the account, captured at sign-up. */
 	barNumber: string | null;
+	/** The primary state — what this card's own button checks. Null when the
+	 *  attorney has claimed nowhere, which is when there is nothing to check. */
 	jurisdiction: string | null;
 };
 
@@ -133,43 +126,18 @@ export function AttorneyVerification({ data }: { data: VerificationView }) {
 	// Optimistic so the panel reads "Checking…" while the search runs, which can
 	// take the better part of a minute.
 	const [optimistic, setOptimistic] = useState<VerificationStatus | null>(null);
-	const jurisdictionId = useId();
-	// Held locally so the Select reflects the choice immediately; the server
-	// re-render then confirms it.
-	const [jurisdiction, setJurisdiction] = useState(data.jurisdiction ?? "");
-	const [savingJurisdiction, startSavingJurisdiction] = useTransition();
-
 	const status = optimistic ?? data.status;
 	const copy = STATUS_COPY[status];
 	const check = data.latest;
-	// Jurisdiction is the only input a check needs.
-	const canRun = !!jurisdiction;
-
-	function changeJurisdiction(next: string) {
-		if (!next || next === jurisdiction) return;
-		const previous = jurisdiction;
-		setJurisdiction(next);
-		startSavingJurisdiction(async () => {
-			const res = await updateJurisdictionAction(next);
-			if (res.ok) {
-				toast.success(
-					res.badgeCleared
-						? `Jurisdiction set to ${next}. Your verification was cleared — run a new check.`
-						: `Jurisdiction set to ${next}.`,
-				);
-				router.refresh();
-			} else {
-				// Put the Select back, so it never shows a value that wasn't stored.
-				setJurisdiction(previous);
-				toast.error(res.error);
-			}
-		});
-	}
+	// A check runs against one state, and this button runs it for the primary one.
+	// Every other state is checked from its own row in the admissions panel.
+	const primary = data.jurisdiction;
+	const canRun = !!primary;
 
 	function run() {
 		setOptimistic("pending");
 		startRunning(async () => {
-			const res = await verifyAttorneyAction();
+			const res = await verifyAttorneyAction({});
 			setOptimistic(null);
 			if (res.ok) {
 				const messages: Record<VerificationStatus, string> = {
@@ -212,66 +180,17 @@ export function AttorneyVerification({ data }: { data: VerificationView }) {
 					<Search data-icon="inline-start" aria-hidden="true" />
 					{running || status === "pending"
 						? "Checking…"
-						: check
-							? "Run check again"
+						: primary
+							? `${check ? "Re-check" : "Verify"} ${primary}`
 							: "Run verification"}
 				</Button>
-			</div>
-
-			{/* What the check runs against. Editable here because jurisdiction decides
-			    which state's records get searched, and it's otherwise only ever set
-			    once, at sign-up. */}
-			<div className="rounded-[var(--radius-card)] border border-border bg-surface p-5">
-				<h3 className="font-bold text-[14.5px] text-ink">Licensing details</h3>
-				<p className="mt-0.5 text-[13px] text-muted-foreground leading-relaxed">
-					A check searches on your legal name and the state below. Your bar
-					number isn't needed — if a record has one, we read it back as
-					evidence.
-				</p>
-
-				<div className="mt-4 max-w-[340px]">
-					<div className="flex flex-col gap-1.5">
-						<label
-							htmlFor={jurisdictionId}
-							className="font-semibold text-[13px] text-ink"
-						>
-							Licensing jurisdiction
-						</label>
-						<Select
-							value={jurisdiction}
-							onValueChange={(value: string | null) =>
-								changeJurisdiction(value ?? "")
-							}
-							disabled={savingJurisdiction || running}
-						>
-							<SelectTrigger
-								id={jurisdictionId}
-								className="h-11 bg-surface text-[14px]"
-							>
-								<SelectValue placeholder="Select the state you're admitted in…" />
-							</SelectTrigger>
-							<SelectContent className="max-h-[300px]">
-								{US_STATES.map((state) => (
-									<SelectItem key={state} value={state} className="text-[14px]">
-										{state}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<p className="text-[12px] text-muted-foreground">
-							{savingJurisdiction
-								? "Saving…"
-								: "Changing this clears any existing badge."}
-						</p>
-					</div>
-				</div>
 			</div>
 
 			{!canRun && (
 				<p className="flex items-start gap-2.5 rounded-[var(--radius-card-sm)] bg-danger/5 px-4 py-3 text-[13px] text-danger leading-relaxed">
 					<CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					<span>
-						Choose your licensing jurisdiction above — a check needs to know
+						Add the states you're admitted in above — a check needs to know
 						which state's records to search.
 					</span>
 				</p>
