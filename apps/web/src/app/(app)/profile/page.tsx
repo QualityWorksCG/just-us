@@ -1,13 +1,15 @@
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
-
+import type { Route } from "next";
 import {
 	type AttorneyProfileData,
 	AttorneyProfileForm,
 } from "@/components/dashboard/attorney-profile-form";
 import type { VerificationView } from "@/components/dashboard/attorney-verification";
+import { BackLink } from "@/components/dashboard/back-link";
 import type { VerificationSource } from "@/lib/attorney-verification";
 import { requireRole } from "@/lib/auth-server";
 import { findScreen } from "@/lib/dashboard-nav";
+import { safeNextPath } from "@/lib/next-path";
 
 /**
  * A bar check measures ~11s. Headroom over that, because a verification killed
@@ -20,7 +22,11 @@ export const maxDuration = 60;
  * editable). This static segment takes precedence over the `[...slug]`
  * placeholder route, which still serves the attorney's other screens.
  */
-export default async function AttorneyProfilePage() {
+export default async function AttorneyProfilePage({
+	searchParams,
+}: {
+	searchParams: Promise<{ next?: string }>;
+}) {
 	// Only attorneys have a directory profile; everyone else lands on their own
 	// dashboard home rather than seeing this route exists.
 	const { session } = await requireRole("attorney");
@@ -29,6 +35,13 @@ export default async function AttorneyProfilePage() {
 		jurisdiction?: string | null;
 		barNumber?: string | null;
 	};
+
+	// Sent here from somewhere that needs a verified attorney — a case invitation,
+	// typically. A bar check is not instant and may end in a human review, so this
+	// is a way back rather than a redirect: they will often leave and return long
+	// after. Same-site paths only; see `safeNextPath`.
+	const { next } = await searchParams;
+	const back = safeNextPath(next);
 
 	const screen = findScreen("attorney", "profile");
 	const saved = await getAttorneyProfile(user.id);
@@ -86,6 +99,13 @@ export default async function AttorneyProfilePage() {
 
 	return (
 		<div>
+			{back ? (
+				<BackLink
+					href={back as Route}
+					label="Back to the case invitation"
+					className="mb-4"
+				/>
+			) : null}
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 				{screen?.sub ??
 					"How you appear in the attorney directory. Shown once your bar standing is verified."}

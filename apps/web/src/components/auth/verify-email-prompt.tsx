@@ -15,9 +15,13 @@ import { AuthMiniShell } from "./auth-mini-shell";
 export function VerifyEmailPrompt({
 	email,
 	signedIn,
+	next,
 }: {
 	email?: string;
 	signedIn: boolean;
+	/** Where the verification link should land them. Already validated as a
+	 *  same-site path by the page. */
+	next?: string | null;
 }) {
 	const router = useRouter();
 	const [pending, setPending] = useState(false);
@@ -26,7 +30,7 @@ export function VerifyEmailPrompt({
 		if (!email) return;
 		setPending(true);
 		await authClient.sendVerificationEmail(
-			{ email, callbackURL: "/home" },
+			{ email, callbackURL: next ?? "/home" },
 			{
 				onSuccess: () => {
 					toast.success("Verification email sent.");

@@ -89,6 +89,30 @@ function tokenErrorCode(
 }
 
 /**
+ * Which invitation, and how the caller earned the right to name it.
+ *
+ * `tokenHash` is the emailed link: possession of the raw token is the only
+ * credential an invitee who has never signed in can offer, so it stands in for
+ * proof that they hold the invited address. `invitationId` is the signed-in
+ * route — the invitation an attorney sees on their own dashboard once they have
+ * an account — where identity comes from the session instead.
+ *
+ * An id is not a secret. Nothing may be read or written from one without the
+ * email match, which is why every mutation below makes that match itself rather
+ * than trusting the screen that named the row.
+ */
+export type CaseInvitationRef =
+	| { tokenHash: string }
+	| { invitationId: string };
+
+/** Both columns are unique, so either side of the ref is a `findUnique` key. */
+function refWhere(ref: CaseInvitationRef) {
+	return "tokenHash" in ref
+		? { tokenHash: ref.tokenHash }
+		: { id: ref.invitationId };
+}
+
+/**
  * Create, resend, or replace the invitation for a case being published.
  *
  * Publishing is re-runnable — the wizard can be reopened against the same case
@@ -258,14 +282,17 @@ export async function countRecentCaseInvitationsBy(
  * absent: whoever holds this link has not proved they are the invited attorney,
  * only that they received (or found) the token. They get the shape of the
  * matter and the name of the person asking — the same line the attorney queue
- * draws — and the substance arrives once they confirm.
+ * draws — and the substance arrives once they confirm. That restraint is also
+ * what makes the id route safe to share this function: an id names a row, and
+ * this returns nothing an id-holder shouldn't see. The caller still has to make
+ * the email match before drawing anything.
  *
  * Returns the row whatever state it is in, so the caller can say "this invite
  * has expired" rather than "not found".
  */
-export async function findCaseInvitationByTokenHash(tokenHash: string) {
+export async function findCaseInvitation(ref: CaseInvitationRef) {
 	return prisma.caseInvitation.findUnique({
-		where: { tokenHash },
+		where: refWhere(ref),
 		include: {
 			case: {
 				select: {
@@ -391,6 +418,81 @@ export async function invitedEmailHasAccount(email: string): Promise<boolean> {
 	return !!user;
 }
 
+export type PendingInvitationForAttorney = {
+	id: string;
+	expiresAt: Date;
+	caseId: string;
+	caseTitle: string;
+	category: string;
+	location: string;
+	goalCents: number;
+	plaintiffName: string;
+};
+
+/**
+ * The invitations an attorney has been sent and not yet answered, for their own
+ * dashboard.
+ *
+ * The counterpart to `pendingInvitationsForCases`, which answers the same
+ * question for the plaintiff. This side did not exist, and its absence was the
+ * bug: only the hash of a token is stored, so the emailed link was the one and
+ * only way into the confirm screen, and an attorney who closed that email — or
+ * who was sent off to finish onboarding or a bar check on the way — had no route
+ * back to it from inside the product. Reading by address gives the invitation a
+ * home that outlives the email.
+ *
+ * Matched on the address rather than the account, because that is what the
+ * invitation was addressed to and the row may predate the account by a week.
+ * Case-insensitively, for the same reason `invitedEmailHasAccount` is: the
+ * plaintiff typed one of these and the account holder typed the other.
+ *
+ * Pending only, and only for a case that can still be taken: an invitation whose
+ * case has since been withdrawn or matched elsewhere is not something to put in
+ * front of an attorney as an outstanding decision. The predicate is the one
+ * `confirmCaseInvitation` enforces, so nothing is advertised here that would be
+ * refused there.
+ */
+export async function pendingInvitationsForEmail(
+	email: string,
+): Promise<PendingInvitationForAttorney[]> {
+	const normalized = email.trim();
+	if (!normalized) return [];
+
+	const rows = await prisma.caseInvitation.findMany({
+		where: {
+			email: { equals: normalized, mode: "insensitive" },
+			...pendingCaseInvitationWhere(),
+			case: { deletedAt: null, status: "seeking", match: { is: null } },
+		},
+		orderBy: { createdAt: "desc" },
+		select: {
+			id: true,
+			expiresAt: true,
+			case: {
+				select: {
+					id: true,
+					title: true,
+					category: true,
+					location: true,
+					goalCents: true,
+					owner: { select: { name: true } },
+				},
+			},
+		},
+	});
+
+	return rows.map((row) => ({
+		id: row.id,
+		expiresAt: row.expiresAt,
+		caseId: row.case.id,
+		caseTitle: row.case.title,
+		category: row.case.category,
+		location: row.case.location,
+		goalCents: row.case.goalCents,
+		plaintiffName: row.case.owner.name,
+	}));
+}
+
 export type CreateInvitedAttorneyResult =
 	| { ok: true; userId: string; email: string }
 	| { ok: false; code: CaseInvitationTokenErrorCode | "email_taken" };
@@ -510,7 +612,7 @@ export type ConfirmCaseInvitationResult =
  * change of visibility, not the first.
  */
 export async function confirmCaseInvitation(input: {
-	tokenHash: string;
+	ref: CaseInvitationRef;
 	/** The signed-in user's id. */
 	attorneyId: string;
 }): Promise<ConfirmCaseInvitationResult> {
@@ -518,7 +620,7 @@ export async function confirmCaseInvitation(input: {
 		async (tx): Promise<ConfirmCaseInvitationResult> => {
 			const now = new Date();
 			const inv = await tx.caseInvitation.findUnique({
-				where: { tokenHash: input.tokenHash },
+				where: refWhere(input.ref),
 				select: {
 					id: true,
 					caseId: true,
@@ -633,14 +735,19 @@ export type DeclineCaseInvitationResult =
  * address is in the metadata, which is as far as the record honestly goes.
  */
 export async function declineCaseInvitation(input: {
-	tokenHash: string;
+	ref: CaseInvitationRef;
 	actorId?: string | null;
+	/** Required on the id route, where there is no token to stand in for holding
+	 *  the invited address. A mismatch is reported as `invalid` rather than as a
+	 *  wrong-account error: an id names a row the caller may have no business
+	 *  knowing exists, and the reply must not confirm that it does. */
+	requireEmail?: string | null;
 }): Promise<DeclineCaseInvitationResult> {
 	return prisma.$transaction(
 		async (tx): Promise<DeclineCaseInvitationResult> => {
 			const now = new Date();
 			const inv = await tx.caseInvitation.findUnique({
-				where: { tokenHash: input.tokenHash },
+				where: refWhere(input.ref),
 				select: {
 					id: true,
 					caseId: true,
@@ -652,6 +759,13 @@ export async function declineCaseInvitation(input: {
 				},
 			});
 			if (!inv) return { ok: false, code: "invalid" };
+
+			if (
+				input.requireEmail !== undefined &&
+				input.requireEmail?.trim().toLowerCase() !== inv.email
+			) {
+				return { ok: false, code: "invalid" };
+			}
 
 			const status = caseInvitationStatus(inv, now);
 			if (status !== "pending") {

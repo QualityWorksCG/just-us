@@ -8,6 +8,7 @@ import {
 	confirmCaseInviteAction,
 	declineCaseInviteAction,
 } from "@/app/case-invite/actions";
+import type { CaseInviteRef } from "@/lib/case-invite-ref";
 
 /**
  * The answer, and the way out of it.
@@ -18,12 +19,12 @@ import {
  * on an email link would otherwise cost the plaintiff their chosen attorney.
  */
 
-export function CaseInviteDecision({ token }: { token: string }) {
+export function CaseInviteDecision({ invite }: { invite: CaseInviteRef }) {
 	const [pending, setPending] = useState<"confirm" | "decline" | null>(null);
 
 	async function confirm() {
 		setPending("confirm");
-		const result = await confirmCaseInviteAction(token);
+		const result = await confirmCaseInviteAction(invite);
 		if (!result.ok) {
 			toast.error(result.error);
 			setPending(null);
@@ -44,7 +45,7 @@ export function CaseInviteDecision({ token }: { token: string }) {
 					: "Confirm I represent this case"}
 			</Button>
 			<DeclineInviteButton
-				token={token}
+				invite={invite}
 				label="Decline this case"
 				disabled={pending === "confirm"}
 				onBusyChange={(busy) => setPending(busy ? "decline" : null)}
@@ -66,12 +67,12 @@ export function CaseInviteDecision({ token }: { token: string }) {
  * invitation pending keeps the plaintiff's case out of the queue for a week.
  */
 export function DeclineInviteButton({
-	token,
+	invite,
 	label = "Decline this case",
 	disabled = false,
 	onBusyChange,
 }: {
-	token: string;
+	invite: CaseInviteRef;
 	label?: string;
 	disabled?: boolean;
 	onBusyChange?: (busy: boolean) => void;
@@ -82,7 +83,7 @@ export function DeclineInviteButton({
 	async function decline() {
 		setPending(true);
 		onBusyChange?.(true);
-		const result = await declineCaseInviteAction(token);
+		const result = await declineCaseInviteAction(invite);
 		if (!result.ok) {
 			toast.error(result.error);
 			setPending(false);
@@ -110,7 +111,7 @@ export function DeclineInviteButton({
 		<div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-line-strong bg-paper p-3">
 			<p className="text-[13px] text-ink-soft leading-relaxed">
 				Decline for good? The case goes straight back in front of other
-				attorneys, and this link stops working.
+				attorneys, and this invitation stops working.
 			</p>
 			<div className="flex gap-2">
 				<Button
