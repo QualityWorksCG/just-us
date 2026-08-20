@@ -114,9 +114,9 @@ export function SeekingQueue({
 	function reasonFor(state: string): string | undefined {
 		if (verifiedStates.includes(state)) return undefined;
 		if (!canExpressInterest) {
-			return "Your bar standing has to be verified first.";
+			return "Verify your bar standing on your profile to express interest.";
 		}
-		return `Your ${state} bar standing has to be verified first.`;
+		return `You're not verified in ${state} yet — verify your bar standing there to express interest.`;
 	}
 
 	return (
@@ -402,6 +402,7 @@ function QueueCard({
 						caseId={item.id}
 						expressed={!!item.myInterest}
 						disabledReason={disabledReason}
+						fullWidth
 					/>
 					<Link
 						href={`/queue/${item.id}` as Route}
