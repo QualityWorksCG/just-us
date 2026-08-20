@@ -1,4 +1,4 @@
-import { getAttorneyProfile } from "@just-us/db/attorney-profile";
+import { getAdmission } from "@just-us/db/admissions";
 import { getQueueCase } from "@just-us/db/representation";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
@@ -26,11 +26,14 @@ export default async function QueueCasePage({
 	const { session } = await requireRole("attorney");
 	const { id } = await params;
 
-	const [item, profile] = await Promise.all([
-		getQueueCase(id, session.user.id),
-		getAttorneyProfile(session.user.id),
-	]);
+	const item = await getQueueCase(id, session.user.id);
 	if (!item) notFound();
+
+	// The gate is per state, not per attorney: whether this attorney can put
+	// themselves forward turns on their admission in *this case's* state, so the
+	// page can tell them exactly what's outstanding (not claimed / claimed but
+	// unverified / verified) rather than a one-size-fits-all "get verified".
+	const admission = await getAdmission(session.user.id, item.state);
 
 	return (
 		// Full-bleed, like the other app screens: the shell's content column already
@@ -45,7 +48,7 @@ export default async function QueueCasePage({
 			/>
 			<QueueCaseDetailView
 				item={item}
-				canExpressInterest={profile?.verificationStatus === "verified"}
+				admissionStatus={admission?.verificationStatus ?? null}
 			/>
 		</div>
 	);

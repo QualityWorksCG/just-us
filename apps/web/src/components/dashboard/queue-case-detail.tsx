@@ -1,5 +1,6 @@
 // biome-ignore-all lint/performance/noImgElement: user-uploaded Blob images aren't static assets next/image can optimize
 import type { QueueCaseDetail } from "@just-us/db/representation";
+import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	CalendarClock,
@@ -7,10 +8,13 @@ import {
 	MapPin,
 	Paperclip,
 	Scale,
+	ShieldAlert,
 	ShieldCheck,
 	Tag,
 	UserRound,
 } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
 
 import { ExpressInterestButton } from "@/components/dashboard/express-interest-button";
 
@@ -54,14 +58,69 @@ function waitingFor(publishedAt: Date | null, createdAt: Date) {
 	return `waiting ${months} ${months === 1 ? "month" : "months"}`;
 }
 
+type ExpressInterestGate =
+	| { canExpress: true }
+	| { canExpress: false; title: string; body: string; cta: string };
+
+/**
+ * Whether this attorney can put themselves forward for this case — and, when they
+ * can't, why and what to do about it.
+ *
+ * The gate is the case's own state: representation needs a *verified* bar
+ * admission there, so each not-yet standing gets its own sentence and next step
+ * rather than a single generic "get verified" that leaves the attorney guessing
+ * whether to add a state, wait on a check, or fix a rejected one.
+ */
+function expressInterestGate(
+	state: string,
+	admissionStatus: string | null,
+): ExpressInterestGate {
+	if (admissionStatus === "verified") return { canExpress: true };
+	const where = state || "this state";
+	if (admissionStatus === null) {
+		return {
+			canExpress: false,
+			title: `You're not admitted in ${where}`,
+			body: `This case is in ${where}, and you can only see and take cases in states you're admitted in. Add ${where} to your directory profile to put yourself forward.`,
+			cta: "Add your states",
+		};
+	}
+	if (admissionStatus === "pending" || admissionStatus === "needs_review") {
+		return {
+			canExpress: false,
+			title: `Your ${where} bar standing is still being verified`,
+			body: `You've claimed ${where} and its bar check is in progress. You can express interest the moment it clears — nothing else is needed from you.`,
+			cta: "View your profile",
+		};
+	}
+	if (admissionStatus === "rejected") {
+		return {
+			canExpress: false,
+			title: `Your ${where} bar standing couldn't be verified`,
+			body: `The bar check for ${where} didn't pass. Update your ${where} bar number on your profile and we'll re-check it.`,
+			cta: "Review your profile",
+		};
+	}
+	// "unverified" — claimed, but no check has run yet — and any unknown status.
+	return {
+		canExpress: false,
+		title: `Verify your ${where} bar standing to express interest`,
+		body: `You've claimed ${where}, but expressing interest needs a verified licence there — plaintiffs only ever see attorneys who can actually take the work.`,
+		cta: "Get verified",
+	};
+}
+
 export function QueueCaseDetailView({
 	item,
-	canExpressInterest,
+	admissionStatus,
 }: {
 	item: QueueCaseDetail;
-	/** False until the attorney's bar standing is verified (JUS-24). */
-	canExpressInterest: boolean;
+	/** This attorney's admission standing in *this case's* state: `verified`
+	 *  unlocks expressing interest; anything else — or `null`, meaning the state
+	 *  isn't claimed at all — drives the explanation of what's outstanding. */
+	admissionStatus: string | null;
 }) {
+	const gate = expressInterestGate(item.state, admissionStatus);
 	const paragraphs = item.story
 		.split(/\n{2,}|\n/)
 		.map((p) => p.trim())
@@ -107,23 +166,50 @@ export function QueueCaseDetailView({
 				)}
 			</div>
 
-			{/* Action bar — the one thing an attorney can do from here. */}
-			<div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-rest)]">
-				<p className="min-w-[24ch] flex-1 text-[13px] text-ink-soft leading-relaxed">
-					{item.myInterest
-						? "You've put yourself forward for this case. The plaintiff sees it on their dashboard and will reach out if they want to take it further."
-						: "Expressing interest tells the plaintiff you're available. It doesn't open a conversation — they decide whether to make contact."}
-				</p>
-				<ExpressInterestButton
-					caseId={item.id}
-					expressed={!!item.myInterest}
-					disabledReason={
-						canExpressInterest
-							? undefined
-							: "Your bar standing has to be verified first."
-					}
-				/>
-			</div>
+			{/* Action bar — the one thing an attorney can do from here. When they
+			    can't yet, it says exactly why and what to do, rather than a bare
+			    disabled button with a hover-only hint. */}
+			{item.myInterest || gate.canExpress ? (
+				<div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-rest)]">
+					<p className="min-w-[24ch] flex-1 text-[13px] text-ink-soft leading-relaxed">
+						{item.myInterest
+							? "You've put yourself forward for this case. The plaintiff sees it on their dashboard and will reach out if they want to take it further."
+							: "Expressing interest tells the plaintiff you're available. It doesn't open a conversation — they decide whether to make contact."}
+					</p>
+					<ExpressInterestButton
+						caseId={item.id}
+						expressed={!!item.myInterest}
+					/>
+				</div>
+			) : (
+				<div className="flex flex-col gap-3 rounded-[var(--radius-card-lg)] border border-brass/40 bg-brass-wash p-4 shadow-[var(--shadow-rest)]">
+					<div className="flex items-start gap-3">
+						<ShieldAlert
+							className="mt-0.5 size-5 shrink-0 text-brass-deep"
+							aria-hidden="true"
+						/>
+						<div className="min-w-0">
+							<p className="font-bold text-[14px] text-ink">{gate.title}</p>
+							<p className="mt-1 text-[13px] text-ink-soft leading-relaxed">
+								{gate.body}
+							</p>
+						</div>
+					</div>
+					<div className="flex flex-wrap items-center gap-2.5 sm:pl-8">
+						<Link
+							href={"/profile" as Route}
+							className={cn(buttonVariants({ size: "sm" }), "h-9")}
+						>
+							{gate.cta}
+						</Link>
+						<ExpressInterestButton
+							caseId={item.id}
+							expressed={false}
+							disabledReason={gate.title}
+						/>
+					</div>
+				</div>
+			)}
 
 			{/* Cover. Height-capped rather than a fixed aspect ratio: 16:9 across a
 			    full-width screen is a banner over a thousand pixels tall, which pushes
