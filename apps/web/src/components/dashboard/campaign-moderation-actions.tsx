@@ -85,7 +85,7 @@ export function CampaignModerationActions({ caseId }: { caseId: string }) {
 					className={cn("bg-danger text-white hover:bg-danger/90")}
 				>
 					<Trash2 data-icon="inline-start" aria-hidden="true" />
-					{armedRemove ? "Confirm — remove from site" : "Remove from site"}
+					{armedRemove ? "Confirm: remove from site" : "Remove from site"}
 				</Button>
 				{armedRemove && (
 					<button

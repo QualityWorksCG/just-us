@@ -34,7 +34,7 @@ export default function AdminInviteEmail({
 			<Text style={heading}>You've been invited</Text>
 			<Text style={paragraph}>
 				{inviterName ?? "An administrator"} invited you to join JustUs as an
-				administrator. Accept below to choose your name and password — your
+				administrator. Accept below to choose your name and password. Your
 				account is ready to use straight away.
 			</Text>
 
@@ -56,7 +56,7 @@ export default function AdminInviteEmail({
 
 			<Text style={footer}>
 				This link expires in 7 days. If you weren't expecting this invitation,
-				you can safely ignore this email — no account is created until you
+				you can safely ignore this email. No account is created until you
 				accept.
 			</Text>
 		</EmailShell>

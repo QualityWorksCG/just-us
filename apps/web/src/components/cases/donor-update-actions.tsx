@@ -39,7 +39,7 @@ export function FollowToggle({
 				toast.error(res.error);
 			} else {
 				toast.success(
-					next ? "Following — you'll see every update." : "Unfollowed.",
+					next ? "Following. You'll see every update." : "Unfollowed.",
 				);
 			}
 		});
@@ -98,7 +98,7 @@ export function ShareCaseButton({ sharePath }: { sharePath: string }) {
 				? `${window.location.origin}${sharePath}`
 				: "";
 		navigator.clipboard?.writeText(url);
-		toast.success("Link copied — thanks for sharing!");
+		toast.success("Link copied. Thanks for sharing!");
 	}
 	return (
 		<button

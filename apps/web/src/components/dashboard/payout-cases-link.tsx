@@ -35,8 +35,8 @@ export function PayoutCasesLink({
 				<h2 className="font-bold text-[15px] text-ink">Donation payouts</h2>
 				<p className="mt-1 text-[13.5px] text-ink-soft leading-relaxed">
 					Each case you represent pays into an account of its own, so no two
-					clients' funds share a balance. Setup lives on the case itself — open
-					a case to link its account, check its status, or reach its Stripe
+					clients' funds share a balance. Setup lives on the case itself: open a
+					case to link its account, check its status, or reach its Stripe
 					dashboard.
 				</p>
 			</div>

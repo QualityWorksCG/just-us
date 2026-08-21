@@ -217,7 +217,7 @@ export function BlockUserDialog({
 													}}
 													className="font-semibold text-[12.5px] text-ink-soft transition-colors hover:text-brass-deep"
 												>
-													Clear — block indefinitely
+													Clear (block indefinitely)
 												</button>
 											</div>
 										)}

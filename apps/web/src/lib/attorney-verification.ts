@@ -37,7 +37,7 @@ export const STATUS_COPY: Record<
 	},
 	pending: {
 		label: "Checking…",
-		blurb: "Searching public bar records — this takes about ten seconds.",
+		blurb: "Searching public bar records. This takes about ten seconds.",
 		tone: "neutral",
 	},
 	verified: {
@@ -49,7 +49,7 @@ export const STATUS_COPY: Record<
 	needs_review: {
 		label: "Needs review",
 		blurb:
-			"The search couldn't reach a clear answer either way. An administrator will take a look — no action needed from you.",
+			"The search couldn't reach a clear answer either way. An administrator will take a look, and no action is needed from you.",
 		tone: "warn",
 	},
 	rejected: {

@@ -51,7 +51,7 @@ export default async function AttorneysPage({
 					<p className="mt-2 max-w-[68ch] text-[14.5px] text-ink-soft leading-relaxed">
 						An open directory of bar-verified attorneys. Search by practice area
 						and state, compare profiles and reviews, and contact whoever you
-						choose — JustUs never picks for you.
+						choose. JustUs never picks for you.
 					</p>
 				</header>
 
@@ -64,7 +64,7 @@ export default async function AttorneysPage({
 							aria-hidden="true"
 						/>
 						Browse and compare freely. To contact an attorney about
-						representation, submit your case first — they'll need it to say yes.
+						representation, submit your case first. They'll need it to say yes.
 					</p>
 					<Link
 						href="/cases/new"

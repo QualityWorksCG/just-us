@@ -89,9 +89,9 @@ export function CaseUpdatesBoard({
 	const hasDonated = !!donation;
 
 	const bannerText = hasDonated
-		? "You're backing this case — you'll get every update here."
+		? "You're backing this case. You'll get every update here."
 		: following
-			? "You're following this case — you'll get every update here."
+			? "You're following this case. You'll get every update here."
 			: "Follow this case to get every update here.";
 
 	return (
@@ -128,7 +128,7 @@ export function CaseUpdatesBoard({
 						caseId={caseId}
 						grouped
 						highlightSince={highlightSince}
-						emptyHint="No updates yet — the attorney's progress posts will appear here."
+						emptyHint="No updates yet. The attorney's progress posts will appear here."
 					/>
 				</div>
 
@@ -147,8 +147,8 @@ export function CaseUpdatesBoard({
 									</span>
 								</p>
 								<p className="mt-2 text-[13px] text-ink-soft leading-relaxed">
-									Thank you{viewerFirstName ? `, ${viewerFirstName}` : ""} —
-									you're one of {donorsCount}{" "}
+									Thank you{viewerFirstName ? `, ${viewerFirstName}` : ""}.
+									You're one of {donorsCount}{" "}
 									{donorsCount === 1 ? "person" : "people"} backing{" "}
 									{plaintiffFirst}.
 								</p>

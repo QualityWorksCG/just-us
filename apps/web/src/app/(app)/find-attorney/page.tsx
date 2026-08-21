@@ -56,6 +56,26 @@ export default async function DashboardAttorneysPage({
 	const draft = draftId ? await getOwnedCase(draftId, session.user.id) : null;
 	const defaultState = draft?.location || undefined;
 
+	// Where "back to your case" returns to, and what the banner says — it depends on
+	// where the case actually is. A still-in-progress draft goes back to the wizard
+	// to keep filling it in. A case already out to attorneys must NOT be walked back
+	// into the creation flow (the plaintiff has published it); it returns to the case
+	// itself, where any attorney requests show up.
+	const caseTitle = draft?.title?.trim() || "Your case";
+	const back = !draft
+		? null
+		: draft.status === "draft"
+			? {
+					href: `/cases/new?draft=${draft.id}` as Route,
+					title: `${caseTitle} is saved`,
+					sub: "Find someone who fits, then head back and add them to your case.",
+				}
+			: {
+					href: `/my-cases/${draft.id}/requests` as Route,
+					title: `${caseTitle} is out to attorneys`,
+					sub: "You can still reach out to anyone here yourself. Any requests show up on your case.",
+				};
+
 	const [attorneys, practiceAreas, states] = await Promise.all([
 		listDirectoryAttorneys({
 			practiceArea: filters.area,
@@ -74,18 +94,16 @@ export default async function DashboardAttorneysPage({
 					"Browse bar-verified attorneys and choose who represents you."}
 			</p>
 
-			{draft && (
+			{back && (
 				<div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-brass-deep/30 bg-brass-wash/60 px-5 py-4">
 					<div className="min-w-0">
-						<p className="font-bold text-[14px] text-ink">
-							{draft.title?.trim() || "Your case"} is saved
-						</p>
+						<p className="font-bold text-[14px] text-ink">{back.title}</p>
 						<p className="mt-0.5 text-[13px] text-ink-soft leading-relaxed">
-							Find someone who fits, then head back and add them to your case.
+							{back.sub}
 						</p>
 					</div>
 					<Link
-						href={`/cases/new?draft=${draft.id}` as Route}
+						href={back.href}
 						className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] bg-brass px-4 font-semibold text-[13px] text-white transition-colors hover:bg-brass-deep"
 					>
 						<ArrowLeft className="size-3.5" aria-hidden="true" />

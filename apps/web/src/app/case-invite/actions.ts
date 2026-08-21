@@ -59,7 +59,7 @@ const CONFIRM_ERRORS: Record<ConfirmCaseInvitationErrorCode, string> = {
 	not_admitted:
 		"You aren't admitted in this case's state, so you can't confirm representation on it. Add the state on your directory profile and verify your bar standing there.",
 	case_unavailable:
-		"This case is no longer available — the plaintiff may have withdrawn it or already have an attorney.",
+		"This case is no longer available. The plaintiff may have withdrawn it or already found an attorney.",
 };
 
 export type CaseInviteActionResult =

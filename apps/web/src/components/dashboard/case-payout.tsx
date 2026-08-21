@@ -123,8 +123,8 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 					: result.reason === "attorney_no_account"
 						? `${recipient} hasn't opened a payout account for this case yet.`
 						: result.detailsSubmitted
-							? `Checked with Stripe — ${recipient}'s details are in and still under review. Your case publishes the moment it clears.`
-							: `Checked with Stripe — ${recipient} hasn't finished payout setup for this case yet.`,
+							? `Checked with Stripe. ${recipient}'s details are in and still under review. Your case publishes the moment it clears.`
+							: `Checked with Stripe. ${recipient} hasn't finished payout setup for this case yet.`,
 			);
 		});
 	}
@@ -135,10 +135,10 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 				<h2 className="font-bold text-[15px] text-ink">Where donations go</h2>
 				<p className="mt-1 text-[13.5px] text-ink-soft leading-relaxed">
 					Donations to this case are paid to your attorney's firm, into an
-					account opened for this case alone — so your funds are never mixed
-					with another client's. Through Stripe, never into a JustUs balance.
-					Your attorney applies the money to your fee under their state bar's
-					trust rules. Donors are told who receives before they give.
+					account opened for this case alone, so your funds are never mixed with
+					another client's. Through Stripe, never into a JustUs balance. Your
+					attorney applies the money to your fee under their state bar's trust
+					rules. Donors are told who receives before they give.
 				</p>
 			</div>
 
@@ -178,7 +178,7 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 							</span>
 							<span className="mt-0.5 block text-[12.5px] text-ink-soft leading-relaxed">
 								{data.designatedEmail
-									? `Your case names ${data.designatedEmail}, but no attorney account on JustUs uses that address yet. Ask them to sign up as an attorney with it — that's what links your case to their firm's payout account.`
+									? `Your case names ${data.designatedEmail}, but no attorney account on JustUs uses that address yet. Ask them to sign up as an attorney with it. That's what links your case to their firm's payout account.`
 									: "Donations are paid to the firm representing you, so this case needs an attorney before it can accept them. Add your attorney's details to the case, or take on one of the attorneys who've expressed interest."}
 							</span>
 						</span>
@@ -189,7 +189,7 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 					<p className="flex items-start gap-2 rounded-[var(--radius-card-sm)] bg-surface-2 px-3.5 py-3 text-[12.5px] text-muted-foreground leading-relaxed">
 						<Mail className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 						{attorney.hasAccount
-							? `Nothing for you to do here — ${attorney.name} finishes this in their own JustUs settings. If it's holding your case up, ${attorney.email} is the address to nudge.`
+							? `Nothing for you to do here. ${attorney.name} finishes this in their own JustUs settings. If it's holding your case up, ${attorney.email} is the address to nudge.`
 							: `${attorney.name} hasn't opened a payout account for this case yet. Each case gets its own, so they may well be set up on their other matters and still owe this one. They do it in Settings on their own JustUs account; ${attorney.email} is the address to reach them at.`}
 					</p>
 				)}
@@ -221,8 +221,8 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 						</button>
 						<p className="text-[12px] text-muted-foreground leading-relaxed">
 							{ready
-								? `Your case goes public straight away, raising toward its goal, with ${recipient} receiving. The destination is fixed from that moment — donors are shown it before they give.`
-								: `Your case is finished and private. Once ${recipient} enables payouts this doesn't always update on its own — press Check & publish to re-check with Stripe and go live the moment their account can receive.`}
+								? `Your case goes public straight away, raising toward its goal, with ${recipient} receiving. The destination is fixed from that moment. Donors are shown it before they give.`
+								: `Your case is finished and private. Once ${recipient} enables payouts this doesn't always update on its own. Press Check & publish to re-check with Stripe and go live the moment their account can receive.`}
 						</p>
 					</>
 				) : bound ? (
@@ -248,7 +248,7 @@ export function CasePayout({ data }: { data: CasePayoutData }) {
 						{attorney?.via === "invited_email" && (
 							<p className="text-[12px] text-muted-foreground leading-relaxed">
 								Matched from the attorney email on your case. Check the firm
-								above is the right one — once this case starts raising, the
+								above is the right one. Once this case starts raising, the
 								destination can't be changed.
 							</p>
 						)}
@@ -265,7 +265,7 @@ function describe(attorney: PayoutAttorney): string {
 	}
 	if (!attorney.transfersEnabled) {
 		return attorney.detailsSubmitted
-			? "Setup submitted for this case — Stripe is still verifying the firm's details."
+			? "Setup submitted for this case. Stripe is still verifying the firm's details."
 			: "Payout setup for this case started but not finished.";
 	}
 	return "Ready to receive this case's donations.";

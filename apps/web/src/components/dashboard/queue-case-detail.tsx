@@ -89,7 +89,7 @@ function expressInterestGate(
 		return {
 			canExpress: false,
 			title: `Your ${where} bar standing is still being verified`,
-			body: `You've claimed ${where} and its bar check is in progress. You can express interest the moment it clears — nothing else is needed from you.`,
+			body: `You've claimed ${where} and its bar check is in progress. You can express interest the moment it clears. Nothing else is needed from you.`,
 			cta: "View your profile",
 		};
 	}
@@ -105,7 +105,7 @@ function expressInterestGate(
 	return {
 		canExpress: false,
 		title: `Verify your ${where} bar standing to express interest`,
-		body: `You've claimed ${where}, but expressing interest needs a verified licence there — plaintiffs only ever see attorneys who can actually take the work.`,
+		body: `You've claimed ${where}, but expressing interest needs a verified licence there. Plaintiffs only ever see attorneys who can actually take the work.`,
 		cta: "Get verified",
 	};
 }
@@ -174,7 +174,7 @@ export function QueueCaseDetailView({
 					<p className="min-w-[24ch] flex-1 text-[13px] text-ink-soft leading-relaxed">
 						{item.myInterest
 							? "You've put yourself forward for this case. The plaintiff sees it on their dashboard and will reach out if they want to take it further."
-							: "Expressing interest tells the plaintiff you're available. It doesn't open a conversation — they decide whether to make contact."}
+							: "Expressing interest tells the plaintiff you're available. It doesn't open a conversation. They decide whether to make contact."}
 					</p>
 					<ExpressInterestButton
 						caseId={item.id}
@@ -316,7 +316,7 @@ export function QueueCaseDetailView({
 								aria-hidden="true"
 							/>
 							Contact details aren't shared. The plaintiff reaches out to you if
-							they choose you — you can't contact them first.
+							they choose you. You can't contact them first.
 						</p>
 					</Panel>
 				</div>

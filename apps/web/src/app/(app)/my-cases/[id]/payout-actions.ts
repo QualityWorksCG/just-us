@@ -98,7 +98,7 @@ const REASONS: Record<string, string> = {
 	no_attorney:
 		"No attorney is linked to this case yet. Donations go to your attorney's firm, so one has to be on JustUs with the email address on your case before this case can accept them.",
 	attorney_no_account:
-		"Your attorney hasn't set up their firm's payout account yet. They do it on the case itself, in their own JustUs account — we've nothing to route donations to until they have.",
+		"Your attorney hasn't set up their firm's payout account yet. They do it on the case itself, in their own JustUs account. We've nothing to route donations to until they have.",
 };
 
 export async function bindCasePayoutAction(
@@ -138,7 +138,7 @@ const GO_LIVE_REASONS: Record<string, string> = {
 	no_attorney: REASONS.no_attorney,
 	attorney_no_account: REASONS.attorney_no_account,
 	transfers_disabled:
-		"Your attorney's payout account for this case can't receive donations yet. Stripe is still verifying their firm's details — your case goes live as soon as that clears.",
+		"Your attorney's payout account for this case can't receive donations yet. Stripe is still verifying their firm's details. Your case goes live as soon as that clears.",
 };
 
 /**
@@ -188,6 +188,8 @@ export async function goLiveAction(
 	revalidatePath("/discover");
 	revalidatePath("/cases");
 	revalidatePath("/home");
+	// The marketing landing features live cases — surface the newly live one.
+	revalidatePath("/");
 	return { ok: true, recipientName: result.firmName ?? result.attorneyName };
 }
 
@@ -237,6 +239,7 @@ export async function checkAndGoLiveAction(
 		revalidatePath("/discover");
 		revalidatePath("/cases");
 		revalidatePath("/home");
+		revalidatePath("/");
 		return {
 			ok: true,
 			live: true,
@@ -390,7 +393,7 @@ export async function startPayoutOnboarding(
 			return {
 				ok: false,
 				error:
-					"This case already has a payout account opened by another firm. It has to be released before a new one can be set up — contact support.",
+					"This case already has a payout account opened by another firm. It has to be released before a new one can be set up. Contact support.",
 			};
 		}
 		let stripeAccountId = existing?.stripeAccountId;

@@ -135,7 +135,7 @@ export function PublicCaseActions({
 				toast.error(res.error);
 			} else {
 				toast.success(
-					next ? "Following — you'll see every update." : "Unfollowed.",
+					next ? "Following. You'll see every update." : "Unfollowed.",
 				);
 			}
 		});
@@ -147,7 +147,7 @@ export function PublicCaseActions({
 				? `${window.location.origin}${sharePath}`
 				: "";
 		navigator.clipboard?.writeText(url);
-		toast.success("Link copied — thanks for sharing!");
+		toast.success("Link copied. Thanks for sharing!");
 	}
 
 	function toggleSave() {
@@ -264,7 +264,7 @@ export function PublicCaseActions({
 						{pending
 							? "Taking you to checkout…"
 							: breakdown
-								? `${config.alreadyBacked ? "Give again" : "Back this case"} — ${exactUsd(breakdown.amountCents)}`
+								? `${config.alreadyBacked ? "Give again" : "Back this case"}: ${exactUsd(breakdown.amountCents)}`
 								: config.alreadyBacked
 									? "Give again"
 									: "Back this case"}
@@ -272,7 +272,7 @@ export function PublicCaseActions({
 
 					<p className="flex items-start gap-1.5 text-[11.5px] text-muted-foreground leading-relaxed">
 						<Lock className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-						No account needed. Paid securely through Stripe — a donation is a
+						No account needed. Paid securely through Stripe. A donation is a
 						gift, with no financial return and no share of any settlement.
 					</p>
 				</div>

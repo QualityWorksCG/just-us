@@ -96,7 +96,7 @@ export function CertificateView({
 					<p className="mt-8 max-w-[54ch] text-[13.5px] text-ink-soft leading-relaxed">
 						Your gift of {amountLabel} helped a wronged person stand before the
 						law with counsel beside them. A gift on JustUs is never an
-						investment and asks nothing in return — this is our thanks for the
+						investment and asks nothing in return. This is our thanks for the
 						difference it made.
 					</p>
 

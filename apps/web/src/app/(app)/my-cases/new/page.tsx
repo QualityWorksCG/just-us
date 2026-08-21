@@ -30,7 +30,7 @@ const STEPS: { icon: LucideIcon; title: string; body: string }[] = [
 	{
 		icon: Handshake,
 		title: "Agree the fee",
-		body: "Set the fee together — it becomes your goal.",
+		body: "Set the fee together. It becomes your goal.",
 	},
 	{
 		icon: Rocket,
@@ -75,7 +75,7 @@ export default async function StartNewCasePage() {
 				</h2>
 				<p className="mt-2.5 max-w-[620px] text-[15px] text-ink-soft leading-relaxed">
 					Tell your story, choose your own attorney, and let the public fund
-					your day in court. Free to start — nothing goes public until you
+					your day in court. Free to start. Nothing goes public until you
 					publish.
 				</p>
 			</div>
@@ -84,7 +84,7 @@ export default async function StartNewCasePage() {
 				<div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-brass bg-surface px-5 py-3.5 shadow-[var(--shadow-rest)]">
 					<p className="flex items-center gap-2 text-[13.5px] text-ink">
 						<Pencil className="size-4 text-brass-deep" aria-hidden="true" />
-						You have a draft in progress —{" "}
+						You have a draft in progress:{" "}
 						<span className="font-bold">
 							“{draft.title || "Untitled case"}”
 						</span>{" "}

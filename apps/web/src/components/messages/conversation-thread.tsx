@@ -372,7 +372,7 @@ export function ConversationThread({
 									value={reportReason}
 									onChange={(event) => setReportReason(event.target.value)}
 									maxLength={1000}
-									placeholder="Anything that would help our team review — what happened, when, and where."
+									placeholder="Anything that would help our team review: what happened, when, and where."
 									className="mt-2 min-h-28 w-full resize-y rounded-[var(--radius-control)] border border-line-strong bg-surface p-3 text-base text-ink leading-relaxed outline-none focus:border-brass-deep focus:ring-1 focus:ring-brass-deep/30"
 								/>
 							</div>

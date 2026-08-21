@@ -48,7 +48,7 @@ export function AttorneyInterestCard({ interest }: { interest: CaseInterest }) {
 		startAccept(async () => {
 			const res = await acceptInterestAction(interest.id);
 			if (res.ok) {
-				toast.success(`${interest.attorneyName} it is — now agree the fee.`);
+				toast.success(`${interest.attorneyName} it is. Now agree the fee.`);
 				router.push(`/cases/new?draft=${res.caseId}` as Route);
 			} else {
 				toast.error(res.error);
@@ -60,7 +60,7 @@ export function AttorneyInterestCard({ interest }: { interest: CaseInterest }) {
 		startDecline(async () => {
 			const res = await declineInterestAction(interest.id, interest.caseId);
 			if (res.ok) {
-				toast.success("Passed on — they won't be able to ask again.");
+				toast.success("Passed on. They won't be able to ask again.");
 				router.refresh();
 			} else {
 				toast.error(res.error);
@@ -145,8 +145,8 @@ export function AttorneyInterestCard({ interest }: { interest: CaseInterest }) {
 			{!verified && (
 				<p className="mt-3 rounded-[var(--radius-card)] border border-border bg-paper-alt px-3.5 py-2.5 text-[12.5px] text-ink-soft leading-relaxed">
 					This attorney's bar standing isn't verified right now, so they can't
-					take your case on yet. Nothing to do — you'll be able to choose them
-					if it clears.
+					take your case on yet. Nothing to do; you'll be able to choose them if
+					it clears.
 				</p>
 			)}
 

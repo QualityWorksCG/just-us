@@ -40,7 +40,7 @@ export default async function RepresentationPage() {
 		return (
 			<div className="flex flex-col gap-6">
 				<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-					Your attorney, the agreed fee, and where funding stands — all of it
+					Your attorney, the agreed fee, and where funding stands. All of it
 					appears here once you've started a case.
 				</p>
 				<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface px-6 py-16 text-center shadow-[var(--shadow-rest)]">
@@ -49,7 +49,7 @@ export default async function RepresentationPage() {
 					</span>
 					<p className="font-bold text-[16px] text-ink">Nothing to show yet</p>
 					<p className="max-w-[44ch] text-[13.5px] text-muted-foreground leading-relaxed">
-						Start a case and choose who represents you — you'll see them here,
+						Start a case and choose who represents you. You'll see them here,
 						with the fee you agreed and how the funding is going.
 					</p>
 					<Link
@@ -131,7 +131,7 @@ export default async function RepresentationPage() {
 			<p className="max-w-[680px] text-[14.5px] text-ink-soft leading-relaxed">
 				{views.length === 1
 					? "Your attorney, the agreed fee, and where funding stands."
-					: `You have ${views.length} cases — ${
+					: `You have ${views.length} cases, ${
 							represented === 0
 								? "none of them with an attorney yet"
 								: represented === views.length
@@ -154,8 +154,8 @@ export default async function RepresentationPage() {
 					className="mt-0.5 size-4 shrink-0 text-brass-deep"
 					aria-hidden="true"
 				/>
-				You choose your attorney — JustUs never assigns one, and never ranks
-				them for your case. Donations are paid to your attorney's firm, into an
+				You choose your attorney. JustUs never assigns one, and never ranks them
+				for your case. Donations are paid to your attorney's firm, into an
 				account opened for your case alone, and applied to your fee under their
 				state bar's trust rules. JustUs never holds the money.
 			</div>

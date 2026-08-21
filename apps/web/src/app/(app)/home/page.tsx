@@ -204,7 +204,7 @@ export default async function DashboardHome({
 					<h2 className="font-bold text-[18px] text-ink">
 						Seeking representation
 					</h2>
-					<p className="mt-1 max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+					<p className="mt-1 text-[14.5px] text-ink-soft leading-relaxed">
 						{home.sub}
 					</p>
 				</div>

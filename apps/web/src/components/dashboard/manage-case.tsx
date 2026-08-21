@@ -315,7 +315,7 @@ export function ManageCase({
 		startDeleting(async () => {
 			const res = await deleteOwnedCaseAction(data.id);
 			if (res.ok) {
-				toast.success("Case deleted — this can't be undone.");
+				toast.success("Case deleted. This can't be undone.");
 				router.push("/my-cases");
 			} else {
 				toast.error(res.error);
@@ -369,8 +369,8 @@ export function ManageCase({
 										: isSeeking
 											? "Out to attorneys"
 											: isPending
-												? "Ready — awaiting your firm"
-												: "Draft — not live yet"}
+												? "Ready, awaiting your firm"
+												: "Draft, not live yet"}
 								</span>
 								<div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
 									<span className="font-extrabold text-[44px] text-ink tabular-nums leading-none tracking-[-0.03em]">
@@ -400,7 +400,7 @@ export function ManageCase({
 										</div>
 										<p className="mt-2 font-semibold text-[13px] text-ink">
 											{pct}% of the way there
-											{raised === 0 ? " — just launched" : ""}
+											{raised === 0 ? ", just launched" : ""}
 										</p>
 									</div>
 								)}
@@ -464,48 +464,53 @@ export function ManageCase({
 					</div>
 
 					{/* Case updates — the plaintiff can post here (their attorney can too),
-					    and jump to the full history (JUS-33). */}
-					<section>
-						<div className="mb-3 flex items-center justify-between gap-3">
-							<h2 className="flex items-center gap-2 font-bold text-[15px] text-ink">
-								Case updates
-								{updates.length > 0 && (
-									<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
-										{updates.length}
-									</span>
-								)}
-							</h2>
-							{/* Persistent CTA to the full updates page, whether or not any
+					    and jump to the full history (JUS-33). Only once the case is live:
+					    updates are progress for backers, so there's nothing to post — and
+					    no one to read it — while the case is still a draft or out to
+					    attorneys. */}
+					{isLive && (
+						<section>
+							<div className="mb-3 flex items-center justify-between gap-3">
+								<h2 className="flex items-center gap-2 font-bold text-[15px] text-ink">
+									Case updates
+									{updates.length > 0 && (
+										<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
+											{updates.length}
+										</span>
+									)}
+								</h2>
+								{/* Persistent CTA to the full updates page, whether or not any
 							    exist yet. */}
-							<Link
-								href={`/my-cases/${data.id}/updates` as Route}
-								className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-[13px] text-brass-deep transition-colors hover:text-brass"
-							>
-								View all case updates
-								<ArrowRight className="size-3.5" aria-hidden="true" />
-							</Link>
-						</div>
+								<Link
+									href={`/my-cases/${data.id}/updates` as Route}
+									className="inline-flex shrink-0 items-center gap-1.5 font-semibold text-[13px] text-brass-deep transition-colors hover:text-brass"
+								>
+									View all case updates
+									<ArrowRight className="size-3.5" aria-hidden="true" />
+								</Link>
+							</div>
 
-						{/* Post an update from the overview — attributed to the plaintiff. */}
-						<div className="mb-4">
-							<CaseUpdateComposer
+							{/* Post an update from the overview — attributed to the plaintiff. */}
+							<div className="mb-4">
+								<CaseUpdateComposer
+									caseId={data.id}
+									authorName={viewerName}
+									authorTone="green"
+									placeholder="Post an update for your backers: a milestone, a hearing date, a thank-you…"
+								/>
+							</div>
+
+							<CaseUpdates
+								updates={updates}
+								viewerId={viewerId}
+								viewerRole="plaintiff"
 								caseId={data.id}
-								authorName={viewerName}
-								authorTone="green"
-								placeholder="Post an update for your backers — a milestone, a hearing date, a thank-you…"
+								emptyHint="No updates yet. Post the first one above. Your attorney can post here too as your case moves."
+								limit={2}
+								highlightSince={updatesHighlightSince}
 							/>
-						</div>
-
-						<CaseUpdates
-							updates={updates}
-							viewerId={viewerId}
-							viewerRole="plaintiff"
-							caseId={data.id}
-							emptyHint="No updates yet — post the first one above. Your attorney can post here too as your case moves."
-							limit={2}
-							highlightSince={updatesHighlightSince}
-						/>
-					</section>
+						</section>
+					)}
 
 					{/* Share / rally panel */}
 					<section className="relative overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-gradient-to-br from-brass-wash/50 via-surface to-green-soft/40 p-6 shadow-[var(--shadow-rest)]">
@@ -526,7 +531,7 @@ export function ManageCase({
 						<div className="mt-4 flex flex-wrap items-center gap-2.5">
 							<button
 								type="button"
-								onClick={() => shareCase("Link copied — thanks for sharing!")}
+								onClick={() => shareCase("Link copied. Thanks for sharing!")}
 								className="inline-flex h-11 items-center gap-2 rounded-[var(--radius-pill)] bg-success px-4 font-semibold text-[13.5px] text-white transition-transform hover:scale-[1.02]"
 							>
 								<Link2 className="size-4" aria-hidden="true" />
@@ -542,10 +547,10 @@ export function ManageCase({
 					<div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-border border-dashed bg-green-soft/40 px-5 py-3.5 text-[13px] text-green-deep leading-relaxed">
 						<Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 						{isLive
-							? "You're live and building momentum — keep sharing updates so backers stay invested in your journey to justice."
+							? "You're live and building momentum. Keep sharing updates so backers stay invested in your journey to justice."
 							: isPending
 								? "Your case is finished and waiting only on your attorney's payout account. Use the time to line up who you'll share it with the day it goes live."
-								: "Fill out your story and add photos in Edit & settings — cases with a clear story and cover image raise far more."}
+								: "Fill out your story and add photos in Edit & settings. Cases with a clear story and cover image raise far more."}
 					</div>
 				</div>
 			) : (
@@ -661,12 +666,12 @@ export function ManageCase({
 									}
 									rows={4}
 									maxLength={THANK_YOU_MAX}
-									placeholder="Say thank you in your own words — every donor gets this with their confirmation."
+									placeholder="Say thank you in your own words. Every donor gets this with their confirmation."
 								/>
 								<p className="mt-1.5 text-ink-soft text-label">
 									{thankYouNote.trim()
 										? `Sent to every donor with their confirmation. ${THANK_YOU_MAX - thankYouNote.length} characters left.`
-										: "Optional. Without one, donors still get a confirmation — just no note from you."}
+										: "Optional. Without one, donors still get a confirmation, just no note from you."}
 								</p>
 							</div>
 						</div>
@@ -832,7 +837,7 @@ export function ManageCase({
 					<section className="rounded-[var(--radius-card-lg)] border border-danger/30 bg-danger/5 p-6">
 						<h2 className="font-bold text-danger text-lg">Delete this case</h2>
 						<p className="mt-1.5 max-w-[60ch] text-[13.5px] text-ink-soft leading-relaxed">
-							This permanently deletes the case. It can't be undone — a deleted
+							This permanently deletes the case. It can't be undone: a deleted
 							case can't be restored, and you'd have to start a new one.
 						</p>
 						<button
@@ -869,7 +874,7 @@ export function ManageCase({
 						</h3>
 						<p className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed">
 							“{data.title || "This case"}” will be permanently deleted. This
-							can't be undone — a deleted case can't be restored.
+							can't be undone: a deleted case can't be restored.
 						</p>
 						<div className="mt-5 flex justify-end gap-2.5">
 							<Button

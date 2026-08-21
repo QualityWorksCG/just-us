@@ -25,9 +25,9 @@ type Tab = (typeof TABS)[number]["key"];
 const INTRO: Record<Tab, string> = {
 	saved: "Cases you've saved to come back to.",
 	following:
-		"Cases you're following — you'll see every new update here and in your bell.",
+		"Cases you're following. You'll see every new update here and in your bell.",
 	backed:
-		"Cases you've contributed to — including ones that have closed, so you can look back on them any time.",
+		"Cases you've contributed to, including ones that have closed, so you can look back on them any time.",
 };
 
 export default async function SavedPage({
@@ -122,7 +122,7 @@ export default async function SavedPage({
 						{tab === "following"
 							? "Follow a case while you browse to get its updates here and in your bell."
 							: tab === "backed"
-								? "When you donate to a case, it shows here — even after it closes, so you can always look back."
+								? "When you donate to a case, it shows here, even after it closes, so you can always look back."
 								: "Save cases while you browse to keep them handy here."}
 					</p>
 					<Link

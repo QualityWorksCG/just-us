@@ -123,7 +123,7 @@ export default async function RevenuePage({
 					<strong className="text-ink">{money(rev.platformFeeCents)}</strong> is
 					the exact sum of the platform fee recorded on each of the{" "}
 					<strong className="text-ink">{rev.donationCount}</strong> succeeded
-					donation record{rev.donationCount === 1 ? "" : "s"} — gross{" "}
+					donation record{rev.donationCount === 1 ? "" : "s"}: gross{" "}
 					{money(rev.grossCents)} = fee {money(rev.platformFeeCents)} + net{" "}
 					{money(rev.netToFirmsCents)}.
 					{rev.refundedCount > 0 && (
@@ -230,7 +230,7 @@ export default async function RevenuePage({
 				</section>
 				<p className="text-[12px] text-muted-foreground">
 					Showing the {ACTIVITY_LIMIT} most recent. Donor identity is shown as a
-					label only — no payment details, card data, or account references are
+					label only. No payment details, card data, or account references are
 					ever recorded here.
 				</p>
 			</div>

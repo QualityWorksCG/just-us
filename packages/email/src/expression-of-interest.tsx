@@ -43,8 +43,8 @@ export default function ExpressionOfInterestEmail({
 			<Text style={paragraph}>
 				{recipientName ? `Hi ${recipientName.split(" ")[0]}, ` : "Hi, "}
 				{who} has expressed interest in representing “{caseTitle}”. Review them
-				and decide whether to take it forward — nothing is shared until you
-				reach out.
+				and decide whether to take it forward. Nothing is shared until you reach
+				out.
 			</Text>
 			<Section style={buttonSection}>
 				<Button href={url} style={buttonStyle}>

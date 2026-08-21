@@ -17,6 +17,7 @@ import {
 import type { Route } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Fragment } from "react";
 
 import { AttorneyInterestCard } from "@/components/dashboard/attorney-interest-card";
 import { BackLink } from "@/components/dashboard/back-link";
@@ -71,11 +72,11 @@ export default async function CaseRequestsPage({
 					<h2 className="mt-3 font-extrabold text-[clamp(1.75rem,3.4vw,2.375rem)] text-ink tracking-[-0.03em]">
 						You've chosen {attorneyName}
 					</h2>
-					<p className="mt-2 max-w-[58ch] text-[14.5px] text-ink-soft leading-relaxed">
+					<p className="mt-2 text-[14.5px] text-ink-soft leading-relaxed">
 						Your attorney is set for “{c.title || "your case"}”. Finish agreeing
-						the fee and publish to take your campaign live. This choice is saved
-						— if something went wrong while publishing, you won't have to choose
-						again.
+						the fee and publish to take your campaign live. This choice is
+						saved. If something went wrong while publishing, you won't have to
+						choose again.
 					</p>
 				</div>
 
@@ -85,35 +86,37 @@ export default async function CaseRequestsPage({
 						const done = i < 3;
 						const active = i === 3;
 						return (
-							<li key={label} className="flex flex-1 items-center gap-2">
-								<span
-									className={cn(
-										"flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]",
-										done && "bg-success text-white",
-										active && "border-2 border-brass text-brass-deep",
-										!done &&
-											!active &&
-											"border border-line-strong text-muted-foreground",
-									)}
-								>
-									{done ? (
-										<Check className="size-3" aria-hidden="true" />
-									) : null}
-								</span>
-								<span
-									className={cn(
-										"whitespace-nowrap text-[12.5px]",
-										done || active
-											? "font-semibold text-ink"
-											: "text-muted-foreground",
-									)}
-								>
-									{label}
-								</span>
+							<Fragment key={label}>
+								<li className="inline-flex shrink-0 items-center gap-2">
+									<span
+										className={cn(
+											"flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]",
+											done && "bg-success text-white",
+											active && "border-2 border-brass text-brass-deep",
+											!done &&
+												!active &&
+												"border border-line-strong text-muted-foreground",
+										)}
+									>
+										{done ? (
+											<Check className="size-3" aria-hidden="true" />
+										) : null}
+									</span>
+									<span
+										className={cn(
+											"whitespace-nowrap text-[12.5px]",
+											done || active
+												? "font-semibold text-ink"
+												: "text-muted-foreground",
+										)}
+									>
+										{label}
+									</span>
+								</li>
 								{i < STEPS.length - 1 && (
-									<span className="h-px flex-1 bg-border" />
+									<span className="h-px flex-1 bg-border" aria-hidden="true" />
 								)}
-							</li>
+							</Fragment>
 						);
 					})}
 				</ol>
@@ -136,7 +139,7 @@ export default async function CaseRequestsPage({
 							className={cn(buttonVariants({ size: "lg" }), "px-5")}
 						>
 							<Handshake data-icon="inline-start" aria-hidden="true" />
-							Continue — agree the fee & publish
+							Continue: agree the fee & publish
 							<ArrowRight data-icon="inline-end" aria-hidden="true" />
 						</Link>
 						<Link
@@ -156,8 +159,8 @@ export default async function CaseRequestsPage({
 						className="mt-0.5 size-4 shrink-0 text-brass-deep"
 						aria-hidden="true"
 					/>
-					Nothing is final until you publish. Your case only goes live — and
-					starts raising — once you've agreed the fee and hit publish.
+					Nothing is final until you publish. Your case only goes live, and
+					starts raising, once you've agreed the fee and hit publish.
 				</div>
 			</div>
 		);
@@ -197,46 +200,52 @@ export default async function CaseRequestsPage({
 						? "Attorneys interested in representing you"
 						: "Your case is out to attorneys"}
 				</h2>
-				<p className="mt-2 max-w-[58ch] text-[14.5px] text-ink-soft leading-relaxed">
+				<p className="mt-2 text-[14.5px] text-ink-soft leading-relaxed">
 					{hasInterest
-						? "These attorneys have put themselves forward. None of them can contact you — you reach out by choosing one, which sets your attorney and moves you to agree the fee. Nothing's final until you publish."
-						: `Bar-verified attorneys can put themselves forward to represent “${c.title || "your case"}”. You'll see them here — or choose an attorney yourself anytime.`}
+						? "These attorneys have put themselves forward. None of them can contact you. You reach out by choosing one, which sets your attorney and moves you to agree the fee. Nothing's final until you publish."
+						: `Bar-verified attorneys can put themselves forward to represent “${c.title || "your case"}”. You'll see them here, or choose an attorney yourself anytime.`}
 				</p>
 			</div>
 
-			{/* Progress stepper */}
+			{/* Progress stepper. Labels take their own width and the connector lines
+			    flex between them, so the row spans the container evenly rather than
+			    leaving dead space after the last step. */}
 			<ol className="flex items-center gap-2 overflow-x-auto pb-1">
 				{STEPS.map((label, i) => {
 					const done = i < activeStep;
 					const active = i === activeStep;
 					return (
-						<li key={label} className="flex flex-1 items-center gap-2">
-							<span
-								className={cn(
-									"flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]",
-									done && "bg-success text-white",
-									active && "border-2 border-brass text-brass-deep",
-									!done &&
-										!active &&
-										"border border-line-strong text-muted-foreground",
-								)}
-							>
-								{done ? <Check className="size-3" aria-hidden="true" /> : null}
-							</span>
-							<span
-								className={cn(
-									"whitespace-nowrap text-[12.5px]",
-									done || active
-										? "font-semibold text-ink"
-										: "text-muted-foreground",
-								)}
-							>
-								{label}
-							</span>
+						<Fragment key={label}>
+							<li className="inline-flex shrink-0 items-center gap-2">
+								<span
+									className={cn(
+										"flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]",
+										done && "bg-success text-white",
+										active && "border-2 border-brass text-brass-deep",
+										!done &&
+											!active &&
+											"border border-line-strong text-muted-foreground",
+									)}
+								>
+									{done ? (
+										<Check className="size-3" aria-hidden="true" />
+									) : null}
+								</span>
+								<span
+									className={cn(
+										"whitespace-nowrap text-[12.5px]",
+										done || active
+											? "font-semibold text-ink"
+											: "text-muted-foreground",
+									)}
+								>
+									{label}
+								</span>
+							</li>
 							{i < STEPS.length - 1 && (
-								<span className="h-px flex-1 bg-border" />
+								<span className="h-px flex-1 bg-border" aria-hidden="true" />
 							)}
-						</li>
+						</Fragment>
 					);
 				})}
 			</ol>
@@ -274,8 +283,8 @@ export default async function CaseRequestsPage({
 					className="mt-0.5 size-4 shrink-0 text-brass-deep"
 					aria-hidden="true"
 				/>
-				Bar-verified attorneys can read your case — your account of what
-				happened, the evidence you filed, and your name — which is how they
+				Bar-verified attorneys can read your case (your account of what
+				happened, the evidence you filed, and your name), which is how they
 				decide whether they can help. Your contact details are never shared, and
 				they can't message you: nothing reaches you until you choose. Passing on
 				one is final; you can keep waiting, and more may still come forward.

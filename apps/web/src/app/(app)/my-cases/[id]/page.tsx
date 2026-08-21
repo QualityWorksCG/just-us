@@ -187,8 +187,8 @@ export default async function CasePage({
 					{c.status === "live"
 						? "Manage your case, or view how your public fundraiser page looks to donors."
 						: c.status === "pending_payout"
-							? "Your case is finished and private. It goes public as soon as your attorney's payout account can receive — publish it below."
-							: "Manage your case — edit the details, update images, or remove it."}
+							? "Your case is finished and private. It goes public as soon as your attorney's payout account can receive. Publish it below."
+							: "Manage your case: edit the details, update images, or remove it."}
 				</p>
 			</div>
 
@@ -316,7 +316,7 @@ async function AttorneyView({
 								viewerId={session.user.id}
 								viewerRole="attorney"
 								caseId={item.id}
-								emptyHint="No updates yet — your first post will appear here and reach every backer."
+								emptyHint="No updates yet. Your first post will appear here and reach every backer."
 								limit={2}
 							/>
 						</div>

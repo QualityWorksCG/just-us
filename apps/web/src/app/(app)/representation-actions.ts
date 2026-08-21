@@ -68,6 +68,6 @@ const FAILURE_MESSAGES = {
 	not_admitted:
 		"You can only put yourself forward for cases in a state you're admitted in. Add that state on your directory profile and verify your bar standing there.",
 	unavailable:
-		"This case is no longer seeking representation — it's been matched, funded, or withdrawn.",
+		"This case is no longer seeking representation. It's been matched, funded, or withdrawn.",
 	already_expressed: "You've already expressed interest in this case.",
 } as const;

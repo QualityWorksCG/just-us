@@ -29,12 +29,19 @@ import { FeaturedCases, type LandingCase } from "@/components/featured-cases";
 import { LandingFaq } from "@/components/landing-faq";
 import { Reveal } from "@/components/reveal";
 
+// The featured cases are real, live rows from the database — without this the page
+// is statically rendered once and freezes them, so a case that has since closed (or
+// a newly live one) never updates. Revalidate periodically as a safety net; the
+// go-live and close actions also revalidate `/` on demand, so the list turns over
+// the moment a case's status changes rather than only on this window.
+export const revalidate = 300;
+
 const howSteps = [
 	{
 		num: "01",
 		icon: FileText,
 		title: "Tell what happened",
-		body: "Share your story and evidence — you decide what goes public.",
+		body: "Share your story and evidence. You decide what goes public.",
 	},
 	{
 		num: "02",
@@ -96,7 +103,7 @@ const trustItems = [
 	{
 		icon: ShieldCheck,
 		title: "You choose your own attorney",
-		body: "Browse bar-verified attorneys and pick who represents you — no one is ever assigned to you.",
+		body: "Browse bar-verified attorneys and pick who represents you. No one is ever assigned to you.",
 		badge: "Your call, always",
 	},
 	{
@@ -167,7 +174,7 @@ const startPaths = [
 	{
 		icon: Scale,
 		title: "Practice law that matters",
-		body: "List the fundable cases you choose — with the fee raised before you file.",
+		body: "List the fundable cases you choose, with the fee raised before you file.",
 		meta: "Bar-verified · funded before you file",
 		cta: "Join as an attorney",
 		href: "/attorneys",
@@ -408,7 +415,7 @@ export default async function Home() {
 						<p className="mt-3.5 max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 							The plaintiff chooses an attorney from the directory and a fee is
 							agreed before a single dollar is asked for. The fee becomes the
-							goal — nothing more is ever raised.
+							goal. Nothing more is ever raised.
 						</p>
 					</div>
 					<ol className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -552,13 +559,12 @@ export default async function Home() {
 						</h2>
 						<p className="mt-3.5 text-[14.5px] text-ink-soft leading-relaxed">
 							JustUs charges a 5% platform fee on donations, added on top of the
-							gift you choose — that's how we keep the lights on. We never take
-							a share of legal fees or settlements, and tips are always
-							optional.
+							gift you choose. That's how we keep the lights on. We never take a
+							share of legal fees or settlements, and tips are always optional.
 						</p>
 						<p className="mt-3.5 text-[13px] text-muted-foreground leading-relaxed">
 							Donations are gifts. They carry no financial return and no share
-							of any outcome — you give because the case matters, and you follow
+							of any outcome. You give because the case matters, and you follow
 							it to the end.
 						</p>
 					</div>
@@ -698,13 +704,13 @@ export default async function Home() {
 							Fair questions, straight answers.
 						</h2>
 						<p className="mt-3 max-w-[380px] text-[14.5px] text-ink-soft leading-relaxed">
-							The ones we hear most. If yours isn't here, ask — we answer donors
+							The ones we hear most. If yours isn't here, ask. We answer donors
 							and plaintiffs alike.
 						</p>
 						<figure className="mt-8 rounded-[var(--radius-card)] border border-[color-mix(in_oklch,var(--success)_28%,var(--green-soft))] bg-green-soft p-5">
 							<Quote className="size-5 text-success" aria-hidden="true" />
 							<blockquote className="mt-3 text-[14px] text-green-deep leading-relaxed">
-								“I never thought strangers would fund my case. They did — and my
+								“I never thought strangers would fund my case. They did, and my
 								attorney never stopped updating me.”
 							</blockquote>
 							<figcaption className="mt-3 font-semibold text-[12.5px] text-[color-mix(in_oklch,var(--green-deep)_78%,transparent)]">
@@ -735,7 +741,7 @@ export default async function Home() {
 							Whoever you are in the fight, start here.
 						</h2>
 						<p className="mt-3 text-[14.5px] text-gold-bright-ink/75">
-							Three ways in — and every one of them is free to start.
+							Three ways in, and every one of them is free to start.
 						</p>
 					</div>
 					<div className="grid gap-4 md:grid-cols-3">
@@ -798,7 +804,7 @@ export default async function Home() {
 								</div>
 							</div>
 							<p className="text-[13.5px] text-dark-fg/60 leading-relaxed">
-								Funding access to justice — so the merit of a case matters more
+								Funding access to justice, so the merit of a case matters more
 								than the size of a bank account.
 							</p>
 						</div>
@@ -851,7 +857,7 @@ export default async function Home() {
 					</div>
 					<div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 						<p className="max-w-3xl text-[12px] text-dark-fg/45 leading-relaxed">
-							Donations made through JustUs are gifts — not investments. They
+							Donations made through JustUs are gifts, not investments. They
 							carry no financial return and grant no share of any settlement or
 							judgment. JustUs never takes custody of donated funds.
 						</p>

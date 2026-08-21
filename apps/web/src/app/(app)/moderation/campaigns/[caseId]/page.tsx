@@ -18,7 +18,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 const HOLD_LABEL: Record<string, { text: string; cls: string }> = {
-	held: { text: "Hidden — awaiting review", cls: "bg-danger/10 text-danger" },
+	held: { text: "Hidden, awaiting review", cls: "bg-danger/10 text-danger" },
 	ok: { text: "Visible", cls: "bg-green-soft text-green-deep" },
 	removed: { text: "Removed", cls: "bg-surface-2 text-ink-soft" },
 };

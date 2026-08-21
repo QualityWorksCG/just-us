@@ -65,14 +65,14 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Dashboard",
 				icon: LayoutDashboard,
 				title: "Your giving dashboard",
-				sub: "Your giving at a glance — here's the difference you're making.",
+				sub: "Your giving at a glance. Here's the difference you're making.",
 			},
 			{
 				slug: "discover",
 				label: "Discover cases",
 				icon: Compass,
 				title: "Discover cases",
-				sub: "Find a case that matters to you — save it, share it, or back it today.",
+				sub: "Find a case that matters to you: save it, share it, or back it today.",
 			},
 			{
 				slug: "saved",
@@ -123,7 +123,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "My cases",
 				icon: Folder,
 				title: "My cases",
-				sub: "Every case you've started — draft, raising, or resolved.",
+				sub: "Every case you've started: draft, raising, or resolved.",
 			},
 			{
 				slug: "attorneys",
@@ -177,7 +177,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				// Says "browse and filter" rather than promising the queue is already
 				// narrowed to this attorney: nothing is filtered unless they ask, so
 				// they can see every case that needs someone (JUS-25).
-				sub: "Cases that need an attorney. Browse the public summaries, filter by category or state, and put yourself forward — the plaintiff decides whether to take it further.",
+				sub: "Cases that need an attorney. Browse the public summaries, filter by category or state, and put yourself forward. The plaintiff decides whether to take it further.",
 			},
 			{
 				slug: "cases",
@@ -187,7 +187,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "My cases",
 				icon: Briefcase,
 				title: "My cases",
-				sub: "Cases matched to you — detail, evidence, and funding.",
+				sub: "Cases matched to you: detail, evidence, and funding.",
 			},
 			{
 				slug: "messages",

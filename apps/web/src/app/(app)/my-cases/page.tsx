@@ -154,7 +154,7 @@ export default async function MyCasesPage({
 				<div>
 					{/* No heading — the shell's header bar carries the screen title. */}
 					<p className="text-[14.5px] text-ink-soft">
-						Every case you've started — draft, raising, or resolved.
+						Every case you've started: draft, raising, or resolved.
 					</p>
 				</div>
 				<Link
@@ -217,8 +217,8 @@ export default async function MyCasesPage({
 					</p>
 					<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
 						{filter === "deleted"
-							? "Deleted cases stay here as a record. Deleting is permanent — a deleted case can't be restored."
-							: "Start your first case — tell your story, choose your attorney, and raise the agreed fee."}
+							? "Deleted cases stay here as a record. Deleting is permanent. A deleted case can't be restored."
+							: "Start your first case: tell your story, choose your attorney, and raise the agreed fee."}
 					</p>
 					{filter !== "deleted" && (
 						<Link
@@ -362,7 +362,7 @@ export default async function MyCasesPage({
 											</p>
 										) : isDeleted ? (
 											<p className="text-[13px] text-muted-foreground">
-												Deleted — this can't be undone.
+												Deleted. This can't be undone.
 											</p>
 										) : (
 											<>
@@ -458,10 +458,7 @@ export default async function MyCasesPage({
 												>
 													<Settings2 className="size-4" aria-hidden="true" />
 												</Link>
-												{!isLive &&
-													!isSeeking &&
-													!isPending &&
-													!isClosed && (
+												{!isLive && !isSeeking && !isPending && !isClosed && (
 													<DeleteDraftButton
 														id={c.id}
 														title={c.title || undefined}

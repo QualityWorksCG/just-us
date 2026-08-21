@@ -83,7 +83,7 @@ export function ContactAttorneyButton({
 							id={descId}
 							className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed"
 						>
-							There's no message box — {firstName} decides from the case itself:
+							There's no message box. {firstName} decides from the case itself:
 							what happened, where, and what you're asking for. So the next
 							screen is the case form.
 						</p>

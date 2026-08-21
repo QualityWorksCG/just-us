@@ -56,7 +56,7 @@ export function CloseCaseButton({
 				<p className="mt-1.5 max-w-[60ch] text-[13.5px] text-ink-soft leading-relaxed">
 					When the matter has resolved, close the case to stop accepting
 					donations. Everyone who backed it receives a certificate of
-					appreciation. Closing is not a refund — a gift on JustUs is never an
+					appreciation. Closing is not a refund. A gift on JustUs is never an
 					investment, and none is returned.
 				</p>
 				<button

@@ -772,13 +772,13 @@ export function AttorneyProfileForm({
 	 */
 	const formatErrors: Record<string, string> = {};
 	if (contactEmail.trim() && !EMAIL_PATTERN.test(contactEmail.trim())) {
-		formatErrors.contactEmail = "Enter a valid email — this isn't saved yet.";
+		formatErrors.contactEmail = "Enter a valid email. This isn't saved yet.";
 	}
 	if (contactPhone.trim() && !isValidPhone(contactPhone)) {
-		formatErrors.contactPhone = `${PHONE_MESSAGE} — this isn't saved yet.`;
+		formatErrors.contactPhone = `${PHONE_MESSAGE}. This isn't saved yet.`;
 	}
 	if (websiteUrl.trim() && !URL_PATTERN.test(websiteUrl.trim())) {
-		formatErrors.websiteUrl = "Include https:// — this isn't saved yet.";
+		formatErrors.websiteUrl = "Include https://. This isn't saved yet.";
 	}
 	if (showFeeRange) {
 		const min = dollarsToCents(feeMin);
@@ -851,7 +851,7 @@ export function AttorneyProfileForm({
 						<p className="mt-0.5 text-[13px] text-muted-foreground leading-relaxed">
 							{pct === 100
 								? "Everything a plaintiff looks for is filled in."
-								: "Still to add — pick one to jump straight to it:"}
+								: "Still to add. Pick one to jump straight to it:"}
 						</p>
 					</div>
 					<p
@@ -896,7 +896,7 @@ export function AttorneyProfileForm({
 									key={m.label}
 									type="button"
 									onClick={() => setTab(m.tab)}
-									aria-label={`Add ${m.label} — go to ${target?.label}`}
+									aria-label={`Add ${m.label}, go to ${target?.label}`}
 									className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-line-strong bg-surface px-3 py-1.5 font-semibold text-[12.5px] text-ink-soft transition-colors hover:border-brass hover:bg-brass-wash hover:text-brass-deep"
 								>
 									{m.label}
@@ -925,7 +925,7 @@ export function AttorneyProfileForm({
 					<Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					<span>
 						This is what plaintiffs see when they're choosing an attorney. Your
-						bar standing is verified separately — your listing goes public once
+						bar standing is verified separately. Your listing goes public once
 						that's confirmed.
 					</span>
 				</p>
@@ -991,7 +991,7 @@ export function AttorneyProfileForm({
 				<Section
 					icon={UserIcon}
 					title="Photo & name"
-					sub="Your legal name must match your bar record — it's what we verify against."
+					sub="Your legal name must match your bar record. It's what we verify against."
 				>
 					<div className="flex flex-col gap-6 sm:flex-row sm:items-start">
 						<div className="flex flex-col items-center gap-2.5">
@@ -1223,7 +1223,7 @@ export function AttorneyProfileForm({
 				<Section
 					icon={Scale}
 					title="Practice areas"
-					sub={`Pick the areas you take cases in — up to ${MAX_AREAS}. Plaintiffs are matched to you on these.`}
+					sub={`Pick the areas you take cases in, up to ${MAX_AREAS}. Plaintiffs are matched to you on these.`}
 				>
 					<div className="flex flex-wrap gap-2">
 						{PRACTICE_AREAS.map((area) => (
@@ -1244,7 +1244,7 @@ export function AttorneyProfileForm({
 					<p className="mt-2.5 text-[12px] text-muted-foreground">
 						{practiceAreas.length}/{MAX_AREAS} selected
 						{practiceAreas.length >= MAX_AREAS &&
-							" — deselect one to choose another."}
+							". Deselect one to choose another."}
 					</p>
 				</Section>
 			)}
@@ -1483,7 +1483,7 @@ export function AttorneyProfileForm({
 								onChange={(e) => setBackground(e.target.value)}
 								rows={4}
 								maxLength={BACKGROUND_MAX}
-								placeholder="Education and prior roles — where you studied and where you've practised."
+								placeholder="Education and prior roles: where you studied and where you've practised."
 								aria-invalid={!!errors.background}
 							/>
 							<div className="flex items-center justify-between">
@@ -1534,11 +1534,11 @@ export function AttorneyProfileForm({
 					) : status === "error" ? (
 						<>
 							<CircleAlert className="size-3.5" aria-hidden="true" />
-							Couldn't save — your changes are still here. Retrying on the next
+							Couldn't save. Your changes are still here. Retrying on the next
 							edit.
 						</>
 					) : dirty ? (
-						"Unsaved changes — saving shortly…"
+						"Unsaved changes, saving shortly…"
 					) : savedAt ? (
 						<>
 							<Check className="size-3.5 text-success" aria-hidden="true" />

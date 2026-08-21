@@ -474,7 +474,7 @@ export function ProfileSettings({
 										>
 											Add or remove states
 										</Link>{" "}
-										on your directory profile — that list is what decides which
+										on your directory profile. That list is what decides which
 										cases reach you.
 									</p>
 								)}
