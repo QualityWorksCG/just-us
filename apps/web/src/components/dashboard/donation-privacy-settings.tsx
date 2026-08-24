@@ -52,7 +52,7 @@ export function DonationPrivacySettings({
 							</label>
 							<p className="mt-1 max-w-[52ch] text-[13px] text-ink-soft leading-relaxed">
 								When on, your name appears in a case's public list of
-								supporters. Turn it off to give anonymously — your gift still
+								supporters. Turn it off to give anonymously. Your gift still
 								counts, but you show as “Anonymous”.
 							</p>
 						</div>

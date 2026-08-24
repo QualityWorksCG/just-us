@@ -281,7 +281,7 @@ export const GET = withEvlog(
 /** The sentence that goes in front of the static help text, per reason. */
 const DEGRADED_PREFACE = {
 	"user-ceiling":
-		"You've used up your assistant allowance for this month — it resets when the new month starts.",
+		"You've used up your assistant allowance for this month. It resets when the new month starts.",
 	"global-ceiling":
 		"The assistant has reached the platform's monthly budget, so it's paused for everyone until next month.",
 	unconfigured: "The assistant isn't connected to a model in this environment.",

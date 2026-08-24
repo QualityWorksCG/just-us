@@ -68,7 +68,7 @@ export function MatchedCasesPanel({
 					</p>
 					<p className="mx-auto mt-1 max-w-[44ch] text-[13px] text-muted-foreground leading-relaxed">
 						When a plaintiff takes your interest further, their case appears
-						here — with its funding, its account status, and a place to post
+						here, with its funding, its account status, and a place to post
 						updates. Put yourself forward in the queue below.
 					</p>
 				</div>

@@ -125,7 +125,7 @@ export function MessageAttorneyButton({
 							id={descriptionId}
 							className="mt-5 rounded-[var(--radius-card-sm)] border border-border bg-paper-alt p-4 text-[13px] text-ink-soft leading-relaxed"
 						>
-							Messaging a JustUs attorney does not create an attorney–client
+							Messaging a JustUs attorney does not create an attorney-client
 							relationship and is not privileged until representation is agreed.
 						</p>
 						<div className="mt-4 flex items-start gap-2.5 text-[13px] text-ink-soft">

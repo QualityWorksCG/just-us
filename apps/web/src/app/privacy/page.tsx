@@ -65,7 +65,7 @@ export default function PrivacyPage() {
 						processor.
 					</li>
 					<li>
-						To keep the platform secure — including rate limiting, lockout after
+						To keep the platform secure, including rate limiting, lockout after
 						repeated failed sign-ins, and fraud and abuse prevention.
 					</li>
 					<li>
@@ -84,14 +84,14 @@ export default function PrivacyPage() {
 				<ul>
 					<li>
 						<strong>Between platform participants,</strong> as the service
-						requires — for example, a case a plaintiff publishes is visible to
+						requires. For example, a case a plaintiff publishes is visible to
 						donors, and a matched attorney can see the case detail relevant to
 						their work.
 					</li>
 					<li>
 						<strong>Service providers</strong> who work on our behalf under
-						contract — such as hosting, our email provider, and our payment
-						processor — limited to what they need to perform their service.
+						contract (such as hosting, our email provider, and our payment
+						processor), limited to what they need to perform their service.
 					</li>
 					<li>
 						<strong>Legal and safety:</strong> when required by law, to respond
@@ -109,7 +109,7 @@ export default function PrivacyPage() {
 				<h2>4. Payments and funds</h2>
 				<p>
 					Donations are processed by a third-party payment processor and route
-					directly to an account held by the case's designated recipient — the
+					directly to an account held by the case's designated recipient: the
 					plaintiff who created it, as stated on the case page. JustUs never
 					takes custody of donated funds and does not receive or store your
 					payment credentials.

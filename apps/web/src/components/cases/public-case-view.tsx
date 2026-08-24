@@ -192,7 +192,7 @@ export function PublicCaseView({
 						<span className="relative inline-flex size-2 rounded-full bg-success" />
 					</span>
 					<span className="font-semibold text-[12.5px]">
-						Live — actively raising
+						Live, actively raising
 					</span>
 					<span className="text-green-deep/50">·</span>
 					<span className="font-semibold text-[12.5px] tabular-nums">
@@ -490,7 +490,7 @@ export function PublicCaseView({
 							limit={2}
 							viewAllHref={updatesHref}
 							highlightSince={updatesHighlightSince}
-							emptyHint={`No updates yet — ${ownerFirst}'s attorney will post progress here.`}
+							emptyHint={`No updates yet. ${ownerFirst}'s attorney will post progress here.`}
 						/>
 					</section>
 

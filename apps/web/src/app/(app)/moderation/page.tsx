@@ -53,7 +53,7 @@ export default async function ModerationPage({
 			<div>
 				<p className="max-w-[680px] text-[14.5px] text-ink-soft leading-relaxed">
 					Cases go live instantly. When the community reports a campaign, an
-					update, or a conversation, it's held here for your ruling — you decide
+					update, or a conversation, it's held here for your ruling. You decide
 					what stays and what comes down.
 				</p>
 			</div>

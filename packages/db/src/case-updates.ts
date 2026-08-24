@@ -74,7 +74,7 @@ function resolveAuthor(
 
 export type PostUpdateResult =
 	| { ok: true; id: string }
-	| { ok: false; reason: "empty" | "not_attached" };
+	| { ok: false; reason: "empty" | "not_attached" | "not_live" };
 
 /**
  * Post an update to a case as `authorId`. Succeeds only when `authorId` is the
@@ -94,13 +94,23 @@ export async function postCaseUpdate(input: {
 
 	const c = await prisma.case.findUnique({
 		where: { id: input.caseId },
-		select: { ownerId: true, match: { select: { attorneyId: true } } },
+		select: {
+			ownerId: true,
+			status: true,
+			match: { select: { attorneyId: true } },
+		},
 	});
 	if (!c) return { ok: false, reason: "not_attached" };
 
 	const isOwner = c.ownerId === input.authorId;
 	const isAttorney = c.match?.attorneyId === input.authorId;
 	if (!isOwner && !isAttorney) return { ok: false, reason: "not_attached" };
+
+	// Updates are progress for backers, so a case can only receive them once it is
+	// public and raising. Before that — draft, out to attorneys, or awaiting the
+	// firm's payout account — there are no backers to reach, and the composer is
+	// hidden; this is the matching server-side guard so it can't be bypassed.
+	if (c.status !== "live") return { ok: false, reason: "not_live" };
 
 	const created = await prisma.caseUpdate.create({
 		data: {
@@ -472,6 +482,11 @@ export type CaseUpdateGroup = {
 	coverImageUrl: string | null;
 	/** Total updates on the case; `updates` holds only the most recent `perCase`. */
 	total: number;
+	/** Updates the owner hasn't seen yet — posted by someone else (their attorney)
+	 *  since they last opened this case. Drives the "N new" badge and Unread tab. */
+	unread: number;
+	/** When the newest update landed, for the "last activity" line. */
+	lastActivityAt: Date | null;
 	updates: CaseUpdate[];
 };
 
@@ -497,6 +512,7 @@ export async function listCaseUpdateGroupsForOwner(
 				status: true,
 				attorneyName: true,
 				coverImageUrl: true,
+				ownerUpdatesSeenAt: true,
 				_count: { select: { updates: true } },
 				updates: {
 					orderBy: { createdAt: "desc" },
@@ -516,6 +532,27 @@ export async function listCaseUpdateGroupsForOwner(
 		}),
 	]);
 
+	// Unread per case: updates from someone other than the owner (their attorney),
+	// newer than the last time the owner opened that case — the same "unseen" rule
+	// the header bell uses. One query across all their cases, tallied in memory.
+	const unreadByCase = new Map<string, number>();
+	if (cases.length > 0) {
+		const unreadRows = await prisma.caseUpdate.findMany({
+			where: {
+				authorId: { not: ownerId },
+				OR: cases.map((c) =>
+					c.ownerUpdatesSeenAt
+						? { caseId: c.id, createdAt: { gt: c.ownerUpdatesSeenAt } }
+						: { caseId: c.id },
+				),
+			},
+			select: { caseId: true },
+		});
+		for (const r of unreadRows) {
+			unreadByCase.set(r.caseId, (unreadByCase.get(r.caseId) ?? 0) + 1);
+		}
+	}
+
 	return (
 		cases
 			.map((c) => ({
@@ -527,6 +564,8 @@ export async function listCaseUpdateGroupsForOwner(
 				attorneyName: c.attorneyName,
 				coverImageUrl: c.coverImageUrl,
 				total: c._count.updates,
+				unread: unreadByCase.get(c.id) ?? 0,
+				lastActivityAt: c.updates[0]?.createdAt ?? null,
 				updates: c.updates.map((u) => ({
 					id: u.id,
 					body: u.body,

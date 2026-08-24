@@ -290,6 +290,90 @@ export async function adminSetVerification(
 }
 
 /**
+ * An administrator's ruling on **one state** an attorney claims — the manual
+ * counterpart to a bar scan, for when the automatic check couldn't reach a clear
+ * answer and the attorney's request lands in review.
+ *
+ * A licence is per state (see `admissions`), so this grants or clears trust for a
+ * single admission rather than the whole account. It ensures the admission exists
+ * (the attorney claimed it, but an admin can also vouch for one they haven't yet),
+ * records the check on that state, then recomputes the profile's coarse badge from
+ * *all* the attorney's admissions — one verified state is enough to make the
+ * account a verified attorney, so the badge follows the best standing. The
+ * evidence row names the state, so the trail shows exactly what was decided.
+ */
+export async function adminSetAdmissionVerification(
+	userId: string,
+	adminId: string,
+	state: string,
+	status: "verified" | "unverified",
+	note?: string,
+): Promise<AdminVerificationResult> {
+	const user = await prisma.user.findUnique({
+		where: { id: userId },
+		select: { role: true, name: true },
+	});
+	if (user?.role !== "attorney") {
+		return { ok: false, reason: "not_attorney" };
+	}
+
+	await prisma.$transaction(async (tx) => {
+		await ensureAdmission(tx, userId, state);
+		await recordAdmissionCheck(tx, userId, state, status);
+
+		// The profile badge is the coarse "is this a checked attorney at all" cache
+		// the directory and queue banner read; it is whatever the attorney's
+		// admissions add up to (best standing wins), never just this one state.
+		const badge = await currentBadge(tx, userId);
+		const profile = await tx.attorneyProfile.upsert({
+			where: { userId },
+			create: {
+				userId,
+				verificationStatus: badge,
+				bioStatus: "approved",
+				...(badge === "verified" ? { verifiedAt: new Date() } : {}),
+			},
+			update: {
+				verificationStatus: badge,
+				...(badge === "verified" ? { verifiedAt: new Date() } : {}),
+			},
+			select: { id: true },
+		});
+
+		const verified = status === "verified";
+		await tx.attorneyVerification.create({
+			data: {
+				profileId: profile.id,
+				status,
+				confidence: 0,
+				isLicensedAttorney: verified ? true : null,
+				inGoodStanding: verified ? true : null,
+				summary: verified
+					? `${state} bar standing marked verified by an administrator.`
+					: `${state} verification cleared by an administrator.`,
+				sources: [],
+				checkedName: user.name,
+				checkedJurisdiction: state,
+				model: "admin-override",
+				triggeredBy: adminId,
+				overriddenBy: adminId,
+				...(note ? { overriddenReason: note } : {}),
+			},
+		});
+
+		await writeAudit(tx, {
+			actorId: adminId,
+			action: verified ? "attorney.verified" : "attorney.verification_cleared",
+			targetType: "user",
+			targetId: userId,
+			reason: note ? `${state}: ${note}` : state,
+		});
+	});
+
+	return { ok: true, status };
+}
+
+/**
  * The newest check that ran against one state.
  *
  * The cooldown is held per state — an attorney adding New Jersey should not be

@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
-import { useId, useRef, useState } from "react";
+import { Fragment, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -333,7 +333,7 @@ export function CaseWizard({
 		atEmailTouched && !atEmailValid
 			? atEmail.trim()
 				? "Enter a valid email address."
-				: "We need their email — it's where the invitation goes."
+				: "We need their email. It's where the invitation goes."
 			: null;
 	// The address as recorded on the case, which is what actually gets invited.
 	const inviteEmail = attorney?.email?.trim() ?? "";
@@ -392,7 +392,7 @@ export function CaseWizard({
 		if (!atEmailValid) {
 			setAtEmailTouched(true);
 			return toast.error(
-				"Add your attorney's email — that's where the invitation goes.",
+				"Add your attorney's email. That's where the invitation goes.",
 			);
 		}
 		setAttorney({
@@ -625,12 +625,10 @@ export function CaseWizard({
 			toast.success("Your attorney is set up. You can publish now.");
 		} else if (!result.payout.attorney) {
 			toast.info(
-				"No attorney is linked to this case yet — add one to set up donations.",
+				"No attorney is linked to this case yet. Add one to set up donations.",
 			);
 		} else {
-			toast.info(
-				"Checked with Stripe — their account still can't receive yet.",
-			);
+			toast.info("Checked with Stripe. Their account still can't receive yet.");
 		}
 	}
 
@@ -694,7 +692,7 @@ export function CaseWizard({
 		setSaving(true);
 		const res = await saveCaseDraftAction(draftPayload());
 		if (res.ok) {
-			toast.success("Progress saved — pick up where you left off anytime.");
+			toast.success("Progress saved. Pick up where you left off anytime.");
 			window.location.assign("/home");
 		} else {
 			toast.error(res.error);
@@ -939,8 +937,8 @@ export function CaseWizard({
 								aria-hidden="true"
 							/>
 							<span>
-								<span className="font-semibold text-ink">If they confirm</span>{" "}
-								— they're attached to your case and open its payout account. You
+								<span className="font-semibold text-ink">If they confirm</span>:{" "}
+								they're attached to your case and open its payout account. You
 								publish once it can receive.
 							</span>
 						</p>
@@ -952,8 +950,8 @@ export function CaseWizard({
 							<span>
 								<span className="font-semibold text-ink">
 									If they decline, or don't answer
-								</span>{" "}
-								— your case goes in front of bar-verified attorneys on JustUs,
+								</span>
+								: your case goes in front of bar-verified attorneys on JustUs,
 								who can request to represent you. Nothing to do on your side.
 							</span>
 						</p>
@@ -980,8 +978,8 @@ export function CaseWizard({
 
 					<p className="mt-5 flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground">
 						<Lock className="size-3.5" aria-hidden="true" />
-						Your case stays private while you wait — nobody can see it or give
-						to it yet.
+						Your case stays private while you wait. Nobody can see it or give to
+						it yet.
 					</p>
 				</div>
 			</div>
@@ -1025,7 +1023,7 @@ export function CaseWizard({
 						</div>
 						<span className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1 font-mono font-semibold text-[11px] text-green-deep uppercase tracking-[0.06em]">
 							<span className="size-1.5 rounded-full bg-success" />
-							Visible
+							Visible to attorneys only
 						</span>
 					</div>
 
@@ -1036,8 +1034,8 @@ export function CaseWizard({
 							{ label: "You choose", done: false },
 							{ label: "Live", done: false },
 						].map((s, i, arr) => (
-							<li key={s.label} className="flex flex-1 items-center gap-2">
-								<span className="inline-flex items-center gap-1.5">
+							<Fragment key={s.label}>
+								<li className="inline-flex shrink-0 items-center gap-1.5">
 									{s.done ? (
 										<CircleCheck
 											className="size-4 text-success"
@@ -1055,11 +1053,11 @@ export function CaseWizard({
 									>
 										{s.label}
 									</span>
-								</span>
+								</li>
 								{i < arr.length - 1 && (
-									<span className="h-px flex-1 bg-border" />
+									<span className="h-px flex-1 bg-border" aria-hidden="true" />
 								)}
-							</li>
+							</Fragment>
 						))}
 					</ol>
 
@@ -1068,13 +1066,16 @@ export function CaseWizard({
 							<Search className="size-4 text-brass-deep" aria-hidden="true" />
 							Don't want to wait? Reach out to attorneys yourself.
 						</span>
-						<button
-							type="button"
-							onClick={() => toast.success("The directory is coming soon.")}
+						<Link
+							href={
+								(caseId
+									? `/find-attorney?draft=${caseId}`
+									: "/find-attorney") as Route
+							}
 							className="shrink-0 font-semibold text-brass-deep hover:underline"
 						>
 							Search →
-						</button>
+						</Link>
 					</div>
 
 					<div className="mt-6 flex items-center justify-center gap-2.5">
@@ -1098,10 +1099,12 @@ export function CaseWizard({
 						</Link>
 					</div>
 
-					<p className="mt-5 flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground">
-						<Clock className="size-3.5" aria-hidden="true" />
-						Attorneys reply on their own time — usually a few days. We'll email
-						you the moment someone requests your case.
+					<p className="mt-5 flex items-start justify-center gap-1.5 text-[12.5px] text-muted-foreground">
+						<Clock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+						<span>
+							Attorneys reply on their own time, usually a few days. We'll email
+							you the moment someone requests your case.
+						</span>
 					</p>
 				</div>
 			</div>
@@ -1130,7 +1133,7 @@ export function CaseWizard({
 					</h1>
 					<p className="mx-auto mt-3 max-w-[460px] text-[15px] text-ink-soft leading-relaxed">
 						Your case is live and ready for backers, {firstName}. Share it far
-						and wide — every gift brings your day in court closer.
+						and wide. Every gift brings your day in court closer.
 					</p>
 
 					<div className="mt-8 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 text-left shadow-[var(--shadow-rest)]">
@@ -1202,7 +1205,7 @@ export function CaseWizard({
 								Preview mode
 							</p>
 							<p className="text-[12px] text-dark-fg-soft">
-								Only you can see this — your case isn't live yet.
+								Only you can see this. Your case isn't live yet.
 							</p>
 						</div>
 					</div>
@@ -1302,8 +1305,8 @@ export function CaseWizard({
 							/>
 							<p className="font-bold text-[14px] text-ink">No updates yet</p>
 							<p className="max-w-[42ch] text-[13px] text-muted-foreground leading-relaxed">
-								Your attorney posts updates here as the case moves — every
-								backer gets notified.
+								Your attorney posts updates here as the case moves. Every backer
+								gets notified.
 							</p>
 						</div>
 
@@ -1525,8 +1528,7 @@ export function CaseWizard({
 								</h1>
 								<p className="mt-2.5 max-w-[560px] text-[15px] text-ink-soft leading-relaxed">
 									A category, the state your case is in, a title, and photos. AI
-									can draft a title from your story — pick one or write your
-									own.
+									can draft a title from your story. Pick one or write your own.
 								</p>
 
 								<div className="mt-8 flex flex-col gap-6">
@@ -1689,7 +1691,7 @@ export function CaseWizard({
 											</span>
 										</p>
 										<p className="mt-0.5 mb-3 text-[12.5px] text-muted-foreground">
-											Add up to 6 — photos or scans that help tell your story.
+											Add up to 6 photos or scans that help tell your story.
 										</p>
 										<div className="flex flex-wrap gap-3">
 											{moreImages.map((url) => (
@@ -1757,7 +1759,7 @@ export function CaseWizard({
 									What happened?
 								</h1>
 								<p className="mt-2.5 max-w-[560px] text-[15px] text-ink-soft leading-relaxed">
-									Tell it in your own words — this is the heart of your case. Be
+									Tell it in your own words. This is the heart of your case. Be
 									specific about who, what, and when. You can edit it anytime
 									before publishing.
 								</p>
@@ -1889,7 +1891,7 @@ export function CaseWizard({
 												</Button>
 											</div>
 											<p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
-												AI only tightens clarity and structure — your facts and
+												AI only tightens clarity and structure. Your facts and
 												voice stay yours. Nothing changes until you accept.
 											</p>
 										</div>
@@ -1941,7 +1943,7 @@ export function CaseWizard({
 														addLink();
 													}
 												}}
-												placeholder="Or paste a link — article, record, video…"
+												placeholder="Or paste a link: article, record, video…"
 												className="h-10 flex-1 bg-surface"
 											/>
 											<Button
@@ -2052,13 +2054,13 @@ export function CaseWizard({
 											}
 											rows={4}
 											maxLength={THANK_YOU_MAX}
-											placeholder="Say thank you in your own words — every donor gets this with their confirmation."
+											placeholder="Say thank you in your own words. Every donor gets this with their confirmation."
 											className="bg-surface"
 										/>
 										<p className="mt-1.5 text-[12.5px] text-muted-foreground leading-relaxed">
 											{thankYouNote.trim()
 												? `Sent to every donor with their confirmation. ${THANK_YOU_MAX - thankYouNote.length} characters left.`
-												: "Skip it for now if you'd rather — donors still get a confirmation, and you can add this later from Manage."}
+												: "Skip it for now if you'd rather. Donors still get a confirmation, and you can add this later from Manage."}
 										</p>
 									</div>
 
@@ -2068,7 +2070,7 @@ export function CaseWizard({
 											aria-hidden="true"
 										/>
 										AI checks your story for completeness and flags what's
-										missing — it never blocks you. You decide what to publish.
+										missing. It never blocks you. You decide what to publish.
 									</p>
 								</div>
 							</>
@@ -2081,7 +2083,7 @@ export function CaseWizard({
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
 									You've already chosen {attorney.name} and they accepted your
-									case — there's nothing to invite or send again. Continue to
+									case. There's nothing to invite or send again. Continue to
 									review the rest, or change your attorney.
 								</p>
 
@@ -2286,7 +2288,7 @@ export function CaseWizard({
 												<p className="text-[12.5px] text-muted-foreground">
 													{state
 														? `Your attorney must be admitted in ${state} to take this case.`
-														: "Taken from your case — go back and choose its state."}
+														: "Taken from your case. Go back and choose its state."}
 												</p>
 											</div>
 											<div className="flex flex-col gap-1.5">
@@ -2315,8 +2317,8 @@ export function CaseWizard({
 												aria-hidden="true"
 											/>
 											We'll email them an invite to represent you. They confirm
-											before they're attached — and if they decline or don't
-											answer, your case goes to attorneys on JustUs instead.
+											before they're attached. If they decline or don't answer,
+											your case goes to attorneys on JustUs instead.
 										</p>
 									</div>
 								)}
@@ -2341,7 +2343,7 @@ export function CaseWizard({
 												</h3>
 												<p className="mt-1 mb-4 flex-1 text-[13px] text-ink-soft leading-relaxed">
 													Publish your case on JustUs. Attorneys can review it
-													and ask to represent you — no searching needed.
+													and ask to represent you. No searching needed.
 												</p>
 												<Button
 													type="button"
@@ -2387,7 +2389,7 @@ export function CaseWizard({
 												className="mt-0.5 size-4 shrink-0 text-warn-deep"
 												aria-hidden="true"
 											/>
-											Heads up — attorneys reply on their own time, so it can
+											Heads up: attorneys reply on their own time, so it can
 											take a few days to hear back. You can do both, and your
 											campaign can still go live while you wait.
 										</div>
@@ -2403,8 +2405,8 @@ export function CaseWizard({
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
 									{bringYourOwn
-										? `Set the fee you agreed with ${attorneyName} — it becomes your funding goal, and nothing more is ever raised. They'll see it when they confirm.`
-										: `You're working with ${attorneyName}. Set the fee you agreed together — it becomes your funding goal, and nothing more is ever raised.`}
+										? `Set the fee you agreed with ${attorneyName}. It becomes your funding goal, and nothing more is ever raised. They'll see it when they confirm.`
+										: `You're working with ${attorneyName}. Set the fee you agreed together. It becomes your funding goal, and nothing more is ever raised.`}
 								</p>
 
 								<p className="mt-7 mb-2.5 font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.1em]">
@@ -2473,7 +2475,7 @@ export function CaseWizard({
 									</div>
 								</div>
 
-								<div className="mt-4 flex max-w-[520px] gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
+								<div className="mt-4 flex gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
 									<Scale
 										className="mt-0.5 size-4 shrink-0 text-brass-deep"
 										aria-hidden="true"
@@ -2483,7 +2485,7 @@ export function CaseWizard({
 											Your funding goal is {money(goal)}
 										</p>
 										<p className="text-ink-soft">
-											The most that's ever raised — it's paid to your attorney's
+											The most that's ever raised. It's paid to your attorney's
 											firm and applied to this fee.
 										</p>
 									</div>
@@ -2503,7 +2505,7 @@ export function CaseWizard({
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
 									Nobody is attached to your case until they say so. We'll email
-									them a link to confirm they represent you — then they open the
+									them a link to confirm they represent you. Then they open the
 									payout account this case is funded into, and you publish.
 								</p>
 
@@ -2511,7 +2513,7 @@ export function CaseWizard({
 									Invitation
 								</p>
 
-								<div className="flex max-w-[520px] items-center gap-4 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+								<div className="flex items-center gap-4 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
 									<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
 										<Mail className="size-5" aria-hidden="true" />
 									</span>
@@ -2538,7 +2540,7 @@ export function CaseWizard({
 									</button>
 								</div>
 
-								<div className="mt-6 flex max-w-[520px] gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
+								<div className="mt-6 flex gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
 									<Lock
 										className="mt-0.5 size-4 shrink-0 text-brass-deep"
 										aria-hidden="true"
@@ -2549,9 +2551,9 @@ export function CaseWizard({
 										</p>
 										<p className="text-ink-soft">
 											Nobody can see it, share it or give to it yet. If they
-											decline — or don't answer within 7 days — your case goes
-											in front of bar-verified attorneys on JustUs, who can
-											request to represent you.
+											decline, or don't answer within 7 days, your case goes in
+											front of bar-verified attorneys on JustUs, who can request
+											to represent you.
 										</p>
 									</div>
 								</div>
@@ -2565,7 +2567,7 @@ export function CaseWizard({
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
 									Donations are paid to {attorneyName}'s firm, into a Stripe
-									account opened for this case alone — never into a JustUs
+									account opened for this case alone, never into a JustUs
 									balance, and never mixed with another client's funds. They
 									open it; you publish once it can receive.
 								</p>
@@ -2586,7 +2588,7 @@ export function CaseWizard({
 
 								{/* The one thing a plaintiff will not guess: nothing is public
 								    yet, and that is deliberate rather than a delay. */}
-								<div className="mt-6 flex max-w-[520px] gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
+								<div className="mt-6 flex gap-2.5 rounded-[var(--radius-card-sm)] bg-brass-wash/60 px-4 py-3.5">
 									<Lock
 										className="mt-0.5 size-4 shrink-0 text-brass-deep"
 										aria-hidden="true"
@@ -2597,8 +2599,8 @@ export function CaseWizard({
 										</p>
 										<p className="text-ink-soft">
 											Nobody can see it, share it or give to it while this is
-											outstanding. That's on purpose — a campaign that can't
-											take a donation costs you the first people you tell.
+											outstanding. That's on purpose: a campaign that can't take
+											a donation costs you the first people you tell.
 										</p>
 									</div>
 								</div>
@@ -2612,7 +2614,7 @@ export function CaseWizard({
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
 									This is exactly what donors will see. Publish when you're
-									ready — your campaign goes live right away.
+									ready. Your campaign goes live right away.
 								</p>
 
 								<p className="mt-7 mb-2.5 font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
@@ -2691,8 +2693,8 @@ export function CaseWizard({
 												label: payoutReady
 													? `Payout account ready · ${payout?.attorney?.firmName ?? attorneyName}`
 													: payout?.attorney
-														? `Payout account — waiting on ${payout.attorney.firmName ?? attorneyName}`
-														: "Payout account — no attorney linked to this case yet",
+														? `Payout account: waiting on ${payout.attorney.firmName ?? attorneyName}`
+														: "Payout account: no attorney linked to this case yet",
 												done: payoutReady,
 											},
 										].map((item) => (
@@ -2893,7 +2895,7 @@ function PayoutStep({
 	// be asked of whom.
 	if (!committed) {
 		return (
-			<div className="max-w-[560px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+			<div className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
 				<div className="flex items-start gap-3">
 					<span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
 						<Landmark className="size-3" aria-hidden="true" />
@@ -2902,7 +2904,7 @@ function PayoutStep({
 						<p className="font-semibold text-[14px] text-ink">{recipient}</p>
 						<p className="mt-1 text-[12.5px] text-ink-soft leading-relaxed">
 							Sending your case hands it to {attorneyName} so they can open its
-							payout account with Stripe — their firm's details, their bank
+							payout account with Stripe: their firm's details, their bank
 							account, a few minutes of their time. Nothing is asked of you.
 						</p>
 						{email && (
@@ -2921,7 +2923,7 @@ function PayoutStep({
 	// state the plaintiff can actually fix, so it says how.
 	if (!linked) {
 		return (
-			<div className="max-w-[560px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+			<div className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
 				<div className="flex items-start gap-3">
 					<span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted-foreground">
 						<UserPlus className="size-3" aria-hidden="true" />
@@ -2932,7 +2934,7 @@ function PayoutStep({
 						</p>
 						<p className="mt-1 text-[12.5px] text-ink-soft leading-relaxed">
 							{payout?.designatedEmail
-								? `Your case names ${payout.designatedEmail}, but nobody has signed up as an attorney on JustUs with it. Ask them to — that's what links your case to their firm's payout account.`
+								? `Your case names ${payout.designatedEmail}, but nobody has signed up as an attorney on JustUs with it. Ask them to. That's what links your case to their firm's payout account.`
 								: `Add ${attorneyName}'s email to your case so we can link it to their firm's payout account.`}
 						</p>
 					</div>
@@ -2958,7 +2960,7 @@ function PayoutStep({
 		},
 		in_review: {
 			title: "Stripe is verifying their details",
-			body: `${attorneyName} finished the form. Stripe reviews the firm's details before releasing the account — usually quick, occasionally a day or two. Nothing for either of you to do.`,
+			body: `${attorneyName} finished the form. Stripe reviews the firm's details before releasing the account, usually quick, occasionally a day or two. Nothing for either of you to do.`,
 		},
 		started: {
 			title: "Setup started, not finished",
@@ -2974,7 +2976,7 @@ function PayoutStep({
 	return (
 		<div
 			className={cn(
-				"max-w-[560px] rounded-[var(--radius-card-lg)] p-5",
+				"rounded-[var(--radius-card-lg)] p-5",
 				ready
 					? "bg-green-soft"
 					: "border border-border bg-surface shadow-[var(--shadow-rest)]",
@@ -3017,7 +3019,7 @@ function PayoutStep({
 					{!ready && email && (
 						<p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
 							<Mail className="size-3.5 shrink-0" aria-hidden="true" />
-							{email} — the address to nudge
+							{email}, the address to nudge
 						</p>
 					)}
 				</div>
@@ -3049,7 +3051,7 @@ function CheckAgain({
 				{checking ? "Checking…" : "Check again"}
 			</Button>
 			<span className="text-[12.5px] text-muted-foreground">
-				We'll email you the moment they're set — you don't have to wait here.
+				We'll email you the moment they're set. You don't have to wait here.
 			</span>
 		</div>
 	);

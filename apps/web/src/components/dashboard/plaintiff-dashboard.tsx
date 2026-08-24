@@ -233,8 +233,8 @@ function NoCase() {
 				</span>
 				<p className="font-bold text-[16px] text-ink">Start your case</p>
 				<p className="max-w-[44ch] text-[13.5px] text-muted-foreground leading-relaxed">
-					Submit your story, choose your attorney, and raise the agreed fee —
-					you decide when it goes live.
+					Submit your story, choose your attorney, and raise the agreed fee. You
+					decide when it goes live.
 				</p>
 				<Link
 					href={"/cases/new" as Route}
@@ -290,12 +290,12 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 		{
 			ok: c.hasCover,
 			weight: 15,
-			tip: "Add a cover image — campaigns with one raise far more.",
+			tip: "Add a cover image. Campaigns with one raise far more.",
 		},
 		{
 			ok: c.evidenceCount > 0,
 			weight: 10,
-			tip: "Attach evidence — optional, but it strengthens your case.",
+			tip: "Attach evidence. It's optional, but it strengthens your case.",
 		},
 	];
 	const readiness = checks.reduce((sum, x) => sum + (x.ok ? x.weight : 0), 0);
@@ -306,8 +306,8 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 			{/* Header */}
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 				{isLive
-					? "Your campaign is live — here's how it's going."
-					: "Your case at a glance — where it stands and what needs you next."}
+					? "Your campaign is live. Here's how it's going."
+					: "Your case at a glance: where it stands and what needs you next."}
 			</p>
 
 			{/* Stat row — all values from the case row */}
@@ -329,7 +329,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 						value={String(c.interestCount)}
 						sub={
 							c.interestCount === 0
-								? "none yet — you can also choose one yourself"
+								? "none yet, though you can also choose one yourself"
 								: c.newInterestCount > 0
 									? `${c.newInterestCount} you haven't seen yet`
 									: "waiting on your decision"
@@ -415,7 +415,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 				{c.donorsCount === 0 && (
 					<p className="mt-3 text-[13px] text-muted-foreground">
 						{isLive
-							? "No donations yet — share your campaign to reach your first backer."
+							? "No donations yet. Share your campaign to reach your first backer."
 							: "Donations start once your case is live."}
 					</p>
 				)}
@@ -436,7 +436,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 						<EmptyState
 							icon={Megaphone}
 							title="No updates yet"
-							body="Once you're live, your attorney posts progress here — and backers get notified."
+							body="Once you're live, your attorney posts progress here, and backers get notified."
 						/>
 					</section>
 				</div>
@@ -589,7 +589,7 @@ function TrustFooter() {
 				aria-hidden="true"
 			/>
 			Donations fund the agreed fee and are paid to your attorney's firm, which
-			applies them to that fee — you never have to handle the money. One
+			applies them to that fee. You never have to handle the money. One
 			transparent 5% fee, shown to each donor before they give.
 		</div>
 	);
@@ -608,7 +608,7 @@ function CasesOverview({ cases }: { cases: CaseSummary[] }) {
 	return (
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				You have {cases.length} cases — here's your portfolio at a glance.
+				You have {cases.length} cases. Here's your portfolio at a glance.
 			</p>
 
 			{/* Totals across every case */}
@@ -704,7 +704,7 @@ function CasesOverview({ cases }: { cases: CaseSummary[] }) {
 				<EmptyState
 					icon={Megaphone}
 					title="No updates yet"
-					body="Once your cases are live, updates from each attorney appear here — each tagged with the case it belongs to."
+					body="Once your cases are live, updates from each attorney appear here, each tagged with the case it belongs to."
 				/>
 			</section>
 
@@ -964,7 +964,7 @@ function StepTracker({
 		};
 	else if (isLive)
 		next = {
-			text: "Your campaign is live — keep sharing to reach your goal.",
+			text: "Your campaign is live. Keep sharing to reach your goal.",
 			href: manage,
 			cta: "Manage your case",
 		};

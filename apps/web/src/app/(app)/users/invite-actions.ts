@@ -100,7 +100,7 @@ export async function inviteAdminAction(email: string): Promise<InviteResult> {
 		return {
 			ok: false,
 			error:
-				"Couldn't send the invitation email. Nothing was created — try again.",
+				"Couldn't send the invitation email. Nothing was created. Try again.",
 		};
 	}
 

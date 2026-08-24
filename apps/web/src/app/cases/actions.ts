@@ -268,6 +268,8 @@ export async function closeCaseAction(id: string): Promise<DeleteCaseResult> {
 		revalidatePath(`/discover/${id}`);
 		revalidatePath("/discover");
 		revalidatePath("/home");
+		// The marketing landing lists live cases too — drop the just-closed one.
+		revalidatePath("/");
 		return { ok: true };
 	} catch {
 		return { ok: false, error: "Couldn't close this case. Please try again." };

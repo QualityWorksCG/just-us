@@ -145,8 +145,8 @@ export function DonorCaseCard({
 			} else {
 				toast.success(
 					next
-						? "Following — you'll get this case's updates."
-						: "Unfollowed — you'll stop getting updates.",
+						? "Following. You'll get this case's updates."
+						: "Unfollowed. You'll stop getting updates.",
 				);
 			}
 		});
@@ -158,7 +158,7 @@ export function DonorCaseCard({
 				? `${window.location.origin}/cases/${c.id}`
 				: "";
 		navigator.clipboard?.writeText(url);
-		toast.success("Link copied — thanks for sharing!");
+		toast.success("Link copied. Thanks for sharing!");
 	}
 
 	return (
@@ -336,7 +336,7 @@ export function DonorCaseCard({
 								aria-pressed={following}
 								aria-label={
 									following
-										? "Following — stop getting updates"
+										? "Following, tap to stop getting updates"
 										: "Follow for updates"
 								}
 								title={following ? "Following" : "Follow for updates"}

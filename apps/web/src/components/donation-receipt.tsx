@@ -56,7 +56,7 @@ export function DonationReceipt({
 			<div className="mb-6 flex items-start gap-2.5 rounded-[var(--radius-card)] border border-success/30 bg-green-soft px-4 py-3.5 text-[13.5px] text-green-deep">
 				<CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 				<p aria-live="polite">
-					<span className="font-bold">Thank you</span> — your gift
+					<span className="font-bold">Thank you</span>. Your gift
 					{amountLabel ? ` of ${amountLabel}` : ""} is in. It's counted below,
 					and your receipt is on its way by email.
 				</p>
@@ -78,7 +78,7 @@ export function DonationReceipt({
 				/>
 			)}
 			<p aria-live="polite">
-				<span className="font-bold text-ink">Payment received</span> —{" "}
+				<span className="font-bold text-ink">Payment received</span>:{" "}
 				{waiting
 					? "confirming it with our payment provider and updating this case's total."
 					: "it's recorded and the case total will update shortly. Your receipt is on its way by email."}

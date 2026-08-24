@@ -306,7 +306,7 @@ function AttorneyPanel({ view }: { view: RepresentationView }) {
 				<p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
 					Matched from the attorney email on your case
 					{attorney.email ? ` (${attorney.email})` : ""}. Check this is the
-					right firm — it's who your case's donations will be paid to.
+					right firm. It's who your case's donations will be paid to.
 				</p>
 			) : null}
 		</div>
@@ -326,8 +326,8 @@ function howMatched(view: RepresentationView): string {
 			return `You brought them to JustUs yourself${when}.`;
 		default:
 			return view.attorney?.userId
-				? "You named them on your case, and they have a JustUs attorney account — JustUs didn't pick them for you."
-				: "You named them on your case — JustUs didn't pick them for you.";
+				? "You named them on your case, and they have a JustUs attorney account. JustUs didn't pick them for you."
+				: "You named them on your case. JustUs didn't pick them for you.";
 	}
 }
 
@@ -358,8 +358,8 @@ function FundingPanel({ view }: { view: RepresentationView }) {
 							{money(view.goalCents)}
 						</p>
 						<p className="mt-1.5 text-[12.5px] text-muted-foreground">
-							Agreed with {view.attorney?.name ?? "your attorney"} — this is
-							your funding goal.
+							Agreed with {view.attorney?.name ?? "your attorney"}. This is your
+							funding goal.
 						</p>
 					</>
 				) : (
@@ -368,7 +368,7 @@ function FundingPanel({ view }: { view: RepresentationView }) {
 							Not set
 						</p>
 						<p className="mt-1.5 text-[12.5px] text-muted-foreground leading-relaxed">
-							Agree a fee with your attorney — it becomes the goal your case
+							Agree a fee with your attorney. It becomes the goal your case
 							raises towards.
 						</p>
 						<Link
@@ -407,7 +407,7 @@ function FundingPanel({ view }: { view: RepresentationView }) {
 						<p className="mt-2.5 inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
 							<Users className="size-3.5" aria-hidden="true" />
 							{view.donorsCount === 0
-								? "No donors yet — share your case to reach the first one."
+								? "No donors yet. Share your case to reach the first one."
 								: `${view.donorsCount} ${view.donorsCount === 1 ? "donor" : "donors"} so far`}
 						</p>
 					</>
@@ -462,8 +462,8 @@ function PayoutLine({ view }: { view: RepresentationView }) {
 			<PayoutRow icon={Clock} tone="waiting">
 				{name} has no JustUs attorney account, so there's no firm account for
 				this case to pay into and it can't accept donations yet. Ask them to
-				sign up as an attorney{email ? ` with ${email}` : ""} — that's what
-				links your case to their firm.
+				sign up as an attorney{email ? ` with ${email}` : ""}. That's what links
+				your case to their firm.
 			</PayoutRow>
 		);
 	}
@@ -473,7 +473,7 @@ function PayoutLine({ view }: { view: RepresentationView }) {
 			<PayoutRow icon={Clock} tone="waiting">
 				{payout.attorneyName} hasn't opened a payout account for this case yet.
 				Each case gets its own, so being set up on their other matters doesn't
-				cover yours — {payout.attorneyEmail} is the address to nudge.
+				cover yours. {payout.attorneyEmail} is the address to nudge.
 			</PayoutRow>
 		);
 	}
@@ -481,7 +481,7 @@ function PayoutLine({ view }: { view: RepresentationView }) {
 		return (
 			<PayoutRow icon={Clock} tone="waiting">
 				{payout.detailsSubmitted
-					? `${payout.attorneyName} has submitted this case's setup — Stripe is still verifying the firm's details. Nothing for you to do.`
+					? `${payout.attorneyName} has submitted this case's setup. Stripe is still verifying the firm's details. Nothing for you to do.`
 					: `${payout.attorneyName} started this case's payout setup but hasn't finished it. They complete it in their own JustUs settings; ${payout.attorneyEmail} is the address to nudge.`}
 			</PayoutRow>
 		);
@@ -489,7 +489,7 @@ function PayoutLine({ view }: { view: RepresentationView }) {
 	return (
 		<PayoutRow icon={Landmark} tone="ready">
 			{payout.bound
-				? `Ready — donations to this case are paid to ${payout.recipient}, who applies them to your fee under their bar's trust rules.`
+				? `Donations to this case are paid to ${payout.recipient}, who applies them to your fee under their bar's trust rules.`
 				: `${payout.recipient} can receive. Open donations from your case page and this case starts raising.`}
 		</PayoutRow>
 	);
@@ -546,11 +546,11 @@ function NoAttorneyPanel({ view }: { view: RepresentationView }) {
 			: "No attorney yet";
 
 	const body = invited
-		? `We emailed ${invited.email} an invitation to confirm they represent you. Until they answer, your case isn't shown to other attorneys — if they haven't by ${formatDate(invited.expiresAt)}, it goes in front of every bar-verified attorney automatically.`
+		? `We emailed ${invited.email} an invitation to confirm they represent you. Until they answer, your case isn't shown to other attorneys. If they haven't by ${formatDate(invited.expiresAt)}, it goes in front of every bar-verified attorney automatically.`
 		: isSeeking
 			? interested > 0
 				? "None of them can contact you. You reach out by choosing one, which sets your attorney and moves you on to agree the fee."
-				: "Bar-verified attorneys can see this case and put themselves forward. You'll see them here — and you can choose an attorney yourself at any time."
+				: "Bar-verified attorneys can see this case and put themselves forward. You'll see them here, and you can choose an attorney yourself at any time."
 			: "Your case needs an attorney before it can name a fee or raise anything. Browse the directory, or publish it out to attorneys and let them come to you.";
 
 	const Icon = invited

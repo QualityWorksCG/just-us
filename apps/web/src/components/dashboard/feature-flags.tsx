@@ -46,7 +46,7 @@ export function FeatureFlags({ initial }: { initial: FlagState }) {
 				<h2 className="font-bold text-[15px] text-ink">Feature flags</h2>
 				<p className="mt-1 text-[13.5px] text-ink-soft leading-relaxed">
 					Turn upcoming capabilities on or off. Changes take effect immediately
-					— no deploy required — and apply to this environment only.
+					(no deploy required) and apply to this environment only.
 				</p>
 			</div>
 

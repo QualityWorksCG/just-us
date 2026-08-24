@@ -457,8 +457,9 @@ export async function listPendingDonationsForCase(input: {
  */
 export type CaseBackerDisplay = {
 	id: string;
-	/** Ready to render — "Anonymous" when the donor opted out or gave as a guest
-	 *  with no name. Never the raw email. */
+	/** Ready to render — "Anonymous" when the donor opted out, or gave as a guest
+	 *  (no account, so no public-listing consent). Never the raw email or a
+	 *  checkout name. */
 	displayName: string;
 	anonymous: boolean;
 	amountCents: number;
@@ -467,9 +468,10 @@ export type CaseBackerDisplay = {
 
 /**
  * A case's supporters for the public list, newest first. Respects each account
- * donor's `donationsAnonymous` preference (their profile toggle) — anonymous
- * donors and nameless guests both render as "Anonymous", so the list can be shown
- * publicly without leaking anyone who asked not to be named.
+ * donor's `donationsAnonymous` preference (their profile toggle), and treats every
+ * guest donation as anonymous — a guest has no account and never opted into being
+ * named publicly. So the list is always safe to show without leaking anyone who
+ * did not ask to be named.
  */
 export async function listCaseBackers(
 	caseId: string,
@@ -482,7 +484,6 @@ export async function listCaseBackers(
 		select: {
 			id: true,
 			donorId: true,
-			donorName: true,
 			netCents: true,
 			succeededAt: true,
 		},
@@ -513,12 +514,13 @@ export async function listCaseBackers(
 				at: r.succeededAt,
 			};
 		}
-		// Guest donation — show the name they gave at checkout, or Anonymous.
-		const name = r.donorName?.trim();
+		// Guest donation — no account, no profile, and no chance to opt into being
+		// named on a public list. The name Stripe collected is for the payment and
+		// the receipt, not consent to appear here, so a guest is always Anonymous.
 		return {
 			id: r.id,
-			displayName: name || "Anonymous",
-			anonymous: !name,
+			displayName: "Anonymous",
+			anonymous: true,
 			amountCents: r.netCents,
 			at: r.succeededAt,
 		};

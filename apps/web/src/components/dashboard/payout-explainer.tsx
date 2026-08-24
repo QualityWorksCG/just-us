@@ -27,21 +27,21 @@ export function PayoutExplainer() {
 			<div className="flex flex-col gap-3 px-5 py-4">
 				<Row icon={Landmark} title="Your attorney's firm receives">
 					Money moves through Stripe straight into the business account of the
-					firm representing you — one opened for your case alone, so your funds
+					firm representing you, one opened for your case alone, so your funds
 					are never pooled with another of their clients'. JustUs never holds
 					it, and it never passes through a JustUs balance.
 				</Row>
 				<Row icon={Scale} title="Your attorney handles it from there">
 					Firms are required by their state bar to move funds like these into
 					their client trust account and apply them to your fee. That obligation
-					is theirs, under their bar's supervision — it isn't something JustUs
+					is theirs, under their bar's supervision. It isn't something JustUs
 					administers.
 				</Row>
 				<Row icon={ShieldCheck} title="What you do">
 					Make sure your case names your attorney and their email address, and
-					that they've opened a payout account for <em>this</em> case — being
-					set up for their other matters doesn't cover yours. Your case page
-					shows exactly what's outstanding.
+					that they've opened a payout account for <em>this</em> case. Being set
+					up for their other matters doesn't cover yours. Your case page shows
+					exactly what's outstanding.
 				</Row>
 				<Link
 					href={"/my-cases" as Route}

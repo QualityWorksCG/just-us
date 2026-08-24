@@ -79,7 +79,7 @@ export async function refineStoryAction(
 			],
 			{ jsonObject: true, temperature: 0.2 },
 		);
-		if (!raw) return { ok: false, error: "AI returned nothing — try again." };
+		if (!raw) return { ok: false, error: "AI returned nothing. Try again." };
 
 		const parsed = JSON.parse(raw) as {
 			status?: unknown;
@@ -90,16 +90,15 @@ export async function refineStoryAction(
 			const message =
 				typeof parsed.message === "string" ? parsed.message.trim() : "";
 			if (!message)
-				return { ok: false, error: "AI returned nothing — try again." };
+				return { ok: false, error: "AI returned nothing. Try again." };
 			return { ok: true, kind: "need_more", message };
 		}
 		if (parsed.status === "refined") {
 			const text = typeof parsed.text === "string" ? parsed.text.trim() : "";
-			if (!text)
-				return { ok: false, error: "AI returned nothing — try again." };
+			if (!text) return { ok: false, error: "AI returned nothing. Try again." };
 			return { ok: true, kind: "refined", text };
 		}
-		return { ok: false, error: "AI returned nothing — try again." };
+		return { ok: false, error: "AI returned nothing. Try again." };
 	} catch {
 		return { ok: false, error: "Couldn't reach the AI. Please try again." };
 	}
@@ -141,7 +140,7 @@ export async function suggestTitlesAction(
 					.slice(0, 3)
 			: [];
 		if (!titles.length)
-			return { ok: false, error: "AI returned no titles — try again." };
+			return { ok: false, error: "AI returned no titles. Try again." };
 		return { ok: true, titles };
 	} catch {
 		return { ok: false, error: "Couldn't draft titles. Please try again." };

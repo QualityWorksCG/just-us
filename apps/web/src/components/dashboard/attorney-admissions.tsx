@@ -83,7 +83,7 @@ export function AttorneyAdmissions({
 				return;
 			}
 			const messages: Record<VerificationStatus, string> = {
-				verified: `Verified in ${state} — you can now take cases there.`,
+				verified: `Verified in ${state}. You can now take cases there.`,
 				needs_review: `${state} couldn't be verified automatically. An administrator will review it.`,
 				rejected: `The check couldn't confirm an active licence in ${state}.`,
 				unverified: `The check found nothing conclusive for ${state}.`,
@@ -107,7 +107,7 @@ export function AttorneyAdmissions({
 			<p className="mt-0.5 max-w-[68ch] text-[13px] text-muted-foreground leading-relaxed">
 				Add every state you hold a licence in. Your queue only shows cases from
 				these states, and you can only take one on once that state's bar
-				standing is verified — each state is checked separately, because each is
+				standing is verified. Each state is checked separately, because each is
 				its own licence.
 			</p>
 
@@ -203,7 +203,7 @@ export function AttorneyAdmissions({
 					Add a state
 				</label>
 				<p className="mt-0.5 mb-2.5 text-[12.5px] text-muted-foreground">
-					Adding a state is a claim, not a licence — run its check to take cases
+					Adding a state is a claim, not a licence. Run its check to take cases
 					there.
 				</p>
 				{/* The field's own chips are suppressed here: the list above already

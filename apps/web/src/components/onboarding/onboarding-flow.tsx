@@ -235,8 +235,8 @@ export function OnboardingFlow({
 								Hi {firstName}, how are you joining?
 							</h1>
 							<p className="mt-2.5 max-w-[560px] text-[15px] text-ink-soft leading-relaxed">
-								Pick what brings you here so we can tailor your experience —
-								you'll still reach every part of JustUs. This just sets your
+								Pick what brings you here so we can tailor your experience.
+								You'll still reach every part of JustUs. This just sets your
 								home base.
 							</p>
 
@@ -352,7 +352,7 @@ export function OnboardingFlow({
 												Where are you admitted to practise?
 											</label>
 											<p className="text-[12.5px] text-muted-foreground leading-relaxed">
-												Add every state you hold a licence in — you'll only be
+												Add every state you hold a licence in. You'll only be
 												shown cases from these. We check each one against its
 												bar records before you can take a case there.
 											</p>
@@ -427,8 +427,8 @@ export function OnboardingFlow({
 										</span>
 										<p className="text-[14px] text-ink-soft leading-relaxed">
 											{isPlaintiff
-												? "You're all set. When you submit a case you'll pick the state it falls under and choose the attorney to represent you — we use that state to find attorneys licensed there."
-												: "You're all set to fund cases. Give any amount to a case you believe in and follow it to the outcome — no extra details needed."}
+												? "You're all set. When you submit a case you'll pick the state it falls under and choose the attorney to represent you. We use that state to find attorneys licensed there."
+												: "You're all set to fund cases. Give any amount to a case you believe in and follow it to the outcome. No extra details needed."}
 										</p>
 									</div>
 								)}

@@ -132,7 +132,7 @@ const PAYOUT_GLANCE: Record<PayoutStage, { value: string; hint: string }> = {
 	incomplete: { value: "Unfinished", hint: "Stripe still needs information" },
 	in_review: {
 		value: "In review",
-		hint: "Stripe is verifying — nothing to do",
+		hint: "Stripe is verifying, nothing to do",
 	},
 	ready: { value: "Active", hint: "Funds land in the account you linked" },
 };
@@ -267,7 +267,7 @@ export function AttorneyCaseDetailView({
 							className="mt-0.5 size-3.5 shrink-0 text-brass-deep"
 							aria-hidden="true"
 						/>
-						No thread yet. Clients open the conversation on JustUs — once{" "}
+						No thread yet. Clients open the conversation on JustUs. Once{" "}
 						{item.plaintiffName.split(/\s+/)[0]} messages you, it appears here
 						and in Messages.
 					</p>
@@ -333,14 +333,21 @@ export function AttorneyCaseDetailView({
 				label="Case sections"
 				// Opens on payouts whenever they are outstanding: that is the work only
 				// the attorney can do, and their client is stuck behind it.
-				initialKey={payoutOutstanding ? "funding" : "updates"}
+				initialKey={payoutOutstanding ? "funding" : isLive ? "updates" : "case"}
 				tabs={[
-					{
-						key: "updates",
-						label: "Updates",
-						count: item.updatesCount,
-						content: updatesPanel,
-					},
+					// Progress updates only exist once the case is live and raising — there
+					// is nothing to post, and no backers to read it, while it is still out
+					// to attorneys or awaiting payout. So the tab appears only then.
+					...(isLive
+						? [
+								{
+									key: "updates",
+									label: "Updates",
+									count: item.updatesCount,
+									content: updatesPanel,
+								},
+							]
+						: []),
 					{
 						key: "case",
 						label: "The case",
@@ -401,7 +408,7 @@ export function AttorneyCaseDetailView({
 											{item.evidence.some((file) => file.kind === "record") && (
 												<p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
 													Items without a link were filed before JustUs stored
-													documents — ask your client for those directly.
+													documents. Ask your client for those directly.
 												</p>
 											)}
 										</>

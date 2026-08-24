@@ -41,7 +41,7 @@ export function ReportCampaign({
 			});
 			if (res.ok) {
 				toast.success(
-					"Thanks — this has been sent to our moderators for review.",
+					"Thanks. This has been sent to our moderators for review.",
 				);
 				setOpen(false);
 				setReason("");
@@ -100,7 +100,7 @@ export function ReportCampaign({
 							htmlFor={fieldId}
 							className="block text-[13px] text-ink-soft leading-relaxed"
 						>
-							Tell our moderators what's wrong — a misleading claim, something
+							Tell our moderators what's wrong: a misleading claim, something
 							defamatory, private information, or anything else. A person
 							reviews every report.
 						</label>

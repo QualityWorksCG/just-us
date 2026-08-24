@@ -309,7 +309,7 @@ export default async function CaseInvitePage({
 				icon={UserRoundX}
 				tone="danger"
 				title="This invitation is for a different account"
-				description={`It was sent to ${maskEmail(invitation.email)}, and you're signed in as ${user.email}. Only the invited address can confirm — receiving the link isn't proof of who you are.`}
+				description={`It was sent to ${maskEmail(invitation.email)}, and you're signed in as ${user.email}. Only the invited address can confirm. Receiving the link isn't proof of who you are.`}
 			>
 				<div className="flex flex-col gap-4">
 					<p className="text-[13px] text-muted-foreground leading-relaxed">
@@ -345,7 +345,7 @@ export default async function CaseInvitePage({
 			>
 				<div className="flex flex-col gap-4">
 					<p className="text-[13px] text-muted-foreground leading-relaxed">
-						The invitation itself is untouched — the plaintiff can send it to
+						The invitation itself is untouched. The plaintiff can send it to
 						another address, or you can decline it so their case goes back in
 						front of other attorneys straight away.
 					</p>
@@ -400,7 +400,7 @@ export default async function CaseInvitePage({
 					</Link>
 					<p className="text-[12px] text-muted-foreground leading-relaxed">
 						Choose <strong className="font-semibold text-ink">Attorney</strong>{" "}
-						when asked — we'll bring you back here as soon as you're done.
+						when asked, and we'll bring you back here as soon as you're done.
 					</p>
 					<DeclineInviteButton
 						invite={ref}
@@ -461,8 +461,8 @@ export default async function CaseInvitePage({
 						Add {c.location} to my states
 					</Link>
 					<p className="text-[12px] text-muted-foreground leading-relaxed">
-						If you are admitted there, add the state and run its bar check —
-						we'll bring you back here. If you aren't, decline so {c.owner.name}
+						If you are admitted there, add the state and run its bar check.
+						We'll bring you back here. If you aren't, decline so {c.owner.name}
 						's case goes in front of attorneys who are, rather than waiting out
 						the week.
 					</p>
@@ -486,7 +486,7 @@ export default async function CaseInvitePage({
 				description={
 					verification === "pending" || verification === "needs_review"
 						? `Your ${c.location} bar check is still being reviewed. Once it clears, come back to this link and you'll be able to confirm.`
-						: `Every attorney on JustUs is checked against the bar of the state a case falls under — including one they were invited to. This case is in ${c.location}.`
+						: `Every attorney on JustUs is checked against the bar of the state a case falls under, including one they were invited to. This case is in ${c.location}.`
 				}
 			>
 				<div className="flex flex-col gap-4">
@@ -500,9 +500,9 @@ export default async function CaseInvitePage({
 							: `Verify my ${c.location} licence`}
 					</Link>
 					<p className="text-[12px] text-muted-foreground leading-relaxed">
-						This invitation is held open for you in the meantime — the case
-						stays off the attorney queue until you answer or it expires. You can
-						come back to it from your dashboard at any time.
+						This invitation is held open for you in the meantime. The case stays
+						off the attorney queue until you answer or it expires. You can come
+						back to it from your dashboard at any time.
 					</p>
 					<DeclineInviteButton
 						invite={ref}
@@ -547,7 +547,7 @@ function SettledInvitation({
 		<p className="text-[13px] text-muted-foreground leading-relaxed">
 			{backInQueue
 				? `"${caseTitle}" is back in the Seeking Representation queue, so any verified attorney can put themselves forward. If you'd still like to act on it, ask the plaintiff for a new invitation.`
-				: `"${caseTitle}" has moved on since — ask the plaintiff directly if you'd still like to act on it.`}
+				: `"${caseTitle}" has moved on since. Ask the plaintiff directly if you'd still like to act on it.`}
 		</p>
 	);
 
@@ -580,7 +580,7 @@ function SettledInvitation({
 					icon={TriangleAlert}
 					tone="danger"
 					title="This invitation was withdrawn"
-					description="The plaintiff cancelled it — usually because they invited a different attorney — so the link no longer works."
+					description="The plaintiff cancelled it (usually because they invited a different attorney), so the link no longer works."
 				>
 					<p className="text-[13px] text-muted-foreground">
 						Contact them directly if you think that's a mistake.

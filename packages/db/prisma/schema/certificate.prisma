@@ -30,6 +30,7 @@ model Certificate {
   donorId    String?
   donorEmail String?
 
+
   // Snapshots taken at issue time, so the certificate stays truthful even if the
   // case is later edited or the donor renames their account.
   recipientName String

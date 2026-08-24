@@ -86,7 +86,7 @@ export function AdminCaseActions({
 
 			<p className="mt-3 text-[13px] text-ink-soft leading-relaxed">
 				{isRemoved
-					? "This case has been taken down — donors can't see or back it. You can restore it to the site."
+					? "This case has been taken down. Donors can't see or back it. You can restore it to the site."
 					: "You're viewing this case exactly as the public does. Take it down if it breaches the rules."}
 			</p>
 
@@ -133,7 +133,7 @@ export function AdminCaseActions({
 							className={cn("bg-danger text-white hover:bg-danger/90")}
 						>
 							<Trash2 data-icon="inline-start" aria-hidden="true" />
-							{armedRemove ? "Confirm — remove from site" : "Remove from site"}
+							{armedRemove ? "Confirm: remove from site" : "Remove from site"}
 						</Button>
 						{armedRemove && (
 							<button
@@ -152,7 +152,7 @@ export function AdminCaseActions({
 			{!isRemoved && (
 				<p className="mt-3 flex items-start gap-1.5 text-[11.5px] text-muted-foreground leading-relaxed">
 					<CircleCheck className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-					Removal is reversible — it hides the case from the public but doesn't
+					Removal is reversible. It hides the case from the public but doesn't
 					delete it, so you can restore it later.
 				</p>
 			)}

@@ -21,7 +21,7 @@ export async function generateMetadata({
 	const attorney = await getDirectoryAttorney(id);
 	if (!attorney) return { title: "Attorney not found" };
 	return {
-		title: `${attorney.legalName} — attorney profile`,
+		title: `${attorney.legalName}, attorney profile`,
 		description:
 			attorney.bio ??
 			`${attorney.legalName} is a bar-verified attorney listed on JustUs.`,

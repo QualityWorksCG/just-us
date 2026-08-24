@@ -54,7 +54,7 @@ export function VerifyEmailPrompt({
 			title="Verify your email"
 			description={
 				email
-					? `We sent a verification link to ${email}. Click it to activate your account — you can't use role features until your email is confirmed.`
+					? `We sent a verification link to ${email}. Click it to activate your account. You can't use role features until your email is confirmed.`
 					: "We sent you a verification link. Click it to activate your account. If you haven't received it, sign in to resend."
 			}
 		>

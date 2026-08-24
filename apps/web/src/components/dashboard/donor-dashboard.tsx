@@ -210,7 +210,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 	return (
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				Your giving at a glance — here's the difference you're making.
+				Your giving at a glance. Here's the difference you're making.
 			</p>
 
 			{/* Stats */}
@@ -276,7 +276,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 								You haven't backed a case yet
 							</p>
 							<p className="max-w-[38ch] text-[12.5px] text-muted-foreground leading-relaxed">
-								Find a cause that matters to you — every gift helps fund
+								Find a cause that matters to you. Every gift helps fund
 								someone's day in court.
 							</p>
 							<Link
@@ -380,8 +380,8 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 					className="mt-0.5 size-4 shrink-0 text-brass-deep"
 					aria-hidden="true"
 				/>
-				Every donation funds the plaintiff's agreed attorney fee — a gift, with
-				no financial return. One transparent 5% fee, shown before you give.
+				Every donation funds the plaintiff's agreed attorney fee. It's a gift,
+				with no financial return. One transparent 5% fee, shown before you give.
 			</div>
 		</div>
 	);
