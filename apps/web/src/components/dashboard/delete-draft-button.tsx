@@ -32,7 +32,7 @@ export function DeleteDraftButton({
 		startTransition(async () => {
 			const res = await deleteCaseAction(id);
 			if (res.ok) {
-				toast.success("Draft deleted — this can't be undone.");
+				toast.success("Draft deleted. This can't be undone.");
 				setOpen(false);
 			} else {
 				toast.error(res.error);
@@ -77,7 +77,7 @@ export function DeleteDraftButton({
 						</h2>
 						<p className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed">
 							{title ? `“${title}” ` : "This draft "}will be permanently
-							deleted. This can't be undone — a deleted case can't be restored.
+							deleted. This can't be undone. A deleted case can't be restored.
 						</p>
 						<div className="mt-5 flex justify-end gap-2.5">
 							<Button

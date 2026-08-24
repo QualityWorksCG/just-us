@@ -44,12 +44,12 @@ const COPY: Record<Stage, { title: string; body: string; cta: string | null }> =
 	{
 		not_started: {
 			title: "Not set up",
-			body: "This case has no payout account yet, so it can't accept donations. Link the firm's business checking account for this matter — use the operating account, not a client trust account.",
+			body: "This case has no payout account yet, so it can't accept donations. Link the firm's business checking account for this matter. Use the operating account, not a client trust account.",
 			cta: "Set up payouts",
 		},
 		incomplete: {
 			title: "Unfinished",
-			body: "Stripe still needs information for this case's account. Already submitted everything? Use “Check again” — Stripe can take a moment to finish reviewing.",
+			body: "Stripe still needs information for this case's account. Already submitted everything? Use “Check again”. Stripe can take a moment to finish reviewing.",
 			cta: "Continue setup",
 		},
 		in_review: {
@@ -116,7 +116,7 @@ export function CasePayoutSetup({
 					toast.success(
 						result.transfersEnabled
 							? "Payouts are active for this case."
-							: "Details received — Stripe is reviewing them.",
+							: "Details received. Stripe is reviewing them.",
 					);
 				} else {
 					toast.error(result.error);
@@ -205,12 +205,12 @@ export function CasePayoutSetup({
 			{stage === "ready" && !payout.bound && (
 				<p className="mt-2.5 text-[12.5px] text-muted-foreground leading-relaxed">
 					{caseStatus === "pending_payout"
-						? "Nothing outstanding here — your client publishes their case whenever they're ready."
+						? "Nothing outstanding here. Your client publishes their case whenever they're ready."
 						: caseStatus === "live"
 							? "Waiting on your client to open donations on their side."
 							: caseStatus === "closed"
 								? "This case is closed, so nothing further will be donated to it."
-								: "Nothing outstanding here — the case itself can't take donations until your client agrees a fee with you and publishes it."}
+								: "Nothing outstanding here. The case itself can't take donations until your client agrees a fee with you and publishes it."}
 				</p>
 			)}
 
@@ -290,7 +290,7 @@ function Shell({
 						</h2>
 						<p className="mt-1 max-w-[62ch] text-[13px] text-ink-soft leading-relaxed">
 							This case pays into an account of its own, so no two clients'
-							funds share a balance. Handled by Stripe — JustUs never takes
+							funds share a balance. Handled by Stripe. JustUs never takes
 							custody of donated funds.
 						</p>
 					</div>

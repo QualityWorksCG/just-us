@@ -73,7 +73,7 @@ export const FEE_APPROACHES = [
 	{
 		value: "contingency",
 		label: "Contingency",
-		blurb: "A share of the recovery — no fee range needed.",
+		blurb: "A share of the recovery. No fee range needed.",
 	},
 	{
 		value: "quoted_per_case",
@@ -142,7 +142,7 @@ export function validatePracticeAreaShares(
 	}
 	const total = areas.reduce((sum, a) => sum + (shares[a] as number), 0);
 	if (total !== 100) {
-		return `Shares must total 100% — they currently total ${total}%.`;
+		return `Shares must total 100%. They currently total ${total}%.`;
 	}
 	return null;
 }

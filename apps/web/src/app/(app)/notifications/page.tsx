@@ -28,7 +28,7 @@ export default async function NotificationsPage() {
 	return (
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				Everything happening on your cases — updates, attorney interest, status
+				Everything happening on your cases: updates, attorney interest, status
 				changes, and donation confirmations.
 			</p>
 			<NotificationList items={items} />

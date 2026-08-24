@@ -5,7 +5,7 @@ import type { Role } from "@just-us/auth";
  * a user asking a legal-sounding question has to see it every time.
  */
 export const DISCLAIMER =
-	"Not a lawyer, and not legal advice. The assistant explains how JustUs works and reads your own account — for advice about your case, talk to your attorney.";
+	"Not a lawyer, and not legal advice. The assistant explains how JustUs works and reads your own account. For advice about your case, talk to your attorney.";
 
 /** Opening prompts, worded for what each role's own screens are called. */
 export const STARTERS: Record<Role, string[]> = {

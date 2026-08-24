@@ -27,7 +27,7 @@ type Mode = "create" | "signin";
 const BULLETS = [
 	"Nothing goes public until you hit publish",
 	"You choose your own attorney",
-	"One transparent 5% fee — we never hold the money",
+	"One transparent 5% fee, and we never hold the money",
 ];
 
 function Field({
@@ -377,7 +377,7 @@ export function AuthScreen({
 					<p className="mt-6 flex gap-2.5 text-[12px] text-paper/50 leading-relaxed">
 						<Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 						<span>
-							Your sign-in is protected — passwords are encrypted, sessions use
+							Your sign-in is protected: passwords are encrypted, sessions use
 							secure cookies, and every account confirms its email before it
 							goes active.
 						</span>
@@ -530,7 +530,7 @@ export function AuthScreen({
 									>
 										Privacy Policy
 									</Link>
-									, and understand donations are gifts — they carry no financial
+									, and understand donations are gifts that carry no financial
 									return and no share of any settlement.
 								</span>
 							</label>

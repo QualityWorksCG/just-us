@@ -60,7 +60,9 @@ export async function syncDonationBySession(
 		if (session.payment_status !== "paid") return { settled: false };
 
 		const intent =
-			typeof session.payment_intent === "string" ? null : session.payment_intent;
+			typeof session.payment_intent === "string"
+				? null
+				: session.payment_intent;
 		const charge =
 			intent && typeof intent.latest_charge !== "string"
 				? intent.latest_charge

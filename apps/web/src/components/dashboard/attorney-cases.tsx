@@ -98,7 +98,7 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		return (
 			<div className="flex flex-col gap-6">
 				<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-					Cases matched to you — the matter, your client, and where its funding
+					Cases matched to you: the matter, your client, and where its funding
 					stands.
 				</p>
 				<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface px-6 py-16 text-center shadow-[var(--shadow-rest)]">
@@ -108,7 +108,7 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 					<p className="font-bold text-[16px] text-ink">No cases yet</p>
 					<p className="max-w-[46ch] text-[13.5px] text-muted-foreground leading-relaxed">
 						Put yourself forward for cases that need representation. When a
-						plaintiff takes you on — or names you on their own case — it appears
+						plaintiff takes you on, or names you on their own case, it appears
 						here.
 					</p>
 					<Link
@@ -133,7 +133,7 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[680px] text-[14.5px] text-ink-soft leading-relaxed">
 				{cases.length === 1
-					? "The case you're acting on — the matter, your client, and where its funding stands."
+					? "The case you're acting on: the matter, your client, and where its funding stands."
 					: `${cases.length} cases you're acting on. ${money(raised)} raised across them so far.`}
 			</p>
 
@@ -150,7 +150,7 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 						</p>
 						<p className="mt-1 max-w-[70ch] text-[13px] text-ink-soft leading-relaxed">
 							Each case pays into its own account, so finishing one doesn't
-							cover the others. Open the case below to set its account up — your
+							cover the others. Open the case below to set its account up. Your
 							client can do nothing about it from their side.
 						</p>
 					</div>
@@ -265,7 +265,7 @@ function CaseRow({ case: c }: { case: AttorneyCase }) {
 				) : (
 					<p className="text-[13px] text-ink-soft leading-relaxed">
 						{c.status === "closed"
-							? "Closed — no longer raising."
+							? "Closed. No longer raising."
 							: c.status === "pending_payout"
 								? c.payout.transfersEnabled
 									? `${money(c.goalCents)} agreed and your account is ready. Your client publishes when they're set.`

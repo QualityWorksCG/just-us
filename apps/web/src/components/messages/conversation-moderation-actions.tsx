@@ -59,12 +59,12 @@ export function ConversationModerationActions({
 				onClick={() =>
 					run(
 						() => resolveReportAction({ reportId, resolution: "dismissed" }),
-						"Report dismissed — no action taken.",
+						"Report dismissed. No action taken.",
 					)
 				}
 			>
 				<Check data-icon="inline-start" aria-hidden="true" />
-				Dismiss — no action
+				Dismiss (no action)
 			</Button>
 
 			<Button
@@ -75,7 +75,7 @@ export function ConversationModerationActions({
 					run(
 						() =>
 							resolveReportAction({ reportId, resolution: "message_removed" }),
-						"Report closed — reporter notified a message was removed.",
+						"Report closed. Reporter notified a message was removed.",
 					)
 				}
 			>
@@ -99,7 +99,7 @@ export function ConversationModerationActions({
 				className={cn("bg-danger text-white hover:bg-danger/90")}
 			>
 				<Ban data-icon="inline-start" aria-hidden="true" />
-				{armedBlock ? `Confirm — restrict ${otherName}` : "Restrict account"}
+				{armedBlock ? `Confirm: restrict ${otherName}` : "Restrict account"}
 			</Button>
 			{armedBlock && (
 				<button

@@ -124,8 +124,8 @@ export function NotificationBell({
 						type="button"
 						aria-label={
 							hasUnread
-								? `Notifications — ${unreadCount} new`
-								: "Notifications — none new"
+								? `Notifications: ${unreadCount} new`
+								: "Notifications: none new"
 						}
 						className="relative flex size-9 items-center justify-center rounded-full border border-border text-ink-soft transition-colors hover:border-brass-deep hover:text-ink"
 					>

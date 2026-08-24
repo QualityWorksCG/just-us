@@ -42,7 +42,7 @@ export default function CertificateEmail({
 			<Text style={paragraph}>
 				{recipientName ? `Hi ${recipientName.split(" ")[0]}, ` : "Hi, "}“
 				{caseTitle}” has now closed. Backing a case on JustUs is a gift, not an
-				investment — there's no financial return, and none is owed. What your
+				investment. There's no financial return, and none is owed. What your
 				support made possible is the case itself, and we've prepared a
 				certificate of appreciation to recognize it.
 			</Text>

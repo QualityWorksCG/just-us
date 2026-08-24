@@ -387,8 +387,8 @@ export function AttorneyProfileView({
 							<p className="mt-3 text-[12.5px] text-muted-foreground leading-relaxed">
 								{attorney.reviews.length > 3
 									? `Showing 3 of ${attorney.reviewCount} client reviews`
-									: `${attorney.reviewCount} client ${attorney.reviewCount === 1 ? "review" : "reviews"}`}{" "}
-								— ratings come from former clients, never from JustUs.
+									: `${attorney.reviewCount} client ${attorney.reviewCount === 1 ? "review" : "reviews"}`}
+								. Ratings come from former clients, never from JustUs.
 							</p>
 						</Card>
 					)}
@@ -401,7 +401,7 @@ export function AttorneyProfileView({
 							Work with {attorney.legalName}
 						</p>
 						<p className="mt-3 text-[13.5px] text-ink-soft leading-relaxed">
-							You make the first move — send your case and {firstName} decides
+							You make the first move: send your case and {firstName} decides
 							whether to take it. If they accept, you agree a fee together and
 							it becomes your funding goal.
 						</p>
@@ -441,7 +441,7 @@ export function AttorneyProfileView({
 									aria-hidden="true"
 								/>
 								<span>
-									Chosen by plaintiffs on JustUs — case counts appear here once
+									Chosen by plaintiffs on JustUs. Case counts appear here once
 									matters close.
 								</span>
 							</li>
@@ -451,7 +451,7 @@ export function AttorneyProfileView({
 									aria-hidden="true"
 								/>
 								<span>
-									Funds settle to the plaintiff each case names — never to
+									Funds settle to the plaintiff each case names, never to
 									JustUs.
 								</span>
 							</li>

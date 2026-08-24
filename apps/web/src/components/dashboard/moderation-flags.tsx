@@ -34,7 +34,7 @@ export function ModerationFlags({ flags }: { flags: QueueFlag[] }) {
 	if (flags.length === 0) {
 		return (
 			<p className="rounded-[var(--radius-card)] bg-paper-alt px-4 py-8 text-center text-[13px] text-muted-foreground">
-				Nothing here right now — reported campaigns and updates will appear for
+				Nothing here right now. Reported campaigns and updates will appear for
 				your ruling.
 			</p>
 		);

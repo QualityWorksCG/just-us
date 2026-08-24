@@ -141,7 +141,7 @@ export function AttorneyVerification({ data }: { data: VerificationView }) {
 			setOptimistic(null);
 			if (res.ok) {
 				const messages: Record<VerificationStatus, string> = {
-					verified: "Verified — your listing now carries the verified badge.",
+					verified: "Verified. Your listing now carries the verified badge.",
 					needs_review:
 						"We couldn't verify this automatically. An administrator will review it.",
 					rejected: "The check couldn't confirm an active licence.",
@@ -190,8 +190,8 @@ export function AttorneyVerification({ data }: { data: VerificationView }) {
 				<p className="flex items-start gap-2.5 rounded-[var(--radius-card-sm)] bg-danger/5 px-4 py-3 text-[13px] text-danger leading-relaxed">
 					<CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					<span>
-						Add the states you're admitted in above — a check needs to know
-						which state's records to search.
+						Add the states you're admitted in above. A check needs to know which
+						state's records to search.
 					</span>
 				</p>
 			)}
@@ -274,8 +274,8 @@ export function AttorneyVerification({ data }: { data: VerificationView }) {
 						) : (
 							<p className="mt-1 text-[13px] text-ink-soft leading-relaxed">
 								None reached. The check couldn't open a licensee record on the
-								licensing authority's own site, which is why this isn't verified
-								— whatever else it found restates a licence rather than
+								licensing authority's own site, which is why this isn't
+								verified. Whatever else it found restates a licence rather than
 								conferring one.
 							</p>
 						)}

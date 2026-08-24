@@ -59,7 +59,7 @@ export function PayoutNudge({
 				</p>
 				<p className="mt-1 text-[13px] text-ink-soft leading-relaxed">
 					{detailsSubmitted
-						? "Stripe is still verifying the details you submitted. There's nothing more for you to do — donations open as soon as it clears."
+						? "Stripe is still verifying the details you submitted. There's nothing more for you to do. Donations open as soon as it clears."
 						: hasAccount
 							? "The payout accounts for these cases aren't finished, so donations to them are blocked. Your clients can't do anything about it from their side."
 							: "Each case is paid into its own account against your firm's operating account, and these don't have one yet. Until they do, the cases are published but unable to raise."}
@@ -70,8 +70,8 @@ export function PayoutNudge({
 				{blockedCases > 0 && !detailsSubmitted && (
 					<p className="mt-1.5 text-[13px] text-ink-soft leading-relaxed">
 						{blockedCases === 1
-							? "One of them hasn't been published at all — that client is waiting on this before their campaign can even start."
-							: `${blockedCases} of them haven't been published at all — those clients are waiting on this before their campaigns can even start.`}
+							? "One of them hasn't been published at all. That client is waiting on this before their campaign can even start."
+							: `${blockedCases} of them haven't been published at all. Those clients are waiting on this before their campaigns can even start.`}
 					</p>
 				)}
 				{!detailsSubmitted && (

@@ -74,7 +74,7 @@ export default async function DiscoverPage({
 	return (
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				Find a case that matters to you — save it, share it, or back it today.
+				Find a case that matters to you. Save it, share it, or back it today.
 			</p>
 
 			<BrowseControls />

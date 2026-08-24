@@ -66,7 +66,7 @@ export function AttorneyDirectory({
 						</p>
 						<p className="max-w-[46ch] text-[13.5px] text-muted-foreground leading-relaxed">
 							{filtered
-								? "Try a broader practice area or state — the directory is still growing."
+								? "Try a broader practice area or state. The directory is still growing."
 								: "Attorneys appear here once their bar standing is verified."}
 						</p>
 					</div>
@@ -86,7 +86,7 @@ export function AttorneyDirectory({
 
 			<p className="rounded-[var(--radius-card)] border border-border bg-paper-alt px-5 py-3.5 text-[12.5px] text-muted-foreground leading-relaxed">
 				JustUs is a directory, not a referral service. Attorneys are listed by
-				the sort you choose — never ranked for your case — and you decide who to
+				the sort you choose (never ranked for your case), and you decide who to
 				contact. Ratings and reviews come from former clients.
 			</p>
 		</div>

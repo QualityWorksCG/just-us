@@ -21,11 +21,11 @@ const bricolage = Bricolage_Grotesque({
 
 export const metadata: Metadata = {
 	title: {
-		default: "JustUs — Justice, funded by the many",
+		default: "JustUs: Justice, funded by the many",
 		template: "%s · JustUs",
 	},
 	description:
-		"JustUs connects wronged people with attorneys and funds their legal fees through public donations. Money goes directly to the attorney — donations are gifts, not investments.",
+		"JustUs connects wronged people with attorneys and funds their legal fees through public donations. Money goes directly to the attorney. Donations are gifts, not investments.",
 };
 
 export default function RootLayout({

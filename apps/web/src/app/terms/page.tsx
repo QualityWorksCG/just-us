@@ -29,7 +29,7 @@ export default function TermsPage() {
 					</strong>{" "}
 					We are not a lender, investment platform, escrow agent, or party to
 					any fee agreement between a plaintiff and an attorney. Using JustUs
-					does not create an attorney–client relationship with JustUs.
+					does not create an attorney-client relationship with JustUs.
 				</p>
 			</section>
 
@@ -69,8 +69,8 @@ export default function TermsPage() {
 					Because donated funds move quickly toward a live legal matter,
 					donations are generally non-refundable except where required by law or
 					expressly stated at the time of giving. Where a refund is made, it is
-					net of the payment processing fees on the original transaction — see
-					section 4.
+					net of the payment processing fees on the original transaction (see
+					section 4).
 				</p>
 			</section>
 
@@ -104,17 +104,17 @@ export default function TermsPage() {
 						<strong>Each case is funded through its own account.</strong> A firm
 						representing more than one case on JustUs holds a separate connected
 						account per case, so one case's donations, refunds, and balance are
-						never combined with another's — a reversal on one case cannot be
+						never combined with another's. A reversal on one case cannot be
 						taken out of a different client's funds.
 					</li>
 					<li>
 						Funds are received by the firm as an{" "}
 						<strong>advance payment of fees from a third party</strong> for the
-						client's matter. Handling them from that point — including any
+						client's matter. Handling them from that point (including any
 						obligation to deposit them in a client trust or IOLTA account, to
-						account for them, and to refund any unearned portion — is governed
-						by the rules of professional conduct of the firm's jurisdiction and
-						is the firm's responsibility alone. JustUs neither administers nor
+						account for them, and to refund any unearned portion) is governed by
+						the rules of professional conduct of the firm's jurisdiction and is
+						the firm's responsibility alone. JustUs neither administers nor
 						supervises trust accounting, and is not a party to the fee agreement
 						between an attorney and their client.
 					</li>
@@ -133,12 +133,11 @@ export default function TermsPage() {
 						<strong>Chargebacks are the receiving firm's liability.</strong> By
 						connecting an account to receive donations, a law firm agrees that
 						any chargeback, fraud reversal, or refund on a donation routed to it
-						— including reversals forced by a card network or bank, and the
-						associated processor fees — is the firm's liability and not
-						JustUs's. JustUs may recover such amounts from the firm's connected
-						balance, including by reversing transfers to it or withholding
-						subsequent transfers, and any shortfall remains a debt owed to
-						JustUs.
+						(including reversals forced by a card network or bank, and the
+						associated processor fees) is the firm's liability and not JustUs's.
+						JustUs may recover such amounts from the firm's connected balance,
+						including by reversing transfers to it or withholding subsequent
+						transfers, and any shortfall remains a debt owed to JustUs.
 					</li>
 					<li>
 						We do not take any share of legal fees or settlements. Fees and
@@ -180,7 +179,7 @@ export default function TermsPage() {
 					<li>
 						An attorney who connects an account to receive donations does so on
 						behalf of their firm, warrants that they are authorized to do so,
-						and must use the firm's <strong>operating account</strong> — not a
+						and must use the firm's <strong>operating account</strong>, not a
 						client trust or IOLTA account, which our payment processor cannot
 						support. A separate account is connected for{" "}
 						<strong>each case</strong> the firm represents, so completing setup
@@ -200,8 +199,8 @@ export default function TermsPage() {
 			<section>
 				<h2>7. No legal advice</h2>
 				<p>
-					Nothing on JustUs — including AI-generated summaries, case-strength
-					indicators, or completeness checks — is legal advice. AI output is
+					Nothing on JustUs (including AI-generated summaries, case-strength
+					indicators, or completeness checks) is legal advice. AI output is
 					labelled, advisory, and never decides an outcome; a person makes
 					vetting and moderation rulings. Always rely on your own attorney for
 					legal advice.

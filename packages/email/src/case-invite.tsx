@@ -83,7 +83,7 @@ export default function CaseInviteEmail({
 		<EmailShell
 			preview={
 				hasAccount
-					? `${plaintiffName} named you as their attorney — confirm to continue`
+					? `${plaintiffName} named you as their attorney. Confirm to continue`
 					: `${plaintiffName} named you as their attorney on JustUs`
 			}
 		>
@@ -102,7 +102,7 @@ export default function CaseInviteEmail({
 			<Text style={paragraph}>
 				{firstName ? `Hi ${firstName}, ` : "Hi, "}
 				{hasAccount
-					? `${plaintiffName} named you as their attorney on JustUs. Sign in with this email address to confirm you represent this case — or decline if you don't.`
+					? `${plaintiffName} named you as their attorney on JustUs. Sign in with this email address to confirm you represent this case, or decline if you don't.`
 					: `${plaintiffName} named you as their attorney on JustUs, where supporters fund the legal costs of cases like theirs. Create your attorney account to review the case and confirm you represent it.`}
 			</Text>
 
@@ -127,7 +127,7 @@ export default function CaseInviteEmail({
 			    that costs the plaintiff a week. Say what actually helps them. */}
 			<Text style={footer}>
 				This link expires in {days}, and {plaintiffName}'s case waits for your
-				answer until then — it isn't shown to other attorneys while this
+				answer until then. It isn't shown to other attorneys while this
 				invitation is open. If you weren't expecting this, or you don't act for{" "}
 				{plaintiffName}, open the link and decline: their case goes in front of
 				other attorneys straight away.

@@ -127,7 +127,7 @@ function InvitationCard({
 							{!admission
 								? `This case is in ${invitation.location}, and you haven't added that state to your profile. A case can only be taken by an attorney admitted where it is.`
 								: awaitingCheck
-									? `Your ${invitation.location} bar standing is still being checked. As soon as it clears you'll be able to confirm — nothing else is needed from you.`
+									? `Your ${invitation.location} bar standing is still being checked. As soon as it clears you'll be able to confirm, and nothing else is needed from you.`
 									: `Every attorney is checked against the state bar where the case is, including one they were invited to. Verify your ${invitation.location} licence to unlock this.`}
 						</p>
 					)}
@@ -155,7 +155,7 @@ function InvitationCard({
 						<span className="text-[12.5px] text-ink-soft">
 							{left <= 1
 								? "Expires today"
-								: `Expires in ${left} days${left <= 2 ? " — the case goes back to the queue after that" : ""}`}
+								: `Expires in ${left} days${left <= 2 ? " (the case goes back to the queue after that)" : ""}`}
 						</span>
 					</div>
 				</div>

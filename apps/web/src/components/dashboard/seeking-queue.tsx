@@ -116,7 +116,7 @@ export function SeekingQueue({
 		if (!canExpressInterest) {
 			return "Verify your bar standing on your profile to express interest.";
 		}
-		return `You're not verified in ${state} yet — verify your bar standing there to express interest.`;
+		return `You're not verified in ${state} yet. Verify your bar standing there to express interest.`;
 	}
 
 	return (
@@ -153,7 +153,7 @@ export function SeekingQueue({
 						<span className="font-bold">
 							Verify your bar standing to put yourself forward.
 						</span>{" "}
-						You can browse the cases in your states now — expressing interest
+						You can browse the cases in your states now. Expressing interest
 						needs a verified licence there, so plaintiffs only ever see
 						attorneys who can actually take the work.
 					</p>
@@ -252,7 +252,7 @@ export function SeekingQueue({
 							{nowhereAdmitted
 								? "The queue is scoped to the states you're admitted in. Add yours on your directory profile and the cases from them appear here."
 								: filtered
-									? "Try a broader category or another state — the queue turns over as plaintiffs publish."
+									? "Try a broader category or another state. The queue turns over as plaintiffs publish."
 									: `Cases appear here the moment a plaintiff in ${admittedStates.length === 1 ? admittedStates[0] : "one of your states"} publishes one out to attorneys.`}
 						</p>
 					</div>
@@ -270,10 +270,10 @@ export function SeekingQueue({
 			</section>
 
 			<p className="rounded-[var(--radius-card)] border border-border bg-paper-alt px-5 py-3.5 text-[12.5px] text-muted-foreground leading-relaxed">
-				Cases are listed by the sort you choose — never ranked for you, and
-				never assigned. Open a case to read the plaintiff's full account and the
+				Cases are listed by the sort you choose, never ranked for you, and never
+				assigned. Open a case to read the plaintiff's full account and the
 				evidence they've filed; their contact details are never shared.
-				Expressing interest tells them you're available — it doesn't open a
+				Expressing interest tells them you're available. It doesn't open a
 				conversation, and the plaintiff is the one who makes contact.
 			</p>
 		</div>

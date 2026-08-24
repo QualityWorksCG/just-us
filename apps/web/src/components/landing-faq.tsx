@@ -6,27 +6,27 @@ import { useState } from "react";
 const faqs = [
 	{
 		q: "Is my donation an investment?",
-		a: "No. Donations on JustUs are gifts. They carry no financial return and no share of any settlement or judgment — you give because the case matters, and you follow it to the end.",
+		a: "No. Donations on JustUs are gifts. They carry no financial return and no share of any settlement or judgment. You give because the case matters, and you follow it to the end.",
 	},
 	{
 		q: "Where does my money actually go?",
-		a: "Straight to the law firm representing the case — into a Stripe Connect account the firm opens for that case alone, named on the case page before you give. Nothing is pooled: another of the firm's cases can't draw on it. The plaintiff never receives it; the firm applies it to the legal fee under its state bar's trust rules. JustUs never takes custody: our own balance never receives a donated dollar. A 5% platform fee is added on top of your gift and shown to the cent before you confirm — so $100 to the case means you pay $105.",
+		a: "Straight to the law firm representing the case: into a Stripe Connect account the firm opens for that case alone, named on the case page before you give. Nothing is pooled: another of the firm's cases can't draw on it. The plaintiff never receives it; the firm applies it to the legal fee under its state bar's trust rules. JustUs never takes custody: our own balance never receives a donated dollar. A 5% platform fee is added on top of your gift and shown to the cent before you confirm, so $100 to the case means you pay $105.",
 	},
 	{
 		q: "What happens if a case doesn't reach its goal?",
-		a: "The agreed fee is the goal, and the attorney and plaintiff decide together how to proceed if funding falls short — a revised scope, more time, or a wind-down. Whatever is raised stays in the case account and is used only for that case; backers are told either way.",
+		a: "The agreed fee is the goal, and the attorney and plaintiff decide together how to proceed if funding falls short: a revised scope, more time, or a wind-down. Whatever is raised stays in the case account and is used only for that case; backers are told either way.",
 	},
 	{
 		q: "What happens if the case loses?",
-		a: "Nothing changes for you financially — a donation is a gift either way. The attorney posts a final update explaining the outcome, and the case closes.",
+		a: "Nothing changes for you financially. A donation is a gift either way. The attorney posts a final update explaining the outcome, and the case closes.",
 	},
 	{
 		q: "How do I know a case is real?",
-		a: "Every case is tied to a real, bar-verified attorney the plaintiff chose — attorneys confirm their standing per jurisdiction before they appear. Plaintiffs post their own story and evidence, and you follow every case to its outcome. AI can help flag gaps, but it never decides.",
+		a: "Every case is tied to a real, bar-verified attorney the plaintiff chose. Attorneys confirm their standing per jurisdiction before they appear. Plaintiffs post their own story and evidence, and you follow every case to its outcome. AI can help flag gaps, but it never decides.",
 	},
 	{
 		q: "What does JustUs earn?",
-		a: "A transparent 5% fee on each donation, plus optional tips. That's the whole model — we take no share of legal fees, no cut of settlements, and nothing from plaintiffs or attorneys for matching.",
+		a: "A transparent 5% fee on each donation, plus optional tips. That's the whole model: we take no share of legal fees, no cut of settlements, and nothing from plaintiffs or attorneys for matching.",
 	},
 	{
 		q: "Can I donate anonymously?",

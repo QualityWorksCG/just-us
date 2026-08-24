@@ -1,4 +1,5 @@
 import { isBlocked, isLocked } from "@just-us/auth/user-status";
+import { listAdmissions } from "@just-us/db/admissions";
 import { getUserWithCases } from "@just-us/db/users";
 import { cn } from "@just-us/ui/lib/utils";
 import { ArrowRight, BadgeCheck, FolderOpen, HandCoins } from "lucide-react";
@@ -6,7 +7,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-
+import { AdmissionVerifyControl } from "@/components/dashboard/admission-verify-control";
 import { BackLink } from "@/components/dashboard/back-link";
 import { BlockUserDialog } from "@/components/dashboard/block-user-dialog";
 import { UnblockUserButton } from "@/components/dashboard/unblock-user-button";
@@ -129,6 +130,10 @@ export default async function UserDetailPage({
 	const u = await getUserWithCases(id);
 	if (!u) notFound();
 
+	// The states this attorney claims, each with its own standing — a licence is
+	// per jurisdiction, so verification is ruled on per state below.
+	const admissions = u.role === "attorney" ? await listAdmissions(u.id) : [];
+
 	const blocked = isBlocked(u);
 	const locked = isLocked(u);
 	const isSelf = u.id === session.user.id;
@@ -238,7 +243,7 @@ export default async function UserDetailPage({
 					const badge = verificationBadge(status);
 					return (
 						<div className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
-							<div className="flex flex-wrap items-start justify-between gap-4">
+							<div className="flex flex-col gap-4">
 								<div className="min-w-0">
 									<h2 className="flex items-center gap-2 font-bold text-[15px] text-ink">
 										<BadgeCheck
@@ -249,8 +254,8 @@ export default async function UserDetailPage({
 									</h2>
 									<p className="mt-1 max-w-[52ch] text-[13px] text-muted-foreground leading-relaxed">
 										{isVerified
-											? "This attorney is verified — they can represent cases and express interest. Clearing it removes that access."
-											: "Only a verified attorney can represent cases or express interest. Mark them verified once their bar standing is confirmed."}
+											? "An attorney's licence is per state. They carry the verified badge because at least one jurisdiction below is verified. Manage each one individually."
+											: "An attorney's licence is per state. Verify each jurisdiction they claim below. When an automatic scan can't clear one, it lands here for your decision, and they can take cases only where they're verified."}
 									</p>
 									<div className="mt-3 flex flex-wrap items-center gap-2">
 										<span className={cn(PILL, badge.cls)}>
@@ -266,7 +271,63 @@ export default async function UserDetailPage({
 										)}
 									</div>
 								</div>
-								<VerifyAttorneyControl userId={u.id} verified={isVerified} />
+								{admissions.length > 0 ? (
+									<ul className="divide-y divide-border overflow-hidden rounded-[var(--radius-card)] border border-border">
+										{admissions.map((a) => {
+											const aBadge = verificationBadge(a.verificationStatus);
+											return (
+												<li
+													key={a.state}
+													className="flex flex-wrap items-center justify-between gap-3 bg-paper-alt/40 px-4 py-3"
+												>
+													<div className="min-w-0">
+														<p className="flex items-center gap-2 font-semibold text-[14px] text-ink">
+															{a.state}
+															{a.primary && (
+																<span className="rounded-[var(--radius-chip)] bg-surface-2 px-1.5 py-0.5 font-mono font-semibold text-[9.5px] text-ink-soft uppercase tracking-[0.06em]">
+																	Primary
+																</span>
+															)}
+														</p>
+														<p className="mt-0.5 text-[12px] text-muted-foreground">
+															{a.barNumber
+																? `Bar #${a.barNumber}`
+																: "No bar number on file"}
+														</p>
+													</div>
+													<div className="flex shrink-0 items-center gap-3">
+														<span className={cn(PILL, aBadge.cls)}>
+															<span
+																className={cn(
+																	"size-1.5 rounded-full",
+																	aBadge.dot,
+																)}
+															/>
+															{aBadge.text}
+														</span>
+														<AdmissionVerifyControl
+															userId={u.id}
+															state={a.state}
+															verified={a.verificationStatus === "verified"}
+														/>
+													</div>
+												</li>
+											);
+										})}
+									</ul>
+								) : (
+									// Legacy attorney with no admission rows — fall back to the
+									// account-level switch so they can still be vouched for.
+									<div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border border-dashed px-4 py-3">
+										<p className="text-[13px] text-muted-foreground">
+											This attorney hasn't claimed any states yet.
+										</p>
+										<VerifyAttorneyControl
+											userId={u.id}
+											verified={isVerified}
+										/>
+									</div>
+								)}
 							</div>
 						</div>
 					);

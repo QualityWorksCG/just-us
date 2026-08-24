@@ -128,7 +128,7 @@ export default async function CaseUpdatesPage({
 						caseId={id}
 						grouped
 						highlightSince={highlightSince}
-						emptyHint="No updates yet — the first post will appear here and reach every backer."
+						emptyHint="No updates yet. The first post will appear here and reach every backer."
 					/>
 				</div>
 

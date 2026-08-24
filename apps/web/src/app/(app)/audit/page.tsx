@@ -16,7 +16,7 @@ const ACTION_LABELS: Record<string, string> = {
 	"invite.resent": "Invitation resent",
 	"invite.revoked": "Invitation revoked",
 	"invite.accepted": "Invitation accepted",
-	"invite.rejected_existing_account": "Invitation rejected — account exists",
+	"invite.rejected_existing_account": "Invitation rejected: account exists",
 	"user.blocked": "User blocked",
 	"user.unblocked": "User unblocked",
 	"user.role_changed": "Role changed",

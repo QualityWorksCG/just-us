@@ -1,6 +1,9 @@
 "use server";
 
-import { adminSetVerification } from "@just-us/db/attorney-profile";
+import {
+	adminSetAdmissionVerification,
+	adminSetVerification,
+} from "@just-us/db/attorney-profile";
 import { blockUser, unblockUser } from "@just-us/db/users";
 import type { Route } from "next";
 import { revalidatePath } from "next/cache";
@@ -34,7 +37,7 @@ const BLOCK_ERRORS = {
 	self_block: "You can't block your own account.",
 	already_blocked: "That account is already blocked.",
 	last_administrator:
-		"This is the last active administrator — the platform can't be left without one.",
+		"This is the last active administrator. The platform can't be left without one.",
 } as const;
 
 const UNBLOCK_ERRORS = {
@@ -128,6 +131,59 @@ export async function setAttorneyVerificationAction(
 		return {
 			ok: false,
 			error: "Couldn't update verification. Please try again.",
+		};
+	}
+
+	revalidatePath(`/users/${parsed.data.userId}` as Route);
+	revalidatePath("/users");
+	return { ok: true };
+}
+
+const verifyAdmissionSchema = z
+	.object({
+		userId: z.string().min(1, "Choose an attorney."),
+		state: z.string().trim().min(1, "Choose a state."),
+		verified: z.boolean(),
+		note: z.string().trim().max(300).optional(),
+	})
+	.strict();
+
+export type SetAdmissionVerificationInput = z.infer<
+	typeof verifyAdmissionSchema
+>;
+
+/**
+ * Verify (or clear) one state an attorney claims. Attorneys practise across
+ * jurisdictions, so when an automatic bar scan can't clear a state, an admin
+ * rules on it here — per state, not for the whole account. The data layer records
+ * the check against that admission and recomputes the account's overall badge.
+ */
+export async function setAdmissionVerificationAction(
+	input: SetAdmissionVerificationInput,
+): Promise<BlockUserActionResult> {
+	const guard = await guardAdministrator();
+	if (!guard.ok) return guard;
+
+	const parsed = verifyAdmissionSchema.safeParse(input);
+	if (!parsed.success) {
+		return { ok: false, error: "Couldn't update that jurisdiction." };
+	}
+
+	try {
+		const res = await adminSetAdmissionVerification(
+			parsed.data.userId,
+			guard.userId,
+			parsed.data.state,
+			parsed.data.verified ? "verified" : "unverified",
+			parsed.data.note,
+		);
+		if (!res.ok) {
+			return { ok: false, error: "That account isn't an attorney." };
+		}
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't update that jurisdiction. Please try again.",
 		};
 	}
 

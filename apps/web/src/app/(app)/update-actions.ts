@@ -1,6 +1,10 @@
 "use server";
 
-import { editCaseUpdate, postCaseUpdate } from "@just-us/db/case-updates";
+import {
+	editCaseUpdate,
+	markAllCaseUpdatesSeenByOwner,
+	postCaseUpdate,
+} from "@just-us/db/case-updates";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -44,6 +48,19 @@ const postUpdateSchema = z
 export type PostUpdateActionResult =
 	| { ok: true }
 	| { ok: false; error: string };
+
+/**
+ * Clear the plaintiff's "new update" markers across every case at once — the
+ * "Mark all as read" control on the Case updates page. Owner-scoped in the data
+ * layer, so it only ever touches the caller's own cases.
+ */
+export async function markAllUpdatesReadAction(): Promise<{ ok: boolean }> {
+	const { session } = await requireRole("plaintiff");
+	await markAllCaseUpdatesSeenByOwner(session.user.id);
+	revalidatePath("/updates");
+	revalidatePath("/home");
+	return { ok: true };
+}
 
 /** Post a case-status update as the signed-in plaintiff or attorney. */
 export async function postCaseUpdateAction(
@@ -129,4 +146,6 @@ export async function editCaseUpdateAction(
 const FAILURE_MESSAGES = {
 	empty: "Write an update before posting it.",
 	not_attached: "You can only post updates to a case you're part of.",
+	not_live:
+		"Updates open once your case is live. Publish it first, then you can post progress for your backers.",
 } as const;

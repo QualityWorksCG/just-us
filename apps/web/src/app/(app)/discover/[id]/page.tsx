@@ -145,11 +145,11 @@ export default async function InAppCasePage({
 	const fundsNote =
 		c.payoutRecipient === "attorney"
 			? firmLabel
-				? `Funds go to ${firmLabel} — the law firm representing ${ownerFirst}, not to ${ownerFirst} and never to JustUs.`
-				: `Funds go to the law firm representing ${ownerFirst} — never to JustUs.`
+				? `Funds go to ${firmLabel}, the law firm representing ${ownerFirst}, not to ${ownerFirst} and never to JustUs.`
+				: `Funds go to the law firm representing ${ownerFirst}, never to JustUs.`
 			: c.payoutRecipient === "plaintiff"
-				? `Funds go to ${ownerFirst}'s account — ${ownerFirst} pays the attorney directly.`
-				: "Funds go to the recipient this case designates — never to JustUs.";
+				? `Funds go to ${ownerFirst}'s account. ${ownerFirst} pays the attorney directly.`
+				: "Funds go to the recipient this case designates, never to JustUs.";
 
 	return (
 		// Full-bleed, like the other app screens: the shell's content column already

@@ -171,7 +171,7 @@ const STATUS_COPY: Record<
 	pending_payout: {
 		headline: "Your case is ready to go live",
 		owner: (t) =>
-			`“${t}” has an attorney and an agreed fee — publish it to start raising.`,
+			`“${t}” has an attorney and an agreed fee. Publish it to start raising.`,
 	},
 	live: {
 		headline: "This case is live and raising",
@@ -375,7 +375,7 @@ export async function notifyCaseClosed(caseId: string) {
 			type: "certificate",
 			caseId,
 			title: "Your certificate of appreciation",
-			body: `“${cert.caseTitle}” has closed. Thank you for backing it — your certificate is ready.`,
+			body: `“${cert.caseTitle}” has closed. Thank you for backing it. Your certificate is ready.`,
 			href: `/certificates/${cert.accessToken}`,
 			dedupeKey: `certificate:${cert.id}`,
 		});
@@ -502,7 +502,7 @@ export async function notifyUserWarned(input: {
 	reasonLabel: string;
 }) {
 	const title = "A warning from JustUs moderation";
-	const body = `Following a report, our moderation team is warning you about ${input.reasonLabel} in your messages. Please review our community guidelines — continued behaviour may lead to your account being restricted.`;
+	const body = `Following a report, our moderation team is warning you about ${input.reasonLabel} in your messages. Please review our community guidelines. Continued behaviour may lead to your account being restricted.`;
 	const dedupeKey = `warned:${input.reportId}`;
 
 	await createNotifications([

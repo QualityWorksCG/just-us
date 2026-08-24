@@ -41,7 +41,7 @@ function isExistingEmailError(err: unknown): boolean {
 
 const EMAIL_TAKEN: SignUpResult = {
 	ok: false,
-	error: "An account with that email already exists — try signing in instead.",
+	error: "An account with that email already exists. Try signing in instead.",
 	fieldErrors: { email: "That email is already registered" },
 };
 
