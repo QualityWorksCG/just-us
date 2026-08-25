@@ -130,14 +130,19 @@ export function MatchedCasesPanel({
 								</div>
 
 								<div className="mt-4 flex items-center gap-2.5">
-									<button
-										type="button"
-										onClick={() => setComposing(c)}
-										className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brass px-3.5 py-2 font-semibold text-[12.5px] text-white transition-colors hover:bg-brass/90"
-									>
-										<Megaphone className="size-3.5" aria-hidden="true" />
-										Post update
-									</button>
+									{/* Updates only reach backers on a live, raising case, so the
+									    composer is offered only there — a case still seeking, awaiting
+									    payout, or closed has nothing to post progress to yet. */}
+									{c.status === "live" && (
+										<button
+											type="button"
+											onClick={() => setComposing(c)}
+											className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brass px-3.5 py-2 font-semibold text-[12.5px] text-white transition-colors hover:bg-brass/90"
+										>
+											<Megaphone className="size-3.5" aria-hidden="true" />
+											Post update
+										</button>
+									)}
 									<Link
 										href={`/my-cases/${c.id}` as Route}
 										className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3.5 py-2 font-semibold text-[12.5px] text-ink transition-colors hover:border-brass-deep hover:text-brass-deep"
