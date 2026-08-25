@@ -128,14 +128,13 @@ export function AppShell({
 		if (!next) setRestoreLauncherFocus(true);
 	}
 
-	// The nav drops to its icon rail for as long as the assistant is open: the
-	// screens size their columns off the viewport, not off the space they actually
-	// get, so the ~13rem the rail gives back is what keeps page content from
-	// running under the assistant. The user's own choice is remembered rather than
-	// overwritten — closing the assistant restores it, and the cookie only moves
-	// when they use the trigger themselves.
+	// The nav follows the user's own choice at all times — including while the
+	// assistant is open. It used to be forced to its icon rail whenever the
+	// assistant was shown, which meant the trigger did nothing there and the panel
+	// could never be expanded again until the chat was closed (the reported defect).
+	// Now the trigger works in every state; the user collapses the nav themselves if
+	// they want the room back for the assistant column.
 	const [navOpen, setNavOpen] = useState(defaultOpen);
-	const assistantShown = flags.aiAssistant && assistantOpen;
 
 	// The screen this URL belongs to — its title is the page heading in the bar
 	// below, and its slug marks the active nav entry. Resolved from the registry
@@ -160,7 +159,7 @@ export function AppShell({
 		// assistant column included — is pushed off the right edge instead of the
 		// page reflowing into the space that's left.
 		<SidebarProvider
-			open={assistantShown ? false : navOpen}
+			open={navOpen}
 			onOpenChange={setNavOpen}
 			className="min-w-0"
 		>

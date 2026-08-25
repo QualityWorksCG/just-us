@@ -26,7 +26,8 @@ const dateFmt = new Intl.DateTimeFormat("en-US", {
 const STATUS_FILTERS: { value: string; label: string }[] = [
 	{ value: "", label: "All" },
 	{ value: "succeeded", label: "Succeeded" },
-	{ value: "refunded", label: "Refunded" },
+	// Refunds aren't facilitated on the platform, so a "Refunded" tab is always
+	// empty — omitted. The badge style stays for any legacy refunded row.
 	{ value: "pending", label: "Pending" },
 	{ value: "failed", label: "Failed" },
 ];
