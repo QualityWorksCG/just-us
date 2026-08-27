@@ -6,7 +6,6 @@ import { cn } from "@just-us/ui/lib/utils";
 import {
 	BadgeCheck,
 	FileText,
-	Handshake,
 	Hourglass,
 	Images,
 	Landmark,
@@ -107,19 +106,6 @@ function EvidenceRow({ file }: { file: CaseEvidence }) {
 			</span>
 		</li>
 	);
-}
-
-function howMatched(item: AttorneyCaseDetail): string {
-	switch (item.origin) {
-		case "expressed_interest":
-			return "You put yourself forward and they took you on.";
-		case "directory":
-			return "They found you in the JustUs directory.";
-		case "bring_your_own":
-			return "They brought you to JustUs themselves.";
-		default:
-			return "They named you on their case by email.";
-	}
 }
 
 /** The glance tile for payouts — the stage, in the fewest words that still say
@@ -242,10 +228,6 @@ export function AttorneyCaseDetailView({
 					<span className="text-[13.5px]">
 						<span className="font-semibold text-ink">{item.plaintiffName}</span>{" "}
 						<span className="text-muted-foreground">is your client</span>
-					</span>
-					<span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-						<Handshake className="size-3.5" aria-hidden="true" />
-						{howMatched(item)}
 					</span>
 					{conversationId && (
 						<Link

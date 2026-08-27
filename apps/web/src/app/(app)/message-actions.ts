@@ -118,7 +118,9 @@ async function notifyForMessage(messageId: string) {
 
 export async function startConversationAction(
 	input: unknown,
-): Promise<ActionResult & { conversationId?: string }> {
+): Promise<
+	ActionResult & { conversationId?: string; reason?: "already_exists" }
+> {
 	const { session } = await requireRole("plaintiff");
 	const parsed = firstMessageSchema.safeParse(input);
 	if (!parsed.success)
@@ -130,8 +132,12 @@ export async function startConversationAction(
 	});
 	if (!result.ok) {
 		if (result.reason === "already_exists") {
+			// They've messaged this attorney before, so there is no "first" message to
+			// create. Rather than drop what they typed, the caller is handed the
+			// existing thread's id and sends them there to continue the conversation.
 			return {
 				ok: false,
+				reason: "already_exists",
 				error: "You already have a conversation with this attorney.",
 				conversationId: result.conversationId,
 			};

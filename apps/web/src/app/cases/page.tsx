@@ -99,7 +99,13 @@ export default async function BrowseCasesPage({
 							const pct =
 								goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
 							const owner = c.owner?.name ?? "A plaintiff";
-							const ownerFirst = owner.split(" ")[0];
+							// "Rosa J." — first name and last initial, the browse card's light
+							// touch on the plaintiff's identity.
+							const nameParts = owner.trim().split(/\s+/);
+							const ownerLabel =
+								nameParts.length > 1
+									? `${nameParts[0]} ${nameParts[nameParts.length - 1][0]}.`
+									: nameParts[0];
 							return (
 								<Link
 									key={c.id}
@@ -132,25 +138,31 @@ export default async function BrowseCasesPage({
 											{c.title || "Untitled case"}
 										</h2>
 										<p className="mt-1 text-[12.5px] text-muted-foreground">
-											{ownerFirst}
+											{ownerLabel}
 											{c.attorneyName ? ` · with ${c.attorneyName}` : ""}
 										</p>
 										<div className="mt-4">
-											<div className="h-2 overflow-hidden rounded-full bg-surface-2">
-												<div
-													className="h-full rounded-full bg-brass"
-													style={{ width: `${Math.max(2, pct)}%` }}
-												/>
-											</div>
-											<div className="mt-2 flex items-center justify-between text-[12.5px]">
-												<span className="font-bold text-ink tabular-nums">
-													{money(raised)} of {money(goal)}
+											<div className="flex items-center justify-between text-[12.5px]">
+												<span className="tabular-nums">
+													<span className="font-bold text-brass-deep">
+														{pct}%
+													</span>{" "}
+													<span className="text-muted-foreground">funded</span>
 												</span>
 												<span className="text-muted-foreground">
 													{c.donorsCount}{" "}
 													{c.donorsCount === 1 ? "donor" : "donors"}
 												</span>
 											</div>
+											<div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-2">
+												<div
+													className="h-full rounded-full bg-brass"
+													style={{ width: `${Math.max(2, pct)}%` }}
+												/>
+											</div>
+											<p className="mt-2 text-[12.5px] text-muted-foreground tabular-nums">
+												{money(raised)} of {money(goal)}
+											</p>
 										</div>
 									</div>
 								</Link>

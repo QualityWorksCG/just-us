@@ -52,6 +52,7 @@ import {
 import { CaseUpdateComposer } from "@/components/dashboard/case-update-composer";
 
 import { CASE_CATEGORIES } from "@/lib/case-categories";
+import { CASE_TITLE_MAX } from "@/lib/case-title";
 import { THANK_YOU_MAX } from "@/lib/thank-you-note";
 
 const CATEGORIES = CASE_CATEGORIES;
@@ -570,8 +571,12 @@ export function ManageCase({
 									id={ids.title}
 									value={title}
 									onChange={(e) => setTitle(e.target.value)}
+									maxLength={CASE_TITLE_MAX}
 									placeholder="Give your case a clear, human title"
 								/>
+								<p className="mt-1 text-right text-[12px] text-muted-foreground">
+									{title.length}/{CASE_TITLE_MAX}
+								</p>
 							</div>
 
 							<div className="grid gap-4 sm:grid-cols-2">

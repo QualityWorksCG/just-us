@@ -101,8 +101,12 @@ export function AttorneyCard({
 	attorney,
 	profileBasePath = "/attorneys",
 	showMessageAction = false,
+	existingConversationId,
 }: {
 	attorney: DirectoryAttorney;
+	/** The plaintiff's existing conversation with this attorney, if any — so the
+	 *  message CTA sends them there instead of opening a fresh compose. */
+	existingConversationId?: string | null;
 	/**
 	 * Where this card's "View profile" link points, without the id.
 	 *
@@ -245,6 +249,11 @@ export function AttorneyCard({
 						<MessageAttorneyButton
 							attorneyId={attorney.userId}
 							attorneyName={attorney.legalName}
+							existingConversationId={existingConversationId}
+							// The directory is a discovery context: if they've messaged this
+							// attorney before, prompt them to the existing thread rather than
+							// opening a compose box that has nowhere new to go.
+							promptOnExisting
 							className="w-full justify-center"
 						/>
 					) : (

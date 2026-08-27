@@ -4,6 +4,7 @@ import {
 	listedStates,
 } from "@just-us/db/attorney-directory";
 import { getOwnedCase } from "@just-us/db/cases";
+import { listMessageConversations } from "@just-us/db/messages";
 import { ArrowLeft } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
@@ -76,7 +77,7 @@ export default async function DashboardAttorneysPage({
 					sub: "You can still reach out to anyone here yourself. Any requests show up on your case.",
 				};
 
-	const [attorneys, practiceAreas, states] = await Promise.all([
+	const [attorneys, practiceAreas, states, conversations] = await Promise.all([
 		listDirectoryAttorneys({
 			practiceArea: filters.area,
 			state: filters.allStates ? undefined : (filters.state ?? defaultState),
@@ -85,7 +86,14 @@ export default async function DashboardAttorneysPage({
 		}),
 		listedPracticeAreas(),
 		listedStates(),
+		// So a card whose attorney the plaintiff has already contacted sends them to
+		// that thread rather than a compose box that has nowhere new to go.
+		listMessageConversations(session.user.id),
 	]);
+	const conversationByAttorney: Record<string, string> = {};
+	for (const c of conversations) {
+		conversationByAttorney[c.otherUser.id] = c.conversationId;
+	}
 
 	return (
 		<div>
@@ -121,6 +129,7 @@ export default async function DashboardAttorneysPage({
 					// Keep profile links inside the shell (see AttorneyCard).
 					profileBasePath="/find-attorney"
 					showMessageAction
+					conversationByAttorney={conversationByAttorney}
 				/>
 			</div>
 		</div>
