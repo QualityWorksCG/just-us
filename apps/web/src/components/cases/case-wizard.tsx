@@ -62,6 +62,7 @@ import {
 import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
 import { CASE_CATEGORIES } from "@/lib/case-categories";
+import { CASE_TITLE_MAX } from "@/lib/case-title";
 import { THANK_YOU_MAX } from "@/lib/thank-you-note";
 
 /** A piece of evidence: a document the plaintiff uploaded, or a link they pasted.
@@ -1604,8 +1605,12 @@ export function CaseWizard({
 											className={inputClass}
 											value={title}
 											onChange={(e) => setTitle(e.target.value)}
+											maxLength={CASE_TITLE_MAX}
 											placeholder="Write your own, or use an AI suggestion below"
 										/>
+										<p className="mt-1 text-right text-[12px] text-muted-foreground">
+											{title.length}/{CASE_TITLE_MAX}
+										</p>
 										{titleSuggestions.length > 0 && (
 											<div className="mt-1.5 flex flex-col gap-1.5">
 												{titleSuggestions.map((t) => (

@@ -33,6 +33,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireRole } from "@/lib/auth-server";
+import { CASE_TITLE_MAX, CASE_TITLE_TOO_LONG } from "@/lib/case-title";
 import { notifyCaseClosed, notifyStatusChange } from "@/lib/notify";
 import { THANK_YOU_MAX, THANK_YOU_TOO_LONG } from "@/lib/thank-you-note";
 
@@ -87,7 +88,11 @@ const thankYouNoteField = z
 // Publishing is strict — the case goes live, so the essentials must be there.
 const createCaseSchema = z.object({
 	id: z.string().optional(),
-	title: z.string().trim().min(3, "Give your case a title."),
+	title: z
+		.string()
+		.trim()
+		.min(3, "Give your case a title.")
+		.max(CASE_TITLE_MAX, CASE_TITLE_TOO_LONG),
 	category: z.string().trim().min(1, "Choose a category."),
 	location: z.string().trim().min(1, "Choose a location."),
 	summary: z.string().trim().min(1, "Add a one-line summary."),
@@ -106,7 +111,11 @@ const createCaseSchema = z.object({
 // Publishing out to attorneys needs the case reviewable, but no attorney/fee yet.
 const seekingSchema = z.object({
 	id: z.string().optional(),
-	title: z.string().trim().min(3, "Give your case a title."),
+	title: z
+		.string()
+		.trim()
+		.min(3, "Give your case a title.")
+		.max(CASE_TITLE_MAX, CASE_TITLE_TOO_LONG),
 	category: z.string().trim().min(1, "Choose a category."),
 	location: z.string().trim().min(1, "Choose a location."),
 	summary: z.string().trim().min(1, "Add a one-line summary."),
@@ -122,7 +131,7 @@ const seekingSchema = z.object({
 // Drafts are lenient — everything's optional so an early save still works.
 const draftSchema = z.object({
 	id: z.string().optional(),
-	title: z.string().optional(),
+	title: z.string().trim().max(CASE_TITLE_MAX, CASE_TITLE_TOO_LONG).optional(),
 	category: z.string().optional(),
 	location: z.string().optional(),
 	summary: z.string().optional(),
@@ -373,7 +382,11 @@ export async function declineInterestAction(
 // attorney, and fee are left untouched here.
 const editCaseSchema = z.object({
 	id: z.string().min(1),
-	title: z.string().trim().min(3, "Give your case a title."),
+	title: z
+		.string()
+		.trim()
+		.min(3, "Give your case a title.")
+		.max(CASE_TITLE_MAX, CASE_TITLE_TOO_LONG),
 	category: z.string().trim().min(1, "Choose a category."),
 	location: z.string().trim().min(1, "Choose a location."),
 	summary: z.string().trim().optional(),
