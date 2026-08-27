@@ -23,6 +23,7 @@ export function AttorneyDirectory({
 	filtered,
 	showMessageAction = false,
 	defaultState,
+	conversationByAttorney,
 }: {
 	attorneys: DirectoryAttorney[];
 	/** Passed to each card — see `AttorneyCard.profileBasePath`. */
@@ -34,6 +35,9 @@ export function AttorneyDirectory({
 	showMessageAction?: boolean;
 	/** Plaintiff jurisdiction used until they deliberately choose a state. */
 	defaultState?: string;
+	/** Attorney user id → the plaintiff's existing conversation with them, so a
+	 *  card whose attorney they've already messaged sends them to that thread. */
+	conversationByAttorney?: Record<string, string>;
 }) {
 	return (
 		<div className="flex flex-col gap-6">
@@ -78,6 +82,9 @@ export function AttorneyDirectory({
 								attorney={attorney}
 								profileBasePath={profileBasePath}
 								showMessageAction={showMessageAction}
+								existingConversationId={
+									conversationByAttorney?.[attorney.userId]
+								}
 							/>
 						))}
 					</div>

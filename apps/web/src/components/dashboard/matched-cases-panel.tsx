@@ -6,7 +6,11 @@ import { ArrowRight, Megaphone, Users, X } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useState } from "react";
-import { money, PayoutChip } from "@/components/dashboard/attorney-cases";
+import {
+	money,
+	PayoutChip,
+	payoutStage,
+} from "@/components/dashboard/attorney-cases";
 import { CaseUpdateComposer } from "@/components/dashboard/case-update-composer";
 
 /** How many matched cases to surface on the dashboard before deferring to the
@@ -14,15 +18,38 @@ import { CaseUpdateComposer } from "@/components/dashboard/case-update-composer"
  *  needs room. */
 const MAX_SHOWN = 6;
 
-const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
-	live: { label: "Live", cls: "bg-green-soft text-green-deep" },
-	seeking: { label: "Seeking", cls: "bg-brass-wash text-brass-deep" },
-	pending_payout: {
-		label: "Awaiting payout setup",
-		cls: "bg-gold-bright/20 text-gold-bright-ink",
-	},
-	closed: { label: "Closed", cls: "bg-surface-2 text-ink-soft" },
-};
+/**
+ * The case's status in the words that name whose move it actually is — not the raw
+ * lifecycle value.
+ *
+ * The raw status misled the attorney twice: a committed case whose payout account
+ * was already set up still read "Awaiting payout setup", and a case waiting on the
+ * plaintiff to agree the fee and publish read a bare "Seeking". So the payout stage
+ * decides the `pending_payout` wording, and everything the attorney has finished
+ * their part on says the plaintiff is the one to act next.
+ */
+function caseBadge(c: AttorneyCase): { label: string; cls: string } {
+	if (c.status === "live") {
+		return { label: "Live", cls: "bg-green-soft text-green-deep" };
+	}
+	if (c.status === "closed") {
+		return { label: "Closed", cls: "bg-surface-2 text-ink-soft" };
+	}
+	// The one thing on this list the attorney can act on: their own payout account,
+	// until it can receive.
+	if (c.status === "pending_payout" && payoutStage(c) !== "ready") {
+		return {
+			label: "Awaiting your payout setup",
+			cls: "bg-gold-bright/20 text-gold-bright-ink",
+		};
+	}
+	// A case still seeking, or committed with the account already able to receive:
+	// nothing is left for the attorney — the plaintiff takes the next step.
+	return {
+		label: "Awaiting next steps from plaintiff",
+		cls: "bg-brass-wash text-brass-deep",
+	};
+}
 
 /**
  * The attorney's matched cases on their dashboard: each with its case-account
@@ -75,10 +102,7 @@ export function MatchedCasesPanel({
 			) : (
 				<div className="grid gap-3">
 					{shown.map((c) => {
-						const badge = STATUS_BADGE[c.status] ?? {
-							label: c.status,
-							cls: "bg-surface-2 text-ink-soft",
-						};
+						const badge = caseBadge(c);
 						return (
 							<div
 								key={c.id}
