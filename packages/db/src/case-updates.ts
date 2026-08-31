@@ -592,3 +592,120 @@ export async function listCaseUpdateGroupsForOwner(
 			)
 	);
 }
+
+/**
+ * The same grouped-by-case shape as the owner feed, for a donor's "Updates"
+ * screen — a donor can support several cases at once, so the flat feed buried which
+ * case each update was about. Cases come from their `Donation` rows.
+ *
+ * "Unread" per case is their unseen `case_update` notifications: a donor has no
+ * per-case seen stamp of their own the way an owner's `ownerUpdatesSeenAt` gives,
+ * but every update fans a notification out to backers, so the unread ones are the
+ * honest count of what they haven't caught up on.
+ */
+export async function listCaseUpdateGroupsForBacker(
+	donorId: string,
+	perCase = 1,
+): Promise<CaseUpdateGroup[]> {
+	const backed = await prisma.donation.findMany({
+		where: { donorId },
+		distinct: ["caseId"],
+		select: { caseId: true },
+	});
+	const caseIds = backed.map((d) => d.caseId);
+	if (caseIds.length === 0) return [];
+
+	const [cases, totals, unreadRows] = await Promise.all([
+		prisma.case.findMany({
+			where: {
+				id: { in: caseIds },
+				deletedAt: null,
+				// Backers never see a held or removed update, so a case whose only
+				// updates were moderated shows nothing and drops out below.
+				updates: { some: { moderationStatus: "ok" } },
+			},
+			select: {
+				id: true,
+				title: true,
+				category: true,
+				location: true,
+				status: true,
+				attorneyName: true,
+				coverImageUrl: true,
+				ownerId: true,
+				owner: { select: { name: true } },
+				updates: {
+					where: { moderationStatus: "ok" },
+					orderBy: { createdAt: "desc" },
+					take: perCase,
+					select: {
+						id: true,
+						body: true,
+						createdAt: true,
+						editedAt: true,
+						authorId: true,
+						tag: true,
+						attachments: true,
+						moderationStatus: true,
+					},
+				},
+			},
+		}),
+		prisma.caseUpdate.groupBy({
+			by: ["caseId"],
+			where: { caseId: { in: caseIds }, moderationStatus: "ok" },
+			_count: { _all: true },
+		}),
+		prisma.notification.findMany({
+			where: {
+				recipientId: donorId,
+				type: "case_update",
+				readAt: null,
+				caseId: { in: caseIds },
+			},
+			select: { caseId: true },
+		}),
+	]);
+
+	const totalByCase = new Map(totals.map((t) => [t.caseId, t._count._all]));
+	const unreadByCase = new Map<string, number>();
+	for (const r of unreadRows) {
+		if (r.caseId)
+			unreadByCase.set(r.caseId, (unreadByCase.get(r.caseId) ?? 0) + 1);
+	}
+
+	return cases
+		.map((c) => ({
+			caseId: c.id,
+			title: c.title || "Untitled case",
+			category: c.category,
+			location: c.location,
+			status: c.status,
+			attorneyName: c.attorneyName,
+			coverImageUrl: c.coverImageUrl,
+			total: totalByCase.get(c.id) ?? c.updates.length,
+			unread: unreadByCase.get(c.id) ?? 0,
+			lastActivityAt: c.updates[0]?.createdAt ?? null,
+			updates: c.updates.map((u) => ({
+				id: u.id,
+				body: u.body,
+				createdAt: u.createdAt,
+				editedAt: u.editedAt,
+				authorId: u.authorId,
+				tag: u.tag,
+				attachments: parseAttachments(u.attachments),
+				moderationStatus: u.moderationStatus,
+				...resolveAuthor(
+					u.authorId,
+					c.ownerId,
+					c.owner?.name ?? null,
+					c.attorneyName,
+				),
+			})),
+		}))
+		.sort(
+			(a, b) =>
+				(b.updates[0]?.createdAt.getTime() ?? 0) -
+				(a.updates[0]?.createdAt.getTime() ?? 0),
+		);
+}

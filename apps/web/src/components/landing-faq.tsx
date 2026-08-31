@@ -6,15 +6,15 @@ import { useState } from "react";
 const faqs = [
 	{
 		q: "Is my donation an investment?",
-		a: "No. Donations on JustUs are gifts. They carry no financial return and no share of any settlement or judgment. You give because the case matters, and you follow it to the end.",
+		a: "No. Donations on JustUs are gifts. They carry no financial return and no share of any settlement or judgment. You give because the case matters, and you follow it to the end. One fee, shown before you donate a cent.",
 	},
 	{
 		q: "Where does my money actually go?",
-		a: "Straight to the law firm representing the case: into a Stripe Connect account the firm opens for that case alone, named on the case page before you give. Nothing is pooled: another of the firm's cases can't draw on it. The plaintiff never receives it; the firm applies it to the legal fee under its state bar's trust rules. JustUs never takes custody: our own balance never receives a donated dollar. A 5% platform fee is added on top of your gift and shown to the cent before you confirm, so $100 to the case means you pay $105.",
+		a: "Straight to the law firm representing the case: into a Stripe Connect account the firm opens for that case alone, named on the case page before you give. Nothing is pooled: another of the firm's cases can't draw on it. The plaintiff never receives it; the firm applies it to the legal fee under its state bar's trust rules. JustUs operates strictly as the technology vessel and never takes custody: our own balance never receives a donated dollar. A 5% platform fee is added on top of your gift and shown to the cent before you confirm, so $100 to the case means you pay $105.",
 	},
 	{
 		q: "What happens if a case doesn't reach its goal?",
-		a: "The agreed fee is the goal, and the attorney and plaintiff decide together how to proceed if funding falls short: a revised scope, more time, or a wind-down. Whatever is raised stays in the case account and is used only for that case; backers are told either way.",
+		a: "The agreed fee is the goal, and the attorney and plaintiff decide together how to proceed if funding falls short: a revised scope, more time, or a wind-down. Whatever is raised stays in the case account and is used only for that case; supporters are told either way.",
 	},
 	{
 		q: "What happens if the case loses?",
@@ -26,7 +26,7 @@ const faqs = [
 	},
 	{
 		q: "What does JustUs earn?",
-		a: "A transparent 5% fee on each donation, plus optional tips. That's the whole model: we take no share of legal fees, no cut of settlements, and nothing from plaintiffs or attorneys for matching.",
+		a: "JustUs Financial generates revenue strictly through a transparent 5% software platform usage fee, which is clearly displayed before you complete any transaction. We never take a percentage cut of legal fees or final settlements.",
 	},
 	{
 		q: "Can I donate anonymously?",

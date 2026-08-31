@@ -63,10 +63,7 @@ export default async function DonationsPage({
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div className="flex flex-wrap items-start justify-between gap-3">
-				<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-					Every gift you've given, and the causes behind them.
-				</p>
+			<div className="flex flex-wrap items-start justify-end gap-3">
 				{/* Offered only when there is something to export — a button that
 				    downloads an empty file reads as a broken feature. */}
 				{rows.length > 0 && (
@@ -197,7 +194,7 @@ function GiftsTable({ rows }: { rows: DonationRows }) {
 					/>
 					<p className="font-bold text-[15px] text-ink">No donations yet</p>
 					<p className="max-w-[42ch] text-[13px] text-muted-foreground leading-relaxed">
-						When you back a case, each gift and its receipt will appear here.
+						When you fund a case, each gift and its receipt will appear here.
 					</p>
 				</div>
 			) : (
@@ -289,7 +286,7 @@ function CertificatesTab({
 				</span>
 				<p className="font-bold text-[16px] text-ink">No certificates yet</p>
 				<p className="max-w-[46ch] text-[13.5px] text-muted-foreground leading-relaxed">
-					When a case you backed reaches its close, a certificate of
+					When a case you supported reaches its close, a certificate of
 					appreciation for it shows up here, with the gifts you gave to it.
 				</p>
 			</div>
@@ -299,9 +296,9 @@ function CertificatesTab({
 	return (
 		<div className="flex flex-col gap-4">
 			<p className="text-[13.5px] text-ink-soft leading-relaxed">
-				These are cases you backed that have now closed. Your support helped see
-				each one through. Here's a certificate of appreciation for every one,
-				with the gifts you gave to it.
+				These are cases you supported that have now closed. Your support helped
+				see each one through. Here's a certificate of appreciation for every
+				one, with the gifts you gave to it.
 			</p>
 			{certificates.map((cert) => {
 				const gifts = giftsByCase.get(cert.caseId) ?? [];

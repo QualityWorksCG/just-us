@@ -366,7 +366,7 @@ export function ManageCase({
 								<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-brass-wash px-2.5 py-1 font-mono font-semibold text-[10px] text-brass-deep uppercase tracking-[0.1em]">
 									<TrendingUp className="size-3" aria-hidden="true" />
 									{isLive
-										? "Raising now"
+										? "Funding now"
 										: isSeeking
 											? "Out to attorneys"
 											: isPending
@@ -497,7 +497,7 @@ export function ManageCase({
 									caseId={data.id}
 									authorName={viewerName}
 									authorTone="green"
-									placeholder="Post an update for your backers: a milestone, a hearing date, a thank-you…"
+									placeholder="Post an update for your supporters: a milestone, a hearing date, a thank-you…"
 								/>
 							</div>
 
@@ -548,7 +548,7 @@ export function ManageCase({
 					<div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-border border-dashed bg-green-soft/40 px-5 py-3.5 text-[13px] text-green-deep leading-relaxed">
 						<Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 						{isLive
-							? "You're live and building momentum. Keep sharing updates so backers stay invested in your journey to justice."
+							? "You're live and building momentum. Keep sharing updates so supporters stay invested in your journey to justice."
 							: isPending
 								? "Your case is finished and waiting only on your attorney's payout account. Use the time to line up who you'll share it with the day it goes live."
 								: "Fill out your story and add photos in Edit & settings. Cases with a clear story and cover image raise far more."}

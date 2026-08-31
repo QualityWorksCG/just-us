@@ -191,9 +191,7 @@ export function PublicCaseView({
 						<span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
 						<span className="relative inline-flex size-2 rounded-full bg-success" />
 					</span>
-					<span className="font-semibold text-[12.5px]">
-						Live, actively raising
-					</span>
+					<span className="font-semibold text-[12.5px]">Active Case</span>
 					<span className="text-green-deep/50">·</span>
 					<span className="font-semibold text-[12.5px] tabular-nums">
 						{pctLabel} funded
@@ -203,7 +201,7 @@ export function PublicCaseView({
 
 			{/* Two columns — image beside the funding card; on mobile the funding card
 			    jumps above the story so donating/saving stays near the top. */}
-			<div className="mt-6 grid items-start gap-8 lg:grid-cols-[1fr_360px]">
+			<div className="mt-6 grid items-start gap-8 lg:grid-cols-[1fr_360px] lg:grid-rows-[auto_1fr]">
 				{/* Cover + parties — first on mobile, top-left on desktop */}
 				<div className="order-1 lg:col-start-1 lg:row-start-1">
 					{/* Cover */}
@@ -392,7 +390,7 @@ export function PublicCaseView({
 									<Heart className="size-4" aria-hidden="true" />
 								</span>
 								<p className="font-semibold text-[13.5px] text-ink">
-									Be the first to back {ownerFirst}
+									Be the first to support {ownerFirst}
 								</p>
 								<p className="max-w-[30ch] text-[12px] text-muted-foreground leading-relaxed">
 									Every gift helps fund {ownerFirst}'s day in court.

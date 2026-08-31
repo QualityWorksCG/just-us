@@ -72,7 +72,7 @@ const DEFAULT_CAT = { bg: "bg-brass-wash", fg: "text-brass-deep", icon: Scale };
 
 // Case status → the frosted badge shown on the card cover.
 const STATUS_BADGE: Record<string, { label: string; dot: string }> = {
-	live: { label: "Live · Raising", dot: "bg-success" },
+	live: { label: "Active Case", dot: "bg-success" },
 	seeking: { label: "Seeking attorney", dot: "bg-brass-deep" },
 	closed: { label: "Closed", dot: "bg-green-deep" },
 	draft: { label: "Draft", dot: "bg-ink-soft" },
@@ -198,7 +198,7 @@ export function DonorCaseCard({
 				{backed && (
 					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-deep px-2.5 py-1 font-mono font-semibold text-[10px] text-white uppercase leading-none tracking-[0.06em] shadow-[var(--shadow-rest)]">
 						<Heart className="size-3 fill-current" aria-hidden="true" />
-						Backed
+						Supported
 					</span>
 				)}
 			</div>
@@ -297,6 +297,16 @@ export function DonorCaseCard({
 				)}
 
 				<div className={compact ? "mt-2.5" : "mt-3"}>
+					{variant === "full" && (
+						<div className="mb-1.5 flex items-center justify-between text-[12.5px]">
+							<span className="font-bold text-brass-deep tabular-nums">
+								{pct}% funded
+							</span>
+							<span className="text-muted-foreground">
+								{c.donors} {c.donors === 1 ? "donor" : "donors"}
+							</span>
+						</div>
+					)}
 					<div className="h-2 overflow-hidden rounded-full bg-surface-2">
 						<div
 							className="h-full rounded-full bg-brass"
@@ -304,12 +314,9 @@ export function DonorCaseCard({
 						/>
 					</div>
 					{variant === "full" && (
-						<div className="mt-2 flex items-center justify-between text-[12.5px]">
+						<div className="mt-2 text-[12.5px]">
 							<span className="font-bold text-ink tabular-nums">
 								{money(c.raised)} of {money(c.goal)}
-							</span>
-							<span className="text-muted-foreground">
-								{c.donors} {c.donors === 1 ? "donor" : "donors"}
 							</span>
 						</div>
 					)}
@@ -326,7 +333,7 @@ export function DonorCaseCard({
 						className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brass px-4 font-semibold text-[13.5px] text-white transition-colors hover:bg-brass-deep"
 					>
 						<HandCoins className="size-4" aria-hidden="true" />
-						{backed ? "Give again" : "Back this case"}
+						{backed ? "Give again" : "Support this case"}
 					</Link>
 					{variant === "full" && (
 						<>

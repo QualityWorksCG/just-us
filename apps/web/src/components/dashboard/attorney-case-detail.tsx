@@ -113,7 +113,7 @@ function EvidenceRow({ file }: { file: CaseEvidence }) {
 const PAYOUT_GLANCE: Record<PayoutStage, { value: string; hint: string }> = {
 	not_started: {
 		value: "Not set up",
-		hint: "Link the firm's account for this case",
+		hint: "Link the firm's account for this intake",
 	},
 	incomplete: { value: "Unfinished", hint: "Stripe still needs information" },
 	in_review: {
@@ -162,7 +162,7 @@ export function AttorneyCaseDetailView({
 	// "$29,000 fee agreed".
 	const badge = isLive
 		? {
-				text: "Live · Raising",
+				text: "Active Case",
 				cls: "bg-green-soft text-green-deep",
 				dot: "bg-success",
 			}
@@ -206,7 +206,7 @@ export function AttorneyCaseDetailView({
 					</span>
 					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-brass-wash px-2.5 py-0.5 font-semibold text-[12px] text-brass-deep">
 						<Tag className="size-3.5" aria-hidden="true" />
-						{item.category || "Case"}
+						{item.category || "Intake"}
 					</span>
 					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-border px-2.5 py-0.5 text-[12px] text-ink-soft">
 						<MapPin className="size-3.5" aria-hidden="true" />
@@ -215,7 +215,7 @@ export function AttorneyCaseDetailView({
 				</div>
 
 				<h2 className="font-extrabold text-[clamp(1.75rem,3.4vw,2.375rem)] text-ink leading-[1.08] tracking-[-0.03em]">
-					{item.title || "Untitled case"}
+					{item.title || "Untitled intake"}
 				</h2>
 
 				{/* The client, and the one way to reach them. Messaging was a sidebar
@@ -273,7 +273,7 @@ export function AttorneyCaseDetailView({
 						isLive
 							? `of ${money(item.goalCents)} agreed fee · ${pct}%`
 							: isClosed
-								? "This case is closed"
+								? "This intake is closed"
 								: item.goalCents > 0
 									? `${money(item.goalCents)} fee agreed · not published yet`
 									: "No fee agreed with your client yet"
@@ -282,14 +282,14 @@ export function AttorneyCaseDetailView({
 				/>
 				<Glance
 					icon={Users}
-					label="Backers"
+					label="Supporters"
 					value={String(item.donorsCount)}
 					hint={
 						item.donorsCount > 0
 							? "donations so far"
 							: isLive
 								? "no donations yet"
-								: "donations open when the case is published"
+								: "donations open when the intake is published"
 					}
 				/>
 				<Glance
@@ -312,7 +312,7 @@ export function AttorneyCaseDetailView({
 			</div>
 
 			<CaseTabs
-				label="Case sections"
+				label="Intake sections"
 				// Opens on payouts whenever they are outstanding: that is the work only
 				// the attorney can do, and their client is stuck behind it.
 				initialKey={payoutOutstanding ? "funding" : isLive ? "updates" : "case"}
@@ -332,7 +332,7 @@ export function AttorneyCaseDetailView({
 						: []),
 					{
 						key: "case",
-						label: "The case",
+						label: "The intake",
 						content: (
 							<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 								<div className="flex min-w-0 flex-col gap-6">
@@ -432,17 +432,17 @@ export function AttorneyCaseDetailView({
 												{item.donorsCount === 0
 													? "No donors yet."
 													: `${item.donorsCount} ${item.donorsCount === 1 ? "donor" : "donors"} so far.`}{" "}
-												Donations are paid into this case's own account as they
-												come in.
+												Donations are paid into this intake's own account as
+												they come in.
 											</p>
 										</>
 									) : (
 										<p className="text-[13.5px] text-ink-soft leading-relaxed">
 											{isClosed
-												? "This case is closed and no longer raising."
+												? "This intake is closed and no longer raising."
 												: item.goalCents > 0
-													? `The fee agreed with your client is ${money(item.goalCents)}. Nothing can be donated until they publish the case.`
-													: "Your client hasn't agreed a fee with you yet. The fee they set becomes the goal their case raises towards, so nothing can be donated until then."}
+													? `The fee agreed with your client is ${money(item.goalCents)}. Nothing can be donated until they publish the intake.`
+													: "Your client hasn't agreed a fee with you yet. The fee they set becomes the goal their intake raises towards, so nothing can be donated until then."}
 										</p>
 									)}
 								</Panel>

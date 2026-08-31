@@ -264,10 +264,10 @@ export function PublicCaseActions({
 						{pending
 							? "Taking you to checkout…"
 							: breakdown
-								? `${config.alreadyBacked ? "Give again" : "Back this case"}: ${exactUsd(breakdown.amountCents)}`
+								? `${config.alreadyBacked ? "Give again" : "Support this case"}: ${exactUsd(breakdown.amountCents)}`
 								: config.alreadyBacked
 									? "Give again"
-									: "Back this case"}
+									: "Support this case"}
 					</button>
 
 					<p className="flex items-start gap-1.5 text-[11.5px] text-muted-foreground leading-relaxed">
@@ -286,8 +286,8 @@ export function PublicCaseActions({
 					<p className="mt-1 text-[12.5px] text-muted-foreground leading-relaxed">
 						{config.blockedReason ??
 							(config.closed
-								? "This case has closed. Thank you to everyone who backed it."
-								: "This case isn't raising right now. Check back shortly.")}
+								? "This case has closed. Thank you to everyone who supported it."
+								: "This case isn't accepting donations right now. Check back shortly.")}
 					</p>
 				</div>
 			)}

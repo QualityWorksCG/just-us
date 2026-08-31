@@ -102,7 +102,7 @@ export async function AdminOverview() {
 		{
 			label: "Live campaigns",
 			value: num.format(stats.liveCampaigns),
-			sub: "raising right now",
+			sub: "funding right now",
 			href: "/campaigns" as Route,
 			icon: Megaphone,
 			tone: "gold",

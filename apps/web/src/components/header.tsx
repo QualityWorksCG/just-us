@@ -75,7 +75,7 @@ export default function Header() {
 							JustUs Financial
 						</span>
 						<span className="mt-0.5 hidden font-mono text-[10px] text-muted-foreground uppercase tracking-[0.12em] sm:block">
-							Litigation crowdfunding
+							Litigation intake sourcing
 						</span>
 					</span>
 				</Link>

@@ -89,7 +89,7 @@ export function CaseUpdatesBoard({
 	const hasDonated = !!donation;
 
 	const bannerText = hasDonated
-		? "You're backing this case. You'll get every update here."
+		? "You're supporting this case. You'll get every update here."
 		: following
 			? "You're following this case. You'll get every update here."
 			: "Follow this case to get every update here.";
@@ -149,20 +149,20 @@ export function CaseUpdatesBoard({
 								<p className="mt-2 text-[13px] text-ink-soft leading-relaxed">
 									Thank you{viewerFirstName ? `, ${viewerFirstName}` : ""}.
 									You're one of {donorsCount}{" "}
-									{donorsCount === 1 ? "person" : "people"} backing{" "}
+									{donorsCount === 1 ? "person" : "people"} supporting{" "}
 									{plaintiffFirst}.
 								</p>
 							</>
 						) : (
 							<p className="mt-2 text-[13px] text-ink-soft leading-relaxed">
 								{donorsCount > 0
-									? `Join ${donorsCount} ${donorsCount === 1 ? "backer" : "backers"} helping ${plaintiffFirst} fund their day in court.`
-									: `Be the first to back ${plaintiffFirst}'s fight.`}
+									? `Join ${donorsCount} ${donorsCount === 1 ? "supporter" : "supporters"} helping ${plaintiffFirst} fund their day in court.`
+									: `Be the first to support ${plaintiffFirst}'s fight.`}
 							</p>
 						)}
 						<div className="mt-4 flex flex-col gap-2.5">
 							<BackCaseButton
-								label={hasDonated ? "Give again" : "Back this case"}
+								label={hasDonated ? "Give again" : "Support this case"}
 								caseHref={caseHref}
 							/>
 							<ShareCaseButton sharePath={`/cases/${caseId}`} />
@@ -182,7 +182,7 @@ export function CaseUpdatesBoard({
 							)}
 						>
 							<TrendingUp className="size-3" aria-hidden="true" />
-							{isLive ? "Live · Raising" : status}
+							{isLive ? "Active Case" : status}
 						</span>
 						<p className="mt-3 font-extrabold text-[20px] text-ink tabular-nums tracking-[-0.02em]">
 							{money(raised)}{" "}

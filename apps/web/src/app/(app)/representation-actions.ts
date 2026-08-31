@@ -1,6 +1,6 @@
 "use server";
 
-import { expressInterest } from "@just-us/db/representation";
+import { expressInterest, withdrawInterest } from "@just-us/db/representation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -49,6 +49,8 @@ export async function expressInterestAction(
 		// attorney's name, no attorney-authored message, so the "no channel until
 		// the plaintiff reaches out" rule above still holds.
 		await notifyExpressionOfInterest(res.interestId).catch(() => {});
+		// The queue list and the dashboard's expressions/caseload both read this.
+		revalidatePath("/queue");
 		revalidatePath("/home");
 		return { ok: true };
 	} catch {
@@ -58,6 +60,47 @@ export async function expressInterestAction(
 		};
 	}
 }
+
+const withdrawInterestSchema = z.object({ caseId: z.string().min(1) }).strict();
+
+/**
+ * Withdraw this attorney's expression of interest — the undo for an accidental
+ * tap on the queue's Express interest CTA. Refused once the plaintiff has already
+ * taken the interest forward, since that is a match to unwind, not a click to take
+ * back.
+ */
+export async function withdrawInterestAction(
+	input: unknown,
+): Promise<ExpressInterestActionResult> {
+	const { session } = await requireRole("attorney");
+
+	const parsed = withdrawInterestSchema.safeParse(input);
+	if (!parsed.success) {
+		return { ok: false, error: "Couldn't withdraw your interest." };
+	}
+
+	try {
+		const res = await withdrawInterest(parsed.data.caseId, session.user.id);
+		if (!res.ok) {
+			return { ok: false, error: WITHDRAW_FAILURE_MESSAGES[res.reason] };
+		}
+		revalidatePath("/queue");
+		revalidatePath("/home");
+		return { ok: true };
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't withdraw your interest. Please try again.",
+		};
+	}
+}
+
+const WITHDRAW_FAILURE_MESSAGES = {
+	not_found:
+		"There's no expression of interest to withdraw — it may already be gone.",
+	already_matched:
+		"This plaintiff has already taken your interest forward, so it can't be withdrawn here.",
+} as const;
 
 const FAILURE_MESSAGES = {
 	not_verified:

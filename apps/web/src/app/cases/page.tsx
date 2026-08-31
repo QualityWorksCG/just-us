@@ -11,7 +11,7 @@ import { BrowseControls } from "@/components/browse-controls";
 export const metadata: Metadata = {
 	title: "Browse cases · JustUs Financial",
 	description:
-		"Browse cases people are funding on JustUs and back someone's fight for justice.",
+		"Browse cases people are funding on JustUs and support someone's fight for justice.",
 };
 
 function money(n: number) {
