@@ -63,6 +63,9 @@ export function ConversationThread({
 	const [reportAttempted, setReportAttempted] = useState(false);
 	const [pending, startTransition] = useTransition();
 	const reportTextareaRef = useRef<HTMLTextAreaElement>(null);
+	// The scrollable message list, pinned to the bottom whenever a message arrives.
+	const scrollRef = useRef<HTMLDivElement>(null);
+	const lastMessageId = messages.at(-1)?.id;
 	const reportTitleId = useId();
 	const reportDescriptionId = useId();
 	const reportReasonId = useId();
@@ -83,6 +86,15 @@ export function ConversationThread({
 		);
 		return () => window.clearInterval(timer);
 	}, [conversationId]);
+	// Keep the newest message in view. The server re-supplies `messages` after a
+	// reply is sent (and when the thread first opens), so pinning the list to the
+	// bottom whenever the last message changes means a sent reply is seen without
+	// the sender having to scroll down to it.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the id/length are the intended re-pin triggers; the effect body only reads the ref
+	useEffect(() => {
+		const el = scrollRef.current;
+		if (el) el.scrollTop = el.scrollHeight;
+	}, [lastMessageId, messages.length]);
 	useEffect(() => {
 		if (!reportOpen) return;
 		const closeOnEscape = (event: KeyboardEvent) => {
@@ -190,7 +202,10 @@ export function ConversationThread({
 						</Button>
 					</div>
 				</CardHeader>
-				<CardContent className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+				<CardContent
+					ref={scrollRef}
+					className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5"
+				>
 					{messages.map((message) => {
 						const own = message.authorId === currentUserId;
 						return (

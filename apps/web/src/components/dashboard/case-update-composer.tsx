@@ -99,7 +99,7 @@ export function CaseUpdateComposer({
 				setBody("");
 				setTag(null);
 				setAttachments([]);
-				toast.success("Update posted. Your backers can see it now.");
+				toast.success("Update posted. Your supporters can see it now.");
 				router.refresh();
 				onPosted?.();
 			} else {

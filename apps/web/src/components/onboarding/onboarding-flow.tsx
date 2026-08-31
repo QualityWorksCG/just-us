@@ -4,13 +4,6 @@ import { JURISDICTION_MESSAGE } from "@just-us/auth/jurisdiction";
 import { requiresJurisdiction } from "@just-us/auth/rbac";
 import { Button } from "@just-us/ui/components/button";
 import { Input } from "@just-us/ui/components/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@just-us/ui/components/select";
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	ArrowLeft,
@@ -38,6 +31,8 @@ const ROLES: {
 	value: Role;
 	label: string;
 	article: string;
+	/** The step-1 button label once this card is picked. */
+	cta: string;
 	icon: LucideIcon;
 	blurb: string;
 	points: string[];
@@ -46,37 +41,36 @@ const ROLES: {
 		value: "plaintiff",
 		label: "I was wronged",
 		article: "a plaintiff",
+		cta: "Start your case",
 		icon: FileText,
 		blurb:
-			"Submit your case and raise the fee to hire the attorney you choose.",
+			"Submit your case and raise the fee to hire the attorney you connect with.",
 		points: [
 			"Submit your case in minutes",
-			"Choose your own attorney",
+			"Connect with counsel",
 			"Raise the agreed fee together",
 		],
 	},
 	{
 		value: "donor",
-		label: "I want to help fund cases",
+		label: "Fuel the fight. Fund a case.",
 		article: "a donor",
+		cta: "Become a supporter",
 		icon: HandCoins,
-		blurb:
-			"Give any amount to cases you believe in and follow them to the outcome.",
-		points: [
-			"Browse live cases",
-			"Donate any amount",
-			"Get updates until it closes",
-		],
+		blurb: "Fund a case that matters to you with a donation of any size.",
+		points: ["Flexible giving", "One-time 5% platform fee"],
 	},
 	{
 		value: "attorney",
 		label: "I'm an attorney",
 		article: "an attorney",
+		cta: "Join as an attorney",
 		icon: Scale,
-		blurb: "Take on fundable cases with the fee raised before you file.",
+		blurb:
+			"Review community-funded intakes with the fee secured before you file.",
 		points: [
 			"Appear in the directory",
-			"Pick the cases you want",
+			"Review the intakes you want",
 			"Fee funded up front",
 		],
 	},
@@ -87,11 +81,18 @@ const STEP2_FORM_ID = "onboarding-step-2";
 export function OnboardingFlow({
 	name,
 	next: returnTo,
+	lockedRole,
 }: {
 	name: string;
 	/** Where they were headed before onboarding interrupted them. Already
 	 *  validated as a same-site path by the page. */
 	next?: string | null;
+	/** A role the account already carries and must not be able to change here — set
+	 *  for an attorney invited to a case, whose account is created as an attorney.
+	 *  When present, the role-choice step is skipped entirely: onboarding opens on
+	 *  the details for that role, so an invite can't be answered as the wrong role
+	 *  (which is unrecoverable — role is fixed once onboarding completes). */
+	lockedRole?: Role;
 }) {
 	const ids = {
 		firm: useId(),
@@ -105,8 +106,10 @@ export function OnboardingFlow({
 		window.location.assign("/");
 	}
 
-	const [step, setStep] = useState<1 | 2>(1);
-	const [role, setRole] = useState<Role | null>(null);
+	// An invited attorney arrives with their role already set: open on the details
+	// step (2) with that role locked in, rather than the role-choice step (1).
+	const [step, setStep] = useState<1 | 2>(lockedRole ? 2 : 1);
+	const [role, setRole] = useState<Role | null>(lockedRole ?? null);
 
 	// The states they are admitted in — attorneys only (JUS-12). A list, because a
 	// licence is per state and an attorney can hold several; the first is the
@@ -200,16 +203,18 @@ export function OnboardingFlow({
 				<div className="flex items-center gap-4">
 					<div className="flex items-center gap-3">
 						<span className="font-mono font-semibold text-[12px] text-muted-foreground uppercase tracking-[0.1em]">
-							Step {step} of 2
+							Step {lockedRole ? 1 : step} of {lockedRole ? 1 : 2}
 						</span>
 						<div className="flex gap-1.5">
 							<span className="h-1.5 w-7 rounded-full bg-brass" />
-							<span
-								className={cn(
-									"h-1.5 w-7 rounded-full",
-									step >= 2 ? "bg-brass" : "bg-brass-wash",
-								)}
-							/>
+							{!lockedRole && (
+								<span
+									className={cn(
+										"h-1.5 w-7 rounded-full",
+										step >= 2 ? "bg-brass" : "bg-brass-wash",
+									)}
+								/>
+							)}
 						</div>
 					</div>
 					<button
@@ -464,26 +469,32 @@ export function OnboardingFlow({
 								onClick={goToStep2}
 								disabled={!role}
 							>
-								{role
-									? `Continue as ${ROLES.find((r) => r.value === role)?.article}`
-									: "Continue"}
+								{role ? ROLES.find((r) => r.value === role)?.cta : "Continue"}
 								<ArrowRight data-icon="inline-end" aria-hidden="true" />
 							</Button>
 						</>
 					) : (
 						<>
-							<Button
-								type="button"
-								variant="outline"
-								size="lg"
-								onClick={() => {
-									setErrors({});
-									setStep(1);
-								}}
-							>
-								<ArrowLeft data-icon="inline-start" aria-hidden="true" />
-								Back
-							</Button>
+							{lockedRole ? (
+								// Nothing to go back to — the role step was skipped. Keep the
+								// left slot filled so the submit stays right-aligned.
+								<p className="text-[13px] text-muted-foreground">
+									You were invited as an attorney.
+								</p>
+							) : (
+								<Button
+									type="button"
+									variant="outline"
+									size="lg"
+									onClick={() => {
+										setErrors({});
+										setStep(1);
+									}}
+								>
+									<ArrowLeft data-icon="inline-start" aria-hidden="true" />
+									Back
+								</Button>
+							)}
 							<Button
 								key="step-2-submit"
 								type="submit"

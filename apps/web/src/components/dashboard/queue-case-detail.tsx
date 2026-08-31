@@ -81,7 +81,7 @@ function expressInterestGate(
 		return {
 			canExpress: false,
 			title: `You're not admitted in ${where}`,
-			body: `This case is in ${where}, and you can only see and take cases in states you're admitted in. Add ${where} to your directory profile to put yourself forward.`,
+			body: `This intake is in ${where}, and you can only see and take intakes in states you're admitted in. Add ${where} to your directory profile to put yourself forward.`,
 			cta: "Add your states",
 		};
 	}
@@ -133,7 +133,7 @@ export function QueueCaseDetailView({
 				<div className="mb-2.5 flex flex-wrap items-center gap-1.5">
 					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-brass-wash px-2.5 py-0.5 font-semibold text-[12px] text-brass-deep">
 						<Tag className="size-3.5" aria-hidden="true" />
-						{item.category || "Case"}
+						{item.category || "Intake"}
 					</span>
 					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-green-soft px-2.5 py-0.5 font-semibold text-[12px] text-green-deep">
 						<MapPin className="size-3.5" aria-hidden="true" />
@@ -146,7 +146,7 @@ export function QueueCaseDetailView({
 				</div>
 
 				<h2 className="font-extrabold text-[clamp(1.75rem,3.4vw,2.375rem)] text-ink leading-[1.08] tracking-[-0.03em]">
-					{item.title || "Untitled case"}
+					{item.title || "Untitled intake"}
 				</h2>
 
 				<div className="mt-3 flex flex-wrap items-center gap-2 text-[13.5px]">
@@ -173,7 +173,7 @@ export function QueueCaseDetailView({
 				<div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-rest)]">
 					<p className="min-w-[24ch] flex-1 text-[13px] text-ink-soft leading-relaxed">
 						{item.myInterest
-							? "You've put yourself forward for this case. The plaintiff sees it on their dashboard and will reach out if they want to take it further."
+							? "You've put yourself forward for this intake. The plaintiff sees it on their dashboard and will reach out if they want to take it further."
 							: "Expressing interest tells the plaintiff you're available. It doesn't open a conversation. They decide whether to make contact."}
 					</p>
 					<ExpressInterestButton
@@ -294,7 +294,7 @@ export function QueueCaseDetailView({
 								    work. */}
 								<p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
 									Filed by the plaintiff. Documents themselves are shared once
-									you're representing the case.
+									you're representing the intake.
 								</p>
 							</>
 						) : (

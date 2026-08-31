@@ -27,5 +27,19 @@ export default async function OnboardingPage({
 		redirect((destination ?? "/home") as Route);
 	}
 
-	return <OnboardingFlow name={session.user.name} next={destination} />;
+	// An attorney invited to a case has their account created as an attorney
+	// (createInvitedAttorneyAccount); every other pre-onboarding account defaults to
+	// "donor". So an attorney role at this point means it was set by the invite, not
+	// chosen here — lock it, so onboarding can't let them pick the wrong role and
+	// strand the invitation on an unrecoverable account.
+	const currentRole = (session.user as { role?: string }).role;
+	const lockedRole = currentRole === "attorney" ? "attorney" : undefined;
+
+	return (
+		<OnboardingFlow
+			name={session.user.name}
+			next={destination}
+			lockedRole={lockedRole}
+		/>
+	);
 }

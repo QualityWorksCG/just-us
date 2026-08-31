@@ -181,7 +181,7 @@ const STATUS_COPY: Record<
 	closed: {
 		headline: "This case has closed",
 		owner: (t) => `“${t}” has been marked closed.`,
-		audience: (t) => `“${t}” has been resolved. Thank you for backing it.`,
+		audience: (t) => `“${t}” has been resolved. Thank you for supporting it.`,
 	},
 };
 
@@ -345,7 +345,7 @@ export async function notifyCaseClosed(caseId: string) {
 			type: "case_status",
 			caseId,
 			title: "This case has closed",
-			body: `“${title}” has been marked closed. Everyone who backed it has been thanked with a certificate of appreciation.`,
+			body: `“${title}” has been marked closed. Everyone who supported it has been thanked with a certificate of appreciation.`,
 			href: ownerHref,
 			dedupeKey: ownerKey,
 		},
@@ -356,7 +356,7 @@ export async function notifyCaseClosed(caseId: string) {
 				to: ctx.owner?.email as string,
 				url: absoluteUrl(ownerHref),
 				headline: "This case has closed",
-				message: `“${title}” has been marked closed. Everyone who backed it has been thanked with a certificate of appreciation.`,
+				message: `“${title}” has been marked closed. Everyone who supported it has been thanked with a certificate of appreciation.`,
 				ctaLabel: "Manage your case",
 				recipientName: ctx.owner?.name ?? undefined,
 			}),
@@ -375,7 +375,7 @@ export async function notifyCaseClosed(caseId: string) {
 			type: "certificate",
 			caseId,
 			title: "Your certificate of appreciation",
-			body: `“${cert.caseTitle}” has closed. Thank you for backing it. Your certificate is ready.`,
+			body: `“${cert.caseTitle}” has closed. Thank you for supporting it. Your certificate is ready.`,
 			href: `/certificates/${cert.accessToken}`,
 			dedupeKey: `certificate:${cert.id}`,
 		});

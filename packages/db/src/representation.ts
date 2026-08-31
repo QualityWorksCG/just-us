@@ -378,6 +378,39 @@ export async function expressInterest(
 	}
 }
 
+export type WithdrawInterestResult =
+	| { ok: true }
+	| { ok: false; reason: "not_found" | "already_matched" };
+
+/**
+ * Withdraw an attorney's expression of interest in a case (JUS: accidental click
+ * on the queue's Express interest CTA).
+ *
+ * Only an interest the plaintiff has not yet taken forward can be pulled: once it
+ * is `accepted` a `Match` exists and the attorney is representing the case, which
+ * is a different relationship to unwind than an unread expression of interest.
+ *
+ * The row is deleted rather than flagged: a withdrawn interest should disappear
+ * from the plaintiff's requests as if it were never sent, and clearing the unique
+ * (case, attorney) key lets the attorney put themselves forward again later. No
+ * `Match` points at a non-accepted request, so nothing cascades.
+ */
+export async function withdrawInterest(
+	caseId: string,
+	attorneyId: string,
+): Promise<WithdrawInterestResult> {
+	const req = await prisma.attorneyRequest.findUnique({
+		where: { caseId_attorneyId: { caseId, attorneyId } },
+		select: { id: true, status: true },
+	});
+	if (!req) return { ok: false, reason: "not_found" };
+	if (req.status === "accepted") {
+		return { ok: false, reason: "already_matched" };
+	}
+	await prisma.attorneyRequest.delete({ where: { id: req.id } });
+	return { ok: true };
+}
+
 /** One expression of interest with the facts a plaintiff's notification needs:
  *  the case, its owner (recipient), and the interested attorney's display name. */
 export async function getInterestForNotify(interestId: string) {

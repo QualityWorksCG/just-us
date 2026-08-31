@@ -59,7 +59,7 @@ const ACCEPTED_AVATAR_TYPES = new Set([
 const ROLE_LABELS: Record<string, string> = {
 	plaintiff: "Plaintiff",
 	attorney: "Attorney",
-	donor: "Donor",
+	donor: "JustUs Member",
 	administrator: "Administrator",
 };
 

@@ -131,7 +131,7 @@ export default async function InAppCasePage({
 		countCaseDonations(c.id),
 	]);
 	const BLOCKED: Record<string, string> = {
-		not_live: "This case isn't raising right now.",
+		not_live: "This case isn't accepting donations right now.",
 		unbound:
 			"This case is still setting up where donations go, so it can't accept them yet.",
 		transfers_disabled:
@@ -177,7 +177,7 @@ export default async function InAppCasePage({
 					blockedReason: destination.ok
 						? null
 						: c.status === "closed"
-							? "This case has closed. Thank you to everyone who backed it."
+							? "This case has closed. Thank you to everyone who supported it."
 							: (BLOCKED[destination.reason] ?? null),
 				}}
 				fundsNote={fundsNote}

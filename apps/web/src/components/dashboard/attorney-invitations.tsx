@@ -47,11 +47,11 @@ export function AttorneyInvitations({
 		<section className="mb-10">
 			<h2 className="font-bold text-[18px] text-ink">
 				{invitations.length === 1
-					? "You've been asked to represent a case"
-					: `You've been asked to represent ${invitations.length} cases`}
+					? "You've been asked to represent an intake"
+					: `You've been asked to represent ${invitations.length} intakes`}
 			</h2>
 			<p className="mt-1 max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				A plaintiff named you as their attorney. Their case is held off the
+				A plaintiff named you as their attorney. Their intake is held off the
 				queue until you answer, so it waits on you rather than going in front of
 				other attorneys.
 			</p>
@@ -108,7 +108,7 @@ function InvitationCard({
 						{invitation.plaintiffName} named you as their attorney
 					</p>
 					<p className="mt-1 font-semibold text-[14px] text-ink leading-snug">
-						{invitation.caseTitle || "Untitled case"}
+						{invitation.caseTitle || "Untitled intake"}
 					</p>
 					<ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-ink-soft">
 						<Fact icon={Tag} value={invitation.category} />
@@ -125,10 +125,10 @@ function InvitationCard({
 					{!verified && (
 						<p className="mt-2.5 text-[13px] text-ink-soft leading-relaxed">
 							{!admission
-								? `This case is in ${invitation.location}, and you haven't added that state to your profile. A case can only be taken by an attorney admitted where it is.`
+								? `This intake is in ${invitation.location}, and you haven't added that state to your profile. An intake can only be taken by an attorney admitted where it is.`
 								: awaitingCheck
 									? `Your ${invitation.location} bar standing is still being checked. As soon as it clears you'll be able to confirm, and nothing else is needed from you.`
-									: `Every attorney is checked against the state bar where the case is, including one they were invited to. Verify your ${invitation.location} licence to unlock this.`}
+									: `Every attorney is checked against the state bar where the intake is, including one they were invited to. Verify your ${invitation.location} licence to unlock this.`}
 						</p>
 					)}
 
@@ -155,7 +155,7 @@ function InvitationCard({
 						<span className="text-[12.5px] text-ink-soft">
 							{left <= 1
 								? "Expires today"
-								: `Expires in ${left} days${left <= 2 ? " (the case goes back to the queue after that)" : ""}`}
+								: `Expires in ${left} days${left <= 2 ? " (the intake goes back to the queue after that)" : ""}`}
 						</span>
 					</div>
 				</div>

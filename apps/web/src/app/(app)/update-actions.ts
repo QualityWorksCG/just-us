@@ -5,6 +5,7 @@ import {
 	markAllCaseUpdatesSeenByOwner,
 	postCaseUpdate,
 } from "@just-us/db/case-updates";
+import { markCaseUpdateNotificationsRead } from "@just-us/db/notifications";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -55,8 +56,14 @@ export type PostUpdateActionResult =
  * layer, so it only ever touches the caller's own cases.
  */
 export async function markAllUpdatesReadAction(): Promise<{ ok: boolean }> {
-	const { session } = await requireRole("plaintiff");
-	await markAllCaseUpdatesSeenByOwner(session.user.id);
+	const { session, role } = await requireRole("plaintiff", "donor");
+	// A plaintiff owns the cases, so their "seen" is a stamp on each case. A donor
+	// doesn't, so theirs is clearing the case-update notifications the count reads.
+	if (role === "donor") {
+		await markCaseUpdateNotificationsRead(session.user.id);
+	} else {
+		await markAllCaseUpdatesSeenByOwner(session.user.id);
+	}
 	revalidatePath("/updates");
 	revalidatePath("/home");
 	return { ok: true };
@@ -147,5 +154,5 @@ const FAILURE_MESSAGES = {
 	empty: "Write an update before posting it.",
 	not_attached: "You can only post updates to a case you're part of.",
 	not_live:
-		"Updates open once your case is live. Publish it first, then you can post progress for your backers.",
+		"Updates open once your case is live. Publish it first, then you can post progress for your supporters.",
 } as const;

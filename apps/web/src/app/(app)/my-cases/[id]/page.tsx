@@ -115,7 +115,7 @@ export default async function CasePage({
 	const badge =
 		c.status === "live"
 			? {
-					text: "Live · Raising",
+					text: "Active Case",
 					cls: "bg-green-soft text-green-deep",
 					dot: "bg-success",
 				}
@@ -260,7 +260,7 @@ async function AttorneyView({
 		<div className="flex w-full flex-col gap-5">
 			<BackLink
 				href={"/my-cases" as Route}
-				label="Back to my cases"
+				label="Back to my intakes"
 				className="mb-1"
 			/>
 			<AttorneyCaseDetailView
@@ -288,7 +288,7 @@ async function AttorneyView({
 							caseId={item.id}
 							authorName={session.user.name}
 							authorTone="brass"
-							placeholder={`Post an update for ${item.plaintiffName.split(/\s+/)[0]} and their backers…`}
+							placeholder={`Post an update for ${item.plaintiffName.split(/\s+/)[0]} and their supporters…`}
 						/>
 
 						<div className="flex flex-col gap-3">
@@ -316,7 +316,7 @@ async function AttorneyView({
 								viewerId={session.user.id}
 								viewerRole="attorney"
 								caseId={item.id}
-								emptyHint="No updates yet. Your first post will appear here and reach every backer."
+								emptyHint="No updates yet. Your first post will appear here and reach every supporter."
 								limit={2}
 							/>
 						</div>

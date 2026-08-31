@@ -42,7 +42,7 @@ export type DonateResult =
 
 /** Why a case can't take money right now, in words a donor can act on. */
 const DESTINATION_REASONS: Record<string, string> = {
-	not_live: "This case isn't raising right now.",
+	not_live: "This case isn't accepting donations right now.",
 	unbound:
 		"This case hasn't finished setting up where donations go. It can't accept them yet.",
 	transfers_disabled:

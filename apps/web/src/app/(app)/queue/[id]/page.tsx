@@ -42,7 +42,7 @@ export default async function QueueCasePage({
 		// it matters instead — on the prose itself.
 		<div className="flex w-full flex-col gap-5">
 			<BackLink
-				href={"/home" as Route}
+				href={"/queue?tab=open" as Route}
 				label="Back to the queue"
 				className="mb-1"
 			/>

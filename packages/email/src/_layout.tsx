@@ -154,7 +154,7 @@ export function EmailShell({
 				<Container style={container}>
 					<Section style={brandRow}>
 						<Text style={brand}>JustUs Financial</Text>
-						<Text style={eyebrow}>Justice, crowdfunded</Text>
+						<Text style={eyebrow}>Litigation intake sourcing</Text>
 					</Section>
 					{children}
 				</Container>

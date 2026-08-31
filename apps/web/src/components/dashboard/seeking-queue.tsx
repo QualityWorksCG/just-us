@@ -1,8 +1,4 @@
-import type {
-	MyInterest,
-	QueueCase,
-	QueueSort,
-} from "@just-us/db/representation";
+import type { QueueCase, QueueSort } from "@just-us/db/representation";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
 import { Eye, Inbox, MapPin, ShieldAlert, UserRound } from "lucide-react";
@@ -21,13 +17,6 @@ import { QueueControls } from "@/components/dashboard/queue-controls";
  * this nor the case view carries a way to contact the plaintiff: see `cardSelect`
  * and `detailSelect`, which is where that line is actually held.
  */
-
-export type InterestTally = {
-	total: number;
-	awaiting: number;
-	accepted: number;
-	declined: number;
-};
 
 const SORTS = new Set<QueueSort>(["newest", "oldest"]);
 
@@ -75,8 +64,6 @@ export function SeekingQueue({
 	admittedStates,
 	verifiedStates,
 	filtered,
-	tally,
-	interests,
 	canExpressInterest,
 }: {
 	cases: QueueCase[];
@@ -95,9 +82,6 @@ export function SeekingQueue({
 	verifiedStates: string[];
 	/** Whether any filter is active, which changes the empty-state wording. */
 	filtered: boolean;
-	tally: InterestTally;
-	/** This attorney's own expressions of interest, newest first. */
-	interests: MyInterest[];
 	/** False until the attorney's bar standing is verified — they can browse the
 	 *  queue either way, but cannot put themselves forward (JUS-24). */
 	canExpressInterest: boolean;
@@ -131,7 +115,7 @@ export function SeekingQueue({
 						<span className="font-bold">
 							Add the states you're admitted in.
 						</span>{" "}
-						Cases are only shown to attorneys licensed where the case is, so
+						Intakes are only shown to attorneys licensed where the intake is, so
 						until you add a state there's nothing here for you to see.
 					</p>
 					<Link
@@ -153,7 +137,7 @@ export function SeekingQueue({
 						<span className="font-bold">
 							Verify your bar standing to put yourself forward.
 						</span>{" "}
-						You can browse the cases in your states now. Expressing interest
+						You can browse the intakes in your states now. Expressing interest
 						needs a verified licence there, so plaintiffs only ever see
 						attorneys who can actually take the work.
 					</p>
@@ -166,64 +150,6 @@ export function SeekingQueue({
 				</div>
 			)}
 
-			{tally.total > 0 && (
-				<section className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
-					<div className="flex flex-wrap items-baseline justify-between gap-2">
-						<h2 className="font-bold text-ink text-lg">
-							Your expressions of interest
-						</h2>
-						<span className="text-[13px] text-muted-foreground tabular-nums">
-							{tally.total} total
-						</span>
-					</div>
-
-					<div className="mt-4 grid gap-3 sm:grid-cols-3">
-						<Tally
-							label="Awaiting a decision"
-							value={tally.awaiting}
-							sub="the plaintiff decides in their own time"
-						/>
-						<Tally
-							label="Taken forward"
-							value={tally.accepted}
-							sub="plaintiffs who came back to you"
-							tone="green"
-						/>
-						<Tally
-							label="Passed on"
-							value={tally.declined}
-							sub="not a fit for that plaintiff"
-						/>
-					</div>
-
-					{/* Named, not just counted. A case leaves the queue the moment it's
-					    matched, so without this list an attorney's interest would simply
-					    vanish and they'd never learn what came of it. */}
-					{interests.length > 0 && (
-						<ul className="mt-4 flex flex-col divide-y divide-border border-border border-t">
-							{interests.map((interest) => (
-								<li
-									key={interest.id}
-									className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3"
-								>
-									<div className="min-w-0 flex-1">
-										<p className="truncate font-semibold text-[13.5px] text-ink">
-											{interest.case.title || "Untitled case"}
-										</p>
-										<p className="truncate text-[12px] text-muted-foreground">
-											{[interest.case.category, interest.case.state]
-												.filter(Boolean)
-												.join(" · ") || "—"}
-										</p>
-									</div>
-									<OutcomeBadge status={interest.status} />
-								</li>
-							))}
-						</ul>
-					)}
-				</section>
-			)}
-
 			<section className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)] sm:p-6">
 				<QueueControls categories={categories} states={states} />
 
@@ -232,7 +158,7 @@ export function SeekingQueue({
 						{filtered ? "Results" : "Seeking representation"}
 					</span>
 					<span className="text-[13px] text-muted-foreground tabular-nums">
-						{cases.length} {cases.length === 1 ? "case" : "cases"}
+						{cases.length} {cases.length === 1 ? "intake" : "intakes"}
 					</span>
 				</div>
 
@@ -245,15 +171,15 @@ export function SeekingQueue({
 							{nowhereAdmitted
 								? "No states added yet"
 								: filtered
-									? "No cases match those filters"
-									: "No cases seeking representation"}
+									? "No intakes match those filters"
+									: "No intakes seeking representation"}
 						</p>
 						<p className="max-w-[46ch] text-[13.5px] text-muted-foreground leading-relaxed">
 							{nowhereAdmitted
-								? "The queue is scoped to the states you're admitted in. Add yours on your directory profile and the cases from them appear here."
+								? "The queue is scoped to the states you're admitted in. Add yours on your directory profile and the intakes from them appear here."
 								: filtered
 									? "Try a broader category or another state. The queue turns over as plaintiffs publish."
-									: `Cases appear here the moment a plaintiff in ${admittedStates.length === 1 ? admittedStates[0] : "one of your states"} publishes one out to attorneys.`}
+									: `Intakes appear here the moment a plaintiff in ${admittedStates.length === 1 ? admittedStates[0] : "one of your states"} publishes one out to attorneys.`}
 						</p>
 					</div>
 				) : (
@@ -270,79 +196,11 @@ export function SeekingQueue({
 			</section>
 
 			<p className="rounded-[var(--radius-card)] border border-border bg-paper-alt px-5 py-3.5 text-[12.5px] text-muted-foreground leading-relaxed">
-				Cases are listed by the sort you choose, never ranked for you, and never
-				assigned. Open a case to read the plaintiff's full account and the
-				evidence they've filed; their contact details are never shared.
+				Intakes are listed by the sort you choose, never ranked for you, and
+				never assigned. Open an intake to read the plaintiff's full account and
+				the evidence they've filed; their contact details are never shared.
 				Expressing interest tells them you're available. It doesn't open a
 				conversation, and the plaintiff is the one who makes contact.
-			</p>
-		</div>
-	);
-}
-
-/**
- * Where one of the attorney's expressions of interest stands.
- *
- * `pending` and `viewed` read the same here. The plaintiff having opened their
- * inbox is not the attorney's business — a read receipt would turn a plaintiff's
- * decision into something they can be seen to be delaying, and the queue is not
- * a place to apply that pressure.
- */
-function OutcomeBadge({ status }: { status: MyInterest["status"] }) {
-	const { label, cls } =
-		status === "accepted"
-			? { label: "Taken forward", cls: "bg-green-soft text-green-deep" }
-			: status === "declined"
-				? { label: "Passed on", cls: "bg-surface-2 text-muted-foreground" }
-				: { label: "Awaiting", cls: "bg-brass-wash text-brass-deep" };
-	return (
-		<span
-			className={cn(
-				"shrink-0 rounded-[var(--radius-pill)] px-2.5 py-0.5 font-semibold text-[11.5px]",
-				cls,
-			)}
-		>
-			{label}
-		</span>
-	);
-}
-
-function Tally({
-	label,
-	value,
-	sub,
-	tone = "cream",
-}: {
-	label: string;
-	value: number;
-	sub: string;
-	tone?: "cream" | "green";
-}) {
-	return (
-		<div
-			className={cn(
-				"rounded-[var(--radius-card)] border border-transparent p-4",
-				tone === "green" ? "bg-green-soft" : "bg-surface-2",
-			)}
-		>
-			<p
-				className={cn(
-					"font-mono font-semibold text-[11px] uppercase tracking-[0.08em]",
-					tone === "green" ? "text-green-deep/80" : "text-muted-foreground",
-				)}
-			>
-				{label}
-			</p>
-			<p className="mt-2 font-extrabold text-[24px] text-ink tabular-nums leading-none tracking-[-0.02em]">
-				{value}
-			</p>
-			<p
-				className={cn(
-					"mt-1.5 text-[12px]",
-					tone === "green" ? "text-green-deep/70" : "text-muted-foreground",
-				)}
-			>
-				{sub}
 			</p>
 		</div>
 	);
@@ -383,7 +241,7 @@ function QueueCard({
 							href={`/queue/${item.id}` as Route}
 							className="rounded-sm outline-none hover:text-brass-deep hover:underline focus-visible:ring-2 focus-visible:ring-ring"
 						>
-							{item.title || "Untitled case"}
+							{item.title || "Untitled intake"}
 						</Link>
 					</h3>
 					<p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
@@ -412,7 +270,7 @@ function QueueCard({
 						)}
 					>
 						<Eye data-icon="inline-start" aria-hidden="true" />
-						View case
+						View intake
 					</Link>
 				</div>
 			</div>

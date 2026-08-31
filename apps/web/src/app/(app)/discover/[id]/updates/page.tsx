@@ -1,5 +1,5 @@
 import { listCaseUpdates } from "@just-us/db/case-updates";
-import { getPublicCase } from "@just-us/db/cases";
+import { getViewableCase } from "@just-us/db/cases";
 import { getCaseDonationSummary } from "@just-us/db/donations";
 import {
 	getFollowUpdatesSeenAt,
@@ -25,7 +25,10 @@ export default async function DiscoverCaseUpdatesPage({
 	const { session } = await requireRole("donor");
 	const { id } = await params;
 
-	const c = await getPublicCase(id);
+	// live OR closed — a supporter can read the timeline of a case that has since
+	// closed (its closing update is the one that matters most). The case page uses
+	// the same predicate; the live-only `getPublicCase` gates the donate flow.
+	const c = await getViewableCase(id);
 	if (!c) notFound();
 
 	const [updates, highlightSince, following, donation] = await Promise.all([

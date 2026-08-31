@@ -14,7 +14,7 @@ import {
 	Text,
 } from "./_layout";
 
-export const donationThankYouSubject = "Thank you for backing this case";
+export const donationThankYouSubject = "Thank you for supporting this case";
 
 type DonationThankYouEmailProps = {
 	url: string;

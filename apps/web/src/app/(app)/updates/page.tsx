@@ -1,9 +1,8 @@
 import type { Role } from "@just-us/auth";
 import {
-	type BackerUpdate,
 	type CaseUpdateGroup,
+	listCaseUpdateGroupsForBacker,
 	listCaseUpdateGroupsForOwner,
-	listUpdatesForBacker,
 } from "@just-us/db/case-updates";
 import { cn } from "@just-us/ui/lib/utils";
 import {
@@ -60,73 +59,35 @@ export default async function UpdatesPage({
 }) {
 	const session = await requireOnboarded();
 	const role = ((session.user as { role?: Role }).role ?? "donor") as Role;
+	const tab = (await searchParams)?.tab === "unread" ? "unread" : "all";
 
+	// A donor supports several cases at once, so their updates group by case exactly
+	// the way a plaintiff's do. The cases and their unread counts are read
+	// differently per role, but the screen they render is one and the same.
 	if (role === "donor") {
-		const updates = await listUpdatesForBacker(session.user.id);
+		const groups = await listCaseUpdateGroupsForBacker(session.user.id, 1);
 		return (
-			<UpdatesFeed
-				updates={updates}
-				intro="The latest from the cases you're backing."
-				emptyText="Back a case and its attorney's progress updates will show up here."
-				hrefFor={(caseId) => `/discover/${caseId}` as Route}
+			<GroupedUpdatesScreen
+				groups={groups}
+				tab={tab}
+				intro="Every case you support with new activity, grouped by case. Open one to see the full timeline."
+				hrefFor={(caseId) => `/discover/${caseId}/updates` as Route}
 			/>
 		);
 	}
 
 	if (role === "plaintiff") {
-		const tab = (await searchParams)?.tab === "unread" ? "unread" : "all";
-		// One latest update per case for the preview; the full timeline lives on
-		// the case's own updates page. Deliberately NOT marking everything seen on
-		// open — the unread badges persist until the plaintiff clears them with
-		// "Mark all as read", or reads a case by opening it.
+		// One latest update per case for the preview; the full timeline lives on the
+		// case's own updates page. Deliberately NOT marking everything seen on open —
+		// the badges persist until "Mark all as read" or opening the case.
 		const groups = await listCaseUpdateGroupsForOwner(session.user.id, 1);
-		const unreadGroups = groups.filter((g) => g.unread > 0);
-		const shown = tab === "unread" ? unreadGroups : groups;
-
 		return (
-			<div className="flex flex-col gap-6">
-				<p className="text-[14.5px] text-ink-soft leading-relaxed">
-					Every case with new activity, grouped by case. Open one to see the
-					full timeline.
-				</p>
-
-				{groups.length === 0 ? (
-					<EmptyUpdates />
-				) : (
-					<div className="flex flex-col gap-4">
-						{/* Tabs + mark-all */}
-						<div className="flex flex-wrap items-center justify-between gap-3">
-							<div className="flex items-center gap-2">
-								<TabLink
-									href={"/updates" as Route}
-									label="All cases"
-									count={groups.length}
-									active={tab === "all"}
-								/>
-								<TabLink
-									href={"/updates?tab=unread" as Route}
-									label="Unread"
-									count={unreadGroups.length}
-									active={tab === "unread"}
-								/>
-							</div>
-							<MarkAllUpdatesRead hasUnread={unreadGroups.length > 0} />
-						</div>
-
-						{shown.length === 0 ? (
-							<p className="rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-6 py-12 text-center text-[13.5px] text-muted-foreground">
-								You're all caught up. No unread updates right now.
-							</p>
-						) : (
-							<div className="flex flex-col gap-4">
-								{shown.map((group) => (
-									<CaseUpdateCard key={group.caseId} group={group} />
-								))}
-							</div>
-						)}
-					</div>
-				)}
-			</div>
+			<GroupedUpdatesScreen
+				groups={groups}
+				tab={tab}
+				intro="Every case with new activity, grouped by case. Open one to see the full timeline."
+				hrefFor={(caseId) => `/my-cases/${caseId}/updates` as Route}
+			/>
 		);
 	}
 
@@ -134,6 +95,73 @@ export default async function UpdatesPage({
 	const screen = findScreen(role, "updates");
 	if (!screen) redirect("/home");
 	return <ScreenPlaceholder sub={screen.sub} />;
+}
+
+/**
+ * The grouped-by-case updates screen, shared by plaintiffs and donors: an intro,
+ * the All / Unread tabs with a mark-all, and one card per case. What differs by
+ * role is only the groups fed in and where "View all updates" leads.
+ */
+function GroupedUpdatesScreen({
+	groups,
+	tab,
+	intro,
+	hrefFor,
+}: {
+	groups: CaseUpdateGroup[];
+	tab: "all" | "unread";
+	intro: string;
+	hrefFor: (caseId: string) => Route;
+}) {
+	const unreadGroups = groups.filter((g) => g.unread > 0);
+	const shown = tab === "unread" ? unreadGroups : groups;
+
+	return (
+		<div className="flex flex-col gap-6">
+			<p className="text-[14.5px] text-ink-soft leading-relaxed">{intro}</p>
+
+			{groups.length === 0 ? (
+				<EmptyUpdates />
+			) : (
+				<div className="flex flex-col gap-4">
+					{/* Tabs + mark-all */}
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<div className="flex items-center gap-2">
+							<TabLink
+								href={"/updates" as Route}
+								label="All cases"
+								count={groups.length}
+								active={tab === "all"}
+							/>
+							<TabLink
+								href={"/updates?tab=unread" as Route}
+								label="Unread"
+								count={unreadGroups.length}
+								active={tab === "unread"}
+							/>
+						</div>
+						<MarkAllUpdatesRead hasUnread={unreadGroups.length > 0} />
+					</div>
+
+					{shown.length === 0 ? (
+						<p className="rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-6 py-12 text-center text-[13.5px] text-muted-foreground">
+							You're all caught up. No unread updates right now.
+						</p>
+					) : (
+						<div className="flex flex-col gap-4">
+							{shown.map((group) => (
+								<CaseUpdateCard
+									key={group.caseId}
+									group={group}
+									hrefFor={hrefFor}
+								/>
+							))}
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
 }
 
 /** A filter pill for the All / Unread tabs. */
@@ -176,8 +204,16 @@ function TabLink({
  * One case's activity at a glance: the case (linking to its full timeline), its
  * newest update as a preview, and a footer summarising how much there is.
  */
-function CaseUpdateCard({ group }: { group: CaseUpdateGroup }) {
-	const href = `/my-cases/${group.caseId}/updates` as Route;
+function CaseUpdateCard({
+	group,
+	hrefFor,
+}: {
+	group: CaseUpdateGroup;
+	/** Where the card's timeline lives — a plaintiff's own case page, a donor's
+	 *  read-only case view — so one card serves both. */
+	hrefFor: (caseId: string) => Route;
+}) {
+	const href = hrefFor(group.caseId);
 	const cat = CAT_ICON[group.category] ?? DEFAULT_CAT;
 	const Icon = cat.icon;
 	const latest = group.updates[0] ?? null;
@@ -303,66 +339,6 @@ function EmptyUpdates() {
 				When your attorney posts progress on one of your cases, it'll show up
 				here.
 			</p>
-		</div>
-	);
-}
-
-/**
- * The donor "Case updates" feed — one attorney update per row, newest first,
- * each linking to where the full case lives. The plaintiff screen groups by case
- * instead.
- */
-function UpdatesFeed({
-	updates,
-	intro,
-	emptyText,
-	hrefFor,
-}: {
-	updates: BackerUpdate[];
-	intro: string;
-	emptyText: string;
-	hrefFor: (caseId: string) => Route;
-}) {
-	return (
-		<div className="flex flex-col gap-6">
-			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-				{intro}
-			</p>
-			{updates.length === 0 ? (
-				<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-6 py-16 text-center">
-					<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
-						<Megaphone className="size-6" aria-hidden="true" />
-					</span>
-					<p className="font-bold text-[16px] text-ink">No updates yet</p>
-					<p className="max-w-[44ch] text-[13.5px] text-muted-foreground leading-relaxed">
-						{emptyText}
-					</p>
-				</div>
-			) : (
-				<ol className="flex max-w-[720px] flex-col gap-4">
-					{updates.map((u) => (
-						<li
-							key={u.id}
-							className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]"
-						>
-							<div className="flex flex-wrap items-center justify-between gap-2">
-								<Link
-									href={hrefFor(u.caseId)}
-									className="font-bold text-[14.5px] text-ink hover:text-brass-deep hover:underline"
-								>
-									{u.caseTitle}
-								</Link>
-								<span className="font-mono text-[10.5px] text-muted-foreground uppercase tracking-[0.07em]">
-									{u.authorName} · <TimeAgo date={u.createdAt} />
-								</span>
-							</div>
-							<div className="mt-2.5 whitespace-pre-wrap text-[14.5px] text-ink-soft leading-relaxed">
-								{u.body}
-							</div>
-						</li>
-					))}
-				</ol>
-			)}
 		</div>
 	);
 }

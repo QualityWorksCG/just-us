@@ -86,7 +86,7 @@ export function AdminCaseActions({
 
 			<p className="mt-3 text-[13px] text-ink-soft leading-relaxed">
 				{isRemoved
-					? "This case has been taken down. Donors can't see or back it. You can restore it to the site."
+					? "This case has been taken down. Donors can't see or support it. You can restore it to the site."
 					: "You're viewing this case exactly as the public does. Take it down if it breaches the rules."}
 			</p>
 

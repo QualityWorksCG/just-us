@@ -76,7 +76,7 @@ export function MatchedCasesPanel({
 	return (
 		<section className="flex flex-col gap-4">
 			<div className="flex items-center justify-between">
-				<h2 className="font-bold text-[18px] text-ink">Your matched cases</h2>
+				<h2 className="font-bold text-[18px] text-ink">Your matched intakes</h2>
 				{cases.length > 0 && (
 					<Link
 						href={"/my-cases" as Route}
@@ -91,10 +91,10 @@ export function MatchedCasesPanel({
 			{cases.length === 0 ? (
 				<div className="rounded-[var(--radius-card-lg)] border border-border border-dashed bg-surface px-6 py-10 text-center">
 					<p className="font-semibold text-[14px] text-ink">
-						No matched cases yet
+						No matched intakes yet
 					</p>
 					<p className="mx-auto mt-1 max-w-[44ch] text-[13px] text-muted-foreground leading-relaxed">
-						When a plaintiff takes your interest further, their case appears
+						When a plaintiff takes your interest further, their intake appears
 						here, with its funding, its account status, and a place to post
 						updates. Put yourself forward in the queue below.
 					</p>
@@ -115,7 +115,7 @@ export function MatchedCasesPanel({
 												href={`/my-cases/${c.id}` as Route}
 												className="font-bold text-[15px] text-ink hover:text-brass-deep"
 											>
-												{c.title || "Untitled case"}
+												{c.title || "Untitled intake"}
 											</Link>
 											<span
 												className={cn(
@@ -171,7 +171,7 @@ export function MatchedCasesPanel({
 										href={`/my-cases/${c.id}` as Route}
 										className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-border px-3.5 py-2 font-semibold text-[12.5px] text-ink transition-colors hover:border-brass-deep hover:text-brass-deep"
 									>
-										Open case
+										Open intake
 										<ArrowRight className="size-3.5" aria-hidden="true" />
 									</Link>
 								</div>
@@ -194,7 +194,7 @@ export function MatchedCasesPanel({
 					<div
 						role="dialog"
 						aria-modal="true"
-						aria-label={`Post an update on ${composing.title || "your case"}`}
+						aria-label={`Post an update on ${composing.title || "your intake"}`}
 						className="relative w-full max-w-[560px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-modal)]"
 					>
 						<div className="mb-4 flex items-start justify-between gap-4">
@@ -203,7 +203,7 @@ export function MatchedCasesPanel({
 									Post an update
 								</h3>
 								<p className="mt-0.5 text-[12.5px] text-muted-foreground">
-									{composing.title || "Your case"} · seen by{" "}
+									{composing.title || "Your intake"} · seen by{" "}
 									{composing.plaintiffName} and every backer
 								</p>
 							</div>
@@ -220,7 +220,7 @@ export function MatchedCasesPanel({
 							caseId={composing.id}
 							authorName={authorName}
 							authorTone="brass"
-							placeholder={`Share progress on ${composing.title || "the case"} with ${composing.plaintiffName.split(/\s+/)[0]} and their backers…`}
+							placeholder={`Share progress on ${composing.title || "the intake"} with ${composing.plaintiffName.split(/\s+/)[0]} and their supporters…`}
 							onPosted={() => setComposing(null)}
 						/>
 					</div>
