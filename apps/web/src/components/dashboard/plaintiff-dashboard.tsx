@@ -341,7 +341,9 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 						icon={Users}
 						label="Donors"
 						value={String(c.donorsCount)}
-						sub={c.donorsCount === 0 ? "no backers yet" : "backers so far"}
+						sub={
+							c.donorsCount === 0 ? "no supporters yet" : "supporters so far"
+						}
 						tone="cream"
 					/>
 				)}
@@ -415,7 +417,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 				{c.donorsCount === 0 && (
 					<p className="mt-3 text-[13px] text-muted-foreground">
 						{isLive
-							? "No donations yet. Share your campaign to reach your first backer."
+							? "No donations yet. Share your campaign to reach your first supporter."
 							: "Donations start once your case is live."}
 					</p>
 				)}
@@ -436,7 +438,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 						<EmptyState
 							icon={Megaphone}
 							title="No updates yet"
-							body="Once you're live, your attorney posts progress here, and backers get notified."
+							body="Once you're live, your attorney posts progress here, and supporters get notified."
 						/>
 					</section>
 				</div>
@@ -629,14 +631,14 @@ function CasesOverview({ cases }: { cases: CaseSummary[] }) {
 					icon={Users}
 					label="Total donors"
 					value={String(totalDonors)}
-					sub={totalDonors === 0 ? "no backers yet" : "across all cases"}
+					sub={totalDonors === 0 ? "no supporters yet" : "across all cases"}
 					tone="cream"
 				/>
 				<StatCard
 					icon={Megaphone}
 					label="Live campaigns"
 					value={String(liveCount)}
-					sub={liveCount === 0 ? "none live yet" : "raising right now"}
+					sub={liveCount === 0 ? "none live yet" : "funding right now"}
 					tone="dark"
 				/>
 				<StatCard
@@ -726,7 +728,7 @@ function CaseRow({ c }: { c: CaseSummary }) {
 
 	const badge = isLive
 		? {
-				text: "Live · Raising",
+				text: "Active Case",
 				cls: "bg-green-soft text-green-deep",
 				dot: "bg-success",
 			}

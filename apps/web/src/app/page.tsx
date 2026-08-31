@@ -46,8 +46,8 @@ const howSteps = [
 	{
 		num: "02",
 		icon: Scale,
-		title: "Choose your attorney",
-		body: "Compare bar-verified attorneys and agree a set fee together.",
+		title: "Explore independent attorneys",
+		body: "Browse state bar-verified attorneys and talk directly with them to agree on your pricing.",
 	},
 	{
 		num: "03",
@@ -102,20 +102,20 @@ const promises = [
 const trustItems = [
 	{
 		icon: ShieldCheck,
-		title: "You choose your own attorney",
-		body: "Browse bar-verified attorneys and pick who represents you. No one is ever assigned to you.",
+		title: "Connect with counsel",
+		body: "Browse state bar-verified attorneys and talk directly with them to agree on your pricing. No one is ever assigned to you.",
 		badge: "Your call, always",
 	},
 	{
 		icon: BadgeCheck,
 		title: "Every attorney is bar-verified",
-		body: "Attorneys confirm their bar standing per jurisdiction before their profile goes live.",
+		body: "Attorneys confirm their active state bar standing per jurisdiction before their profile goes live.",
 		badge: "Bar-checked per jurisdiction",
 	},
 	{
 		icon: Lock,
 		title: "Funds we never touch",
-		body: "Donations settle straight into an account the plaintiff holds and controls, named on every case.",
+		body: "Donations go straight to the law firm representing the case, into its own account for that case alone. JustUs is the technology vessel that powers this and never touches a dollar.",
 		badge: "Stripe Connect · $0 to JustUs",
 	},
 	{
@@ -238,7 +238,7 @@ function HeroVisual() {
 					/>
 					<span className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-card/95 px-3 py-1.5 font-semibold text-[12px] text-ink shadow-[var(--shadow-float)] backdrop-blur">
 						<ShieldCheck className="size-3.5 text-success" aria-hidden="true" />
-						You choose your attorney
+						Connect with counsel
 					</span>
 				</div>
 
@@ -333,8 +333,8 @@ export default async function Home() {
 							<span className="text-brass">bank balance.</span>
 						</h1>
 						<p className="mt-5 max-w-[480px] animate-[ju-rise_0.8s_var(--ease-rise)_0.24s_both] text-[16.5px] text-ink-soft leading-relaxed">
-							Choose your own attorney, agree a fair fee, and let the public
-							fund your day in court.
+							Connect directly with independent attorneys to agree on your
+							pricing, and let community donations fund your day in court.
 						</p>
 						<div className="mt-7 flex animate-[ju-rise_0.8s_var(--ease-rise)_0.34s_both] flex-col gap-3 sm:flex-row">
 							<Link
@@ -555,12 +555,13 @@ export default async function Home() {
 							id="fees-heading"
 							className="font-extrabold text-[30px] text-ink tracking-[-0.02em]"
 						>
-							One fee. Shown before you give, to the cent.
+							One fee. Shown before you donate one cent.
 						</h2>
 						<p className="mt-3.5 text-[14.5px] text-ink-soft leading-relaxed">
 							JustUs charges a 5% platform fee on donations, added on top of the
-							gift you choose. That's how we keep the lights on. We never take a
-							share of legal fees or settlements, and tips are always optional.
+							amount you choose to donate. That's how we keep the lights on. We
+							never take a share of legal fees or settlements, and tips are
+							always optional.
 						</p>
 						<p className="mt-3.5 text-[13px] text-muted-foreground leading-relaxed">
 							Donations are gifts. They carry no financial return and no share
@@ -590,9 +591,10 @@ export default async function Home() {
 						</div>
 						<p className="mt-2 flex gap-2 rounded-[var(--radius-card-sm)] bg-brass-wash px-3.5 py-3 text-[13px] text-brass-deep leading-relaxed">
 							<Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-							Funds route directly to an account the plaintiff holds and
-							controls, stated on the case before you give. They pay their
-							attorney themselves. JustUs never takes custody.
+							Funds route straight to the firm representing the case, into its
+							account for that case alone, stated on the case before you give.
+							JustUs is the technology vessel that powers this and never takes
+							custody.
 						</p>
 					</div>
 				</div>
@@ -799,7 +801,7 @@ export default async function Home() {
 								<div>
 									<p className="font-bold text-lg">JustUs Financial</p>
 									<p className="font-mono text-[11px] text-dark-fg/55 uppercase tracking-[0.1em]">
-										Litigation crowdfunding
+										Litigation intake sourcing
 									</p>
 								</div>
 							</div>
@@ -859,7 +861,8 @@ export default async function Home() {
 						<p className="max-w-3xl text-[12px] text-dark-fg/45 leading-relaxed">
 							Donations made through JustUs are gifts, not investments. They
 							carry no financial return and grant no share of any settlement or
-							judgment. JustUs never takes custody of donated funds.
+							judgment. JustUs Financial operates strictly as the technology
+							vessel and never takes custody of donated funds.
 						</p>
 						<p className="shrink-0 font-mono text-[11px] text-dark-fg/45">
 							© 2026 JustUs Financial LLC

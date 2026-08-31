@@ -26,7 +26,7 @@ type Mode = "create" | "signin";
 
 const BULLETS = [
 	"Nothing goes public until you hit publish",
-	"You choose your own attorney",
+	"Connect with your own attorney",
 	"One transparent 5% fee, and we never hold the money",
 ];
 
@@ -325,7 +325,7 @@ export function AuthScreen({
 									JustUs Financial
 								</span>
 								<span className="mt-1 block font-mono text-[10px] text-paper/50 uppercase tracking-[0.14em]">
-									Justice, crowdfunded
+									Litigation intake sourcing
 								</span>
 							</span>
 						</Link>
@@ -335,8 +335,9 @@ export function AuthScreen({
 						Justice shouldn't depend on what's in your pocket.
 					</h1>
 					<p className="mb-6 max-w-[440px] text-[15px] text-paper/70 leading-relaxed">
-						Create your account to submit a case, fund one, or take one on. You
-						choose how you're joining right after you sign in.
+						Create your account to submit a cause, support one, or securely
+						manage client onboarding. You choose how you're joining right after
+						you sign in.
 					</p>
 					<ul className="flex flex-col gap-2.5">
 						{BULLETS.map((b) => (

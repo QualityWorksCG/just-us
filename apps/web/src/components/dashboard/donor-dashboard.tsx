@@ -224,7 +224,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 				<Stat
 					icon={Scale}
 					value={String(data.casesBacked)}
-					label="Cases backed"
+					label="Cases funded"
 					tone="tan"
 				/>
 				<Stat
@@ -246,7 +246,9 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 				    live or closed (closed shows a "Closed" badge so they can look back). */}
 				<section className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">
 					<div className="mb-3 flex items-center justify-between">
-						<h2 className="font-bold text-ink text-lg">Cases you're backing</h2>
+						<h2 className="font-bold text-ink text-lg">
+							Cases you're supporting
+						</h2>
 						{data.backingCount > 0 && (
 							<Link
 								href={"/saved?tab=backed" as Route}
@@ -273,7 +275,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 								aria-hidden="true"
 							/>
 							<p className="font-bold text-[14px] text-ink">
-								You haven't backed a case yet
+								You haven't donated to a case yet
 							</p>
 							<p className="max-w-[38ch] text-[12.5px] text-muted-foreground leading-relaxed">
 								Find a cause that matters to you. Every gift helps fund
@@ -324,7 +326,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 							/>
 							<p className="font-bold text-[14px] text-ink">No updates yet</p>
 							<p className="max-w-[34ch] text-[12.5px] text-muted-foreground leading-relaxed">
-								Once you back a case, its attorney's updates show up here.
+								Once you donate to a case, the attorney's updates appear here.
 							</p>
 						</div>
 					)}

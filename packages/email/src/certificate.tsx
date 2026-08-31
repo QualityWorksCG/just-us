@@ -38,11 +38,11 @@ export default function CertificateEmail({
 }: CertificateEmailProps) {
 	return (
 		<EmailShell preview={`Your certificate of appreciation for ${caseTitle}`}>
-			<Text style={heading}>Thank you for backing this case</Text>
+			<Text style={heading}>Thank you for supporting this case</Text>
 			<Text style={paragraph}>
 				{recipientName ? `Hi ${recipientName.split(" ")[0]}, ` : "Hi, "}“
-				{caseTitle}” has now closed. Backing a case on JustUs is a gift, not an
-				investment. There's no financial return, and none is owed. What your
+				{caseTitle}” has now closed. Supporting a case on JustUs is a gift, not
+				an investment. There's no financial return, and none is owed. What your
 				support made possible is the case itself, and we've prepared a
 				certificate of appreciation to recognize it.
 			</Text>
@@ -61,7 +61,7 @@ export default function CertificateEmail({
 			{serial ? <Text style={paragraph}>Certificate no. {serial}</Text> : null}
 			<Hr style={divider} />
 			<Text style={footer}>
-				You're receiving this because you backed a case that has now closed.
+				You're receiving this because you supported a case that has now closed.
 			</Text>
 		</EmailShell>
 	);

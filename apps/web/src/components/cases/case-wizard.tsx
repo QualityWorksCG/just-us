@@ -1350,7 +1350,7 @@ export function CaseWizard({
 							</p>
 							<Button size="lg" className="w-full">
 								<Handshake data-icon="inline-start" aria-hidden="true" />
-								Back this case
+								Support this case
 							</Button>
 							<Button variant="outline" size="lg" className="mt-2.5 w-full">
 								<Link2 data-icon="inline-start" aria-hidden="true" />

@@ -13,7 +13,7 @@ import {
 	Text,
 } from "./_layout";
 
-export const caseUpdateSubject = "New update on a case you're backing";
+export const caseUpdateSubject = "New update on a case you're supporting";
 
 type CaseUpdateEmailProps = {
 	url: string;
@@ -93,8 +93,8 @@ export default function CaseUpdateEmail({
 			</Text>
 			<Hr style={divider} />
 			<Text style={footer}>
-				You're getting this because you're backing or following this case. Turn
-				off email notifications in Profile &amp; settings.
+				You're getting this because you're supporting or following this case.
+				Turn off email notifications in Profile &amp; settings.
 			</Text>
 		</EmailShell>
 	);

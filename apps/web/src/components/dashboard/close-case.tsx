@@ -38,7 +38,7 @@ export function CloseCaseButton({
 			if (res.ok) {
 				toast.success(
 					backerCount > 0
-						? "Case closed. Your backers are being thanked with a certificate."
+						? "Case closed. Your supporters are being thanked with a certificate."
 						: "Case closed.",
 				);
 				setOpen(false);
@@ -55,7 +55,7 @@ export function CloseCaseButton({
 				<h2 className="font-bold text-[18px] text-ink">Close this case</h2>
 				<p className="mt-1.5 max-w-[60ch] text-[13.5px] text-ink-soft leading-relaxed">
 					When the matter has resolved, close the case to stop accepting
-					donations. Everyone who backed it receives a certificate of
+					donations. Everyone who supported it receives a certificate of
 					appreciation. Closing is not a refund. A gift on JustUs is never an
 					investment, and none is returned.
 				</p>
@@ -91,8 +91,8 @@ export function CloseCaseButton({
 							“{title || "This case"}” will stop accepting donations and leave
 							the public directory.{" "}
 							{backerCount > 0
-								? `Its ${backerCount} backer${backerCount === 1 ? "" : "s"} will be thanked with a certificate of appreciation.`
-								: "It has no backers yet, so no certificates will be issued."}{" "}
+								? `Its ${backerCount} supporter${backerCount === 1 ? "" : "s"} will be thanked with a certificate of appreciation.`
+								: "It has no supporters yet, so no certificates will be issued."}{" "}
 							This does not refund anyone.
 						</p>
 						<div className="mt-5 flex justify-end gap-2.5">

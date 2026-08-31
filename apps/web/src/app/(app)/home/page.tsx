@@ -1,47 +1,33 @@
 import type { Role } from "@just-us/auth";
-import { listAdmissions } from "@just-us/db/admissions";
-import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import { pendingInvitationsForEmail } from "@just-us/db/case-invitations";
 import { listUpdatesForBacker } from "@just-us/db/case-updates";
 import { listOwnedCases } from "@just-us/db/cases";
 import { donorStats, listBackedCases } from "@just-us/db/donations";
 import { listMessageConversations } from "@just-us/db/messages";
 import { attorneyPayoutReadiness } from "@just-us/db/payouts";
-import {
-	interestCounts,
-	listAttorneyCases,
-	listMyInterests,
-	listSeekingQueue,
-	queueCategories,
-	queueStates,
-} from "@just-us/db/representation";
+import { listAttorneyCases, listMyInterests } from "@just-us/db/representation";
 import { interestCountsByCase } from "@just-us/db/requests";
 import { countSavedCases, listSavedCases } from "@just-us/db/saves";
+import type { Route } from "next";
 
 import { AdminOverview } from "@/components/dashboard/admin-overview";
-import { AttorneyInvitations } from "@/components/dashboard/attorney-invitations";
+import {
+	type AttentionItem,
+	AttorneyDashboard,
+	type CaseloadItem,
+} from "@/components/dashboard/attorney-dashboard";
 import { toDonorCase } from "@/components/dashboard/donor-case";
 import { DonorDashboard } from "@/components/dashboard/donor-dashboard";
-import { MatchedCasesPanel } from "@/components/dashboard/matched-cases-panel";
-import { PayoutNudge } from "@/components/dashboard/payout-nudge";
 import {
 	type CaseSummary,
 	PlaintiffDashboard,
 } from "@/components/dashboard/plaintiff-dashboard";
 import { ScreenPlaceholder } from "@/components/dashboard/screen-placeholder";
-import {
-	readQueueParams,
-	SeekingQueue,
-	toQueueSort,
-} from "@/components/dashboard/seeking-queue";
 import { requireOnboarded } from "@/lib/auth-server";
+import { caseInviteHref } from "@/lib/case-invite-ref";
 import { getRoleNav } from "@/lib/dashboard-nav";
 
-export default async function DashboardHome({
-	searchParams,
-}: {
-	searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function DashboardHome() {
 	const session = await requireOnboarded();
 	const role = ((session.user as { role?: Role }).role ?? "donor") as Role;
 
@@ -133,97 +119,102 @@ export default async function DashboardHome({
 
 	const home = getRoleNav(role).items[0];
 
-	// The attorney's home is the Seeking Representation queue (JUS-25).
+	// The attorney's home is their dashboard (JUS-25): a read of where their work
+	// stands. The open queue and their expressions of interest live on the separate
+	// "Intake requests" screen.
 	if (role === "attorney") {
-		const filters = readQueueParams(await searchParams);
-		const [
-			cases,
-			categories,
-			states,
-			tally,
-			interests,
-			profile,
-			payout,
-			matched,
-			invitations,
-			admissions,
-		] = await Promise.all([
-			listSeekingQueue(session.user.id, {
-				category: filters.category,
-				state: filters.state,
-				sort: toQueueSort(filters.sort),
-			}),
-			queueCategories(session.user.id),
-			queueStates(session.user.id),
-			interestCounts(session.user.id),
-			listMyInterests(session.user.id),
-			getAttorneyProfile(session.user.id),
-			// Donations pay the firm, so an unfinished payout account here blocks
-			// someone else's published case. This is the only screen that tells them.
-			attorneyPayoutReadiness({
-				userId: session.user.id,
-				email: session.user.email,
-			}),
-			// Matched cases for the dashboard panel — gated to this attorney's own
-			// cases (account activity + update posting are scoped by this).
-			listAttorneyCases({ userId: session.user.id, email: session.user.email }),
-			// Invitations sent to this address and not yet answered. Read by email,
-			// because that is what the plaintiff named and the row can predate the
-			// account — and read here at all because the emailed link was otherwise
-			// the only way back to the decision.
-			pendingInvitationsForEmail(session.user.email),
-			// The states this attorney is admitted in, each with its bar standing. The
-			// queue is already scoped to them server-side, so this is here to explain
-			// the screen rather than to filter it — an empty list is the one case where
-			// an empty queue is about the attorney rather than about the platform, and
-			// each invitation below needs the standing of its own case's state.
-			listAdmissions(session.user.id),
-		]);
+		const [matched, invitations, payout, interests, conversations] =
+			await Promise.all([
+				listAttorneyCases({
+					userId: session.user.id,
+					email: session.user.email,
+				}),
+				// Invitations sent to this address and not yet answered — read by email,
+				// because the plaintiff named an address and the row can predate the
+				// account.
+				pendingInvitationsForEmail(session.user.email),
+				// Donations pay the firm, so an unfinished payout account blocks a
+				// published case from taking money.
+				attorneyPayoutReadiness({
+					userId: session.user.id,
+					email: session.user.email,
+				}),
+				listMyInterests(session.user.id),
+				listMessageConversations(session.user.id),
+			]);
+
+		const liveCases = matched.filter((c) => c.status === "live").length;
+		const closedCases = matched.filter((c) => c.status === "closed").length;
+		const raisedCents = matched.reduce((sum, c) => sum + c.raisedCents, 0);
+		const raisedCasesCount = matched.filter((c) => c.raisedCents > 0).length;
+		const takenForward = interests.filter(
+			(i) => i.status === "accepted",
+		).length;
+		const unread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+		const payoutPending = payout.unstartedCases + payout.waitingCases;
+
+		const attention: AttentionItem[] = [
+			...invitations.map((inv) => ({
+				id: `inv-${inv.id}`,
+				kind: "request" as const,
+				title: "New case request",
+				sub: `${inv.caseTitle || "Untitled intake"} · ${inv.category} · ${inv.location}`,
+				cta: "Review",
+				href: caseInviteHref({ invitationId: inv.id }) as Route,
+			})),
+			...(payoutPending > 0
+				? [
+						{
+							id: "payout",
+							kind: "payout" as const,
+							title: "Finish payout setup",
+							sub: `${payoutPending} ${payoutPending === 1 ? "intake" : "intakes"} can't accept donations until set up`,
+							cta: "Set up",
+							href: "/my-cases" as Route,
+						},
+					]
+				: []),
+			...(unread > 0
+				? [
+						{
+							id: "messages",
+							kind: "reply" as const,
+							title: "New messages",
+							sub: `${unread} unread ${unread === 1 ? "message" : "messages"}`,
+							cta: "Open",
+							href: "/messages" as Route,
+						},
+					]
+				: []),
+		];
+
+		const caseload: CaseloadItem[] = matched.map((c) => ({
+			id: c.id,
+			title: c.title,
+			status: c.status,
+			state: c.state,
+			raisedCents: c.raisedCents,
+			goalCents: c.goalCents,
+		}));
+
+		const firstName =
+			session.user.name.trim().split(/\s+/)[0] || session.user.name;
 
 		return (
-			<div>
-				{/* Before the payout nudge: an unanswered invitation is a plaintiff
-				    waiting on a decision only this attorney can make, and their case is
-				    off the queue until it comes. */}
-				<AttorneyInvitations
-					invitations={invitations}
-					admissions={admissions}
-				/>
-				<PayoutNudge
-					waitingCases={payout.waitingCases}
-					unstartedCases={payout.unstartedCases}
-					inReviewCases={payout.inReviewCases}
-					blockedCases={payout.blockedCases}
-				/>
-				{/* Matched cases first — the attorney's active work, with each case's
-				    account activity and a way to post updates without leaving here. */}
-				<div className="mt-2 mb-10">
-					<MatchedCasesPanel cases={matched} authorName={session.user.name} />
-				</div>
-				<div className="border-border border-t pt-8">
-					<h2 className="font-bold text-[18px] text-ink">
-						Seeking representation
-					</h2>
-					<p className="mt-1 text-[14.5px] text-ink-soft leading-relaxed">
-						{home.sub}
-					</p>
-				</div>
-				<div className="mt-8">
-					<SeekingQueue
-						cases={cases}
-						categories={categories}
-						states={states}
-						admittedStates={admissions.map((row) => row.state)}
-						verifiedStates={admissions
-							.filter((row) => row.verificationStatus === "verified")
-							.map((row) => row.state)}
-						filtered={filters.filtered}
-						tally={tally}
-						interests={interests}
-						canExpressInterest={profile?.verificationStatus === "verified"}
-					/>
-				</div>
-			</div>
+			<AttorneyDashboard
+				firstName={firstName}
+				hour={new Date().getHours()}
+				activeCases={matched.length}
+				liveCases={liveCases}
+				closedCases={closedCases}
+				newRequests={invitations.length}
+				raisedCents={raisedCents}
+				raisedCasesCount={raisedCasesCount}
+				expressionsTotal={interests.length}
+				expressionsTakenForward={takenForward}
+				attention={attention}
+				caseload={caseload}
+			/>
 		);
 	}
 

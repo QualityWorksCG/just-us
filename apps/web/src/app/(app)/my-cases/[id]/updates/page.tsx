@@ -95,17 +95,17 @@ export default async function CaseUpdatesPage({
 		<div className="w-full">
 			<BackLink
 				href={`/my-cases/${id}` as Route}
-				label="Back to case"
+				label={isAttorney ? "Back to intake" : "Back to case"}
 				className="mb-3"
 			/>
 			<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-				Case updates
+				{isAttorney ? "Intake updates" : "Case updates"}
 			</h2>
 			<p className="mt-1 text-[14.5px] text-ink-soft">
-				{title || "Untitled case"} ·{" "}
+				{title || (isAttorney ? "Untitled intake" : "Untitled case")} ·{" "}
 				{isAttorney
-					? `client ${clientName} · shared with their backers`
-					: "shared with your backers"}
+					? `client ${clientName} · shared with their supporters`
+					: "shared with your supporters"}
 			</p>
 
 			<div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -117,8 +117,8 @@ export default async function CaseUpdatesPage({
 						authorTone={isAttorney ? "brass" : "green"}
 						placeholder={
 							isAttorney
-								? `Post an update for ${firstName(clientName)} and their backers…`
-								: "Share an update with your backers…"
+								? `Post an update for ${firstName(clientName)} and their supporters…`
+								: "Share an update with your supporters…"
 						}
 					/>
 					<CaseUpdates
@@ -128,7 +128,7 @@ export default async function CaseUpdatesPage({
 						caseId={id}
 						grouped
 						highlightSince={highlightSince}
-						emptyHint="No updates yet. The first post will appear here and reach every backer."
+						emptyHint="No updates yet. The first post will appear here and reach every supporter."
 					/>
 				</div>
 
@@ -175,7 +175,7 @@ export default async function CaseUpdatesPage({
 											{donorsCount}
 										</p>
 										<p className="text-[12.5px] text-muted-foreground">
-											{donorsCount === 1 ? "backer" : "backers"}
+											{donorsCount === 1 ? "supporter" : "supporters"}
 										</p>
 									</div>
 								</div>
@@ -194,8 +194,8 @@ export default async function CaseUpdatesPage({
 								</div>
 							</div>
 							<p className="mt-4 border-border border-t pt-3 text-[12.5px] text-muted-foreground leading-relaxed">
-								Everyone backing or following your case sees every update you or
-								your attorney post.
+								Everyone supporting or following your case sees every update you
+								or your attorney post.
 							</p>
 						</div>
 					)}
@@ -214,7 +214,7 @@ export default async function CaseUpdatesPage({
 							)}
 						>
 							<TrendingUp className="size-3" aria-hidden="true" />
-							{isLive ? "Live · Raising" : status}
+							{isLive ? "Active Case" : status}
 						</span>
 						<p className="mt-3 font-extrabold text-[20px] text-ink tabular-nums tracking-[-0.02em]">
 							{money(raised)}{" "}

@@ -98,6 +98,19 @@ export async function markAllNotificationsRead(recipientId: string) {
 }
 
 /**
+ * Mark a user's unread `case_update` notifications read — the donor's equivalent of
+ * an owner stamping `ownerUpdatesSeenAt`, since a donor's "unread per case" is
+ * counted from these. Scoped to the one type so "Mark all as read" on the Updates
+ * screen doesn't also clear their expression-of-interest or donation notices.
+ */
+export async function markCaseUpdateNotificationsRead(recipientId: string) {
+	return prisma.notification.updateMany({
+		where: { recipientId, type: "case_update", readAt: null },
+		data: { readAt: new Date() },
+	});
+}
+
+/**
  * Claim the single email send for a notification. Stamps `emailedAt` only if it
  * was null, so exactly one caller wins under a race — the email idempotency
  * boundary. Returns true if this caller may send.

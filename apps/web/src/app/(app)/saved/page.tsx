@@ -17,13 +17,13 @@ import { requireRole } from "@/lib/auth-server";
 const TABS = [
 	{ key: "saved", label: "Saved" },
 	{ key: "following", label: "Following" },
-	{ key: "backed", label: "Backed" },
+	{ key: "backed", label: "Supported" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["key"];
 
 const INTRO: Record<Tab, string> = {
-	saved: "Cases you've saved to come back to.",
+	saved: "",
 	following:
 		"Cases you're following. You'll see every new update here and in your bell.",
 	backed:
@@ -115,7 +115,7 @@ export default async function SavedPage({
 						{tab === "following"
 							? "Not following any cases yet"
 							: tab === "backed"
-								? "You haven't backed a case yet"
+								? "You haven't donated to a case yet"
 								: "Nothing saved yet"}
 					</p>
 					<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
@@ -123,7 +123,7 @@ export default async function SavedPage({
 							? "Follow a case while you browse to get its updates here and in your bell."
 							: tab === "backed"
 								? "When you donate to a case, it shows here, even after it closes, so you can always look back."
-								: "Save cases while you browse to keep them handy here."}
+								: "Not ready to decide? Save your interests here. Explore our active directory to find a cause to fund."}
 					</p>
 					<Link
 						href={"/discover" as Route}

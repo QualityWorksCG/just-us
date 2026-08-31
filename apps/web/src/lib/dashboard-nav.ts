@@ -57,8 +57,8 @@ export type RoleNav = {
 
 export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 	donor: {
-		eyebrow: "DONOR",
-		roleLabel: "Donor",
+		eyebrow: "JustUs Member",
+		roleLabel: "JustUs Member",
 		items: [
 			{
 				slug: "",
@@ -69,17 +69,17 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 			},
 			{
 				slug: "discover",
-				label: "Discover cases",
+				label: "Discover Profiles",
 				icon: Compass,
 				title: "Discover cases",
-				sub: "Find a case that matters to you: save it, share it, or back it today.",
+				sub: "Find a case that matters to you: save it, share it, or support it today.",
 			},
 			{
 				slug: "saved",
 				label: "Saved",
 				icon: Bookmark,
 				title: "Saved cases",
-				sub: "Cases you've saved to come back to.",
+				sub: "",
 			},
 			{
 				slug: "donations",
@@ -93,7 +93,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Updates",
 				icon: Megaphone,
 				title: "Updates",
-				sub: "The latest from the cases you're backing.",
+				sub: "Automated updates from independent representatives and system events.",
 			},
 			{
 				slug: "settings",
@@ -171,23 +171,30 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 		items: [
 			{
 				slug: "",
-				label: "Representation queue",
-				icon: Inbox,
-				title: "Seeking representation",
-				// Says "browse and filter" rather than promising the queue is already
-				// narrowed to this attorney: nothing is filtered unless they ask, so
-				// they can see every case that needs someone (JUS-25).
-				sub: "Cases that need an attorney. Browse the public summaries, filter by category or state, and put yourself forward. The plaintiff decides whether to take it further.",
+				label: "Dashboard",
+				icon: LayoutDashboard,
+				title: "Dashboard",
+				sub: "Your caseload at a glance: what's live, what needs you, and what's raised.",
 			},
 			{
 				slug: "cases",
 				// Shares `/my-cases` with the plaintiff screen of the same name; that
 				// route serves each role its own view.
 				path: "/my-cases",
-				label: "My cases",
+				label: "My intakes",
 				icon: Briefcase,
-				title: "My cases",
-				sub: "Cases matched to you: detail, evidence, and funding.",
+				title: "My intakes",
+				sub: "Intakes matched to you: detail, evidence, and funding.",
+			},
+			{
+				slug: "queue",
+				label: "Intake requests",
+				icon: Inbox,
+				title: "Intake requests",
+				// Says "browse and filter" rather than promising the queue is already
+				// narrowed to this attorney: nothing is filtered unless they ask, so
+				// they can see every intake that needs someone (JUS-25).
+				sub: "Intakes matched to you, plus open cases seeking an attorney. You decide who to put yourself forward for.",
 			},
 			{
 				slug: "messages",
@@ -265,7 +272,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Investors",
 				icon: TrendingUp,
 				title: "Investors",
-				sub: "Investor accounts and the cases they are backing.",
+				sub: "Investor accounts and the cases they are supporting.",
 				flag: "investorTrack",
 			},
 			{

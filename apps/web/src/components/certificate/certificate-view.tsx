@@ -87,7 +87,7 @@ export function CertificateView({
 					</p>
 
 					<p className="mt-8 max-w-[52ch] text-[14.5px] text-ink-soft leading-relaxed">
-						in heartfelt appreciation for backing the pursuit of justice in
+						in heartfelt appreciation for supporting the pursuit of justice in
 					</p>
 					<p className="mt-2 max-w-[52ch] font-semibold text-[18px] text-ink italic">
 						“{caseTitle}”

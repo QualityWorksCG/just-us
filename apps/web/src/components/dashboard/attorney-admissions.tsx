@@ -83,7 +83,7 @@ export function AttorneyAdmissions({
 				return;
 			}
 			const messages: Record<VerificationStatus, string> = {
-				verified: `Verified in ${state}. You can now take cases there.`,
+				verified: `Verified in ${state}. You can now take intakes there.`,
 				needs_review: `${state} couldn't be verified automatically. An administrator will review it.`,
 				rejected: `The check couldn't confirm an active licence in ${state}.`,
 				unverified: `The check found nothing conclusive for ${state}.`,
@@ -105,15 +105,15 @@ export function AttorneyAdmissions({
 				Where you're admitted
 			</h3>
 			<p className="mt-0.5 max-w-[68ch] text-[13px] text-muted-foreground leading-relaxed">
-				Add every state you hold a licence in. Your queue only shows cases from
-				these states, and you can only take one on once that state's bar
+				Add every state you hold a licence in. Your queue only shows intakes
+				from these states, and you can only take one on once that state's bar
 				standing is verified. Each state is checked separately, because each is
 				its own licence.
 			</p>
 
 			{admissions.length === 0 ? (
 				<p className="mt-4 rounded-[var(--radius-card-sm)] bg-danger/5 px-4 py-3 text-[13px] text-danger leading-relaxed">
-					You haven't added any states yet, so no cases can reach you. Add the
+					You haven't added any states yet, so no intakes can reach you. Add the
 					state you're admitted in to start seeing work.
 				</p>
 			) : (
@@ -185,7 +185,7 @@ export function AttorneyAdmissions({
 										act(
 											row.state,
 											() => removeAdmissionAction(row.state),
-											`${row.state} removed. Cases you already represent there aren't affected.`,
+											`${row.state} removed. Intakes you already represent there aren't affected.`,
 										)
 									}
 									aria-label={`Remove ${row.state}`}
@@ -203,8 +203,8 @@ export function AttorneyAdmissions({
 					Add a state
 				</label>
 				<p className="mt-0.5 mb-2.5 text-[12.5px] text-muted-foreground">
-					Adding a state is a claim, not a licence. Run its check to take cases
-					there.
+					Adding a state is a claim, not a licence. Run its check to take
+					intakes there.
 				</p>
 				{/* The field's own chips are suppressed here: the list above already
 				    shows what has been added, with the standing this control cannot. */}
@@ -229,10 +229,10 @@ export function AttorneyAdmissions({
 					<Landmark className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 					<span>
 						{verifiedCount === 0
-							? "None of your states are verified yet, so you can browse cases but not take them on."
+							? "None of your states are verified yet, so you can browse intakes but not take them on."
 							: verifiedCount === admissions.length
 								? "Every state you've added is verified."
-								: `${verifiedCount} of ${admissions.length} verified. You can only take cases in the verified ones.`}
+								: `${verifiedCount} of ${admissions.length} verified. You can only take intakes in the verified ones.`}
 					</span>
 				</p>
 			)}

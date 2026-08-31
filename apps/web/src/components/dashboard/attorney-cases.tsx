@@ -98,21 +98,21 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		return (
 			<div className="flex flex-col gap-6">
 				<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
-					Cases matched to you: the matter, your client, and where its funding
+					Intakes matched to you: the matter, your client, and where its funding
 					stands.
 				</p>
 				<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface px-6 py-16 text-center shadow-[var(--shadow-rest)]">
 					<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
 						<Briefcase className="size-6" aria-hidden="true" />
 					</span>
-					<p className="font-bold text-[16px] text-ink">No cases yet</p>
+					<p className="font-bold text-[16px] text-ink">No intakes yet</p>
 					<p className="max-w-[46ch] text-[13.5px] text-muted-foreground leading-relaxed">
-						Put yourself forward for cases that need representation. When a
-						plaintiff takes you on, or names you on their own case, it appears
+						Put yourself forward for intakes that need representation. When a
+						plaintiff takes you on, or names you on their own intake, it appears
 						here.
 					</p>
 					<Link
-						href={"/home" as Route}
+						href={"/queue?tab=open" as Route}
 						className={cn(buttonVariants({ size: "lg" }), "mt-2 px-5")}
 					>
 						<Search data-icon="inline-start" aria-hidden="true" />
@@ -133,8 +133,8 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[680px] text-[14.5px] text-ink-soft leading-relaxed">
 				{cases.length === 1
-					? "The case you're acting on: the matter, your client, and where its funding stands."
-					: `${cases.length} cases you're acting on. ${money(raised)} raised across them so far.`}
+					? "The intake you're acting on: the matter, your client, and where its funding stands."
+					: `${cases.length} intakes you're acting on. ${money(raised)} raised across them so far.`}
 			</p>
 
 			{blocked > 0 && (
@@ -145,13 +145,13 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 					<div>
 						<p className="font-bold text-[14px] text-ink">
 							{blocked === 1
-								? "One published case can't accept donations yet"
-								: `${blocked} published cases can't accept donations yet`}
+								? "One published intake can't accept donations yet"
+								: `${blocked} published intakes can't accept donations yet`}
 						</p>
 						<p className="mt-1 max-w-[70ch] text-[13px] text-ink-soft leading-relaxed">
-							Each case pays into its own account, so finishing one doesn't
-							cover the others. Open the case below to set its account up. Your
-							client can do nothing about it from their side.
+							Each intake pays into its own account, so finishing one doesn't
+							cover the others. Open the intake below to set its account up.
+							Your client can do nothing about it from their side.
 						</p>
 					</div>
 				</div>
@@ -184,7 +184,7 @@ function CaseRow({ case: c }: { case: AttorneyCase }) {
 
 	const badge = isLive
 		? {
-				text: "Live · Raising",
+				text: "Active Case",
 				cls: "bg-green-soft text-green-deep",
 				dot: "bg-success",
 			}
@@ -231,7 +231,7 @@ function CaseRow({ case: c }: { case: AttorneyCase }) {
 					<PayoutChip case={c} />
 				</div>
 				<h2 className="mt-2 font-bold text-[17px] text-ink leading-snug">
-					{c.title || "Untitled case"}
+					{c.title || "Untitled intake"}
 				</h2>
 				<p className="mt-1 text-[12.5px] text-muted-foreground">
 					{meta ? `${meta} · ` : ""}for {c.plaintiffName}
@@ -271,7 +271,7 @@ function CaseRow({ case: c }: { case: AttorneyCase }) {
 									? `${money(c.goalCents)} agreed and your account is ready. Your client publishes when they're set.`
 									: // The one line that says the quiet part: their client's
 										// campaign does not exist yet, and this is why.
-										`${money(c.goalCents)} agreed. Their case can't go public until this one's payout account is set up.`
+										`${money(c.goalCents)} agreed. Their intake can't go public until this one's payout account is set up.`
 								: c.goalCents > 0
 									? `${money(c.goalCents)} agreed. Not raising until your client publishes.`
 									: "Your client hasn't agreed the fee with you yet, so there's no goal to raise."}

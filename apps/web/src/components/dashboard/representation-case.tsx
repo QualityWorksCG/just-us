@@ -102,7 +102,7 @@ function CardHeader({ view }: { view: RepresentationView }) {
 	const badge =
 		view.status === "live"
 			? {
-					text: "Live · Raising",
+					text: "Active Case",
 					cls: "bg-green-soft text-green-deep",
 					dot: "bg-success",
 				}

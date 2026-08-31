@@ -51,9 +51,8 @@ export function NotificationSettings({
 								Email notifications
 							</label>
 							<p className="mt-1 max-w-[52ch] text-[13px] text-ink-soft leading-relaxed">
-								Get an email for case updates, attorney interest, status
-								changes, and donation confirmations. The in-app bell always
-								stays on.
+								Get an email for updates, status changes, and your
+								contributions. The in-app bell always stays on.
 							</p>
 						</div>
 						<span className="flex items-center gap-2 pt-0.5">
