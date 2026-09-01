@@ -92,6 +92,8 @@ function statusPills(u: {
 	role: string;
 	emailVerified: boolean;
 	attorneyProfile: { verificationStatus: string } | null;
+	/** How many of this attorney's claimed states still await a bar check. */
+	pendingStates?: number;
 	banned: boolean | null;
 	banExpires: Date | null;
 	lockedUntil: Date | null;
@@ -112,6 +114,19 @@ function statusPills(u: {
 								dot: "bg-ink-soft",
 							},
 				];
+	// A verified badge can hide a second state still under review, so name it
+	// outright — this is the whole signal that would otherwise only appear once an
+	// admin opened the attorney.
+	if (u.role === "attorney" && (u.pendingStates ?? 0) > 0) {
+		pills.push({
+			text:
+				u.pendingStates === 1
+					? "1 state to verify"
+					: `${u.pendingStates} states to verify`,
+			cls: "bg-gold-bright/20 text-gold-bright-ink",
+			dot: "bg-gold-bright",
+		});
+	}
 	if (isBlocked(u)) {
 		pills.push({
 			text: "Blocked",
@@ -368,7 +383,10 @@ export default async function UsersPage({
 
 									<Cell label="Status">
 										<div className="flex flex-wrap gap-1.5">
-											{statusPills(u).map((p) => (
+											{statusPills({
+												...u,
+												pendingStates: u._count.admissions,
+											}).map((p) => (
 												<span key={p.text} className={cn(PILL, p.cls)}>
 													<span
 														className={cn("size-1.5 rounded-full", p.dot)}

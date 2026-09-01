@@ -1,4 +1,5 @@
 import type { Role } from "@just-us/auth";
+import { pendingInvitationsForEmail } from "@just-us/db/case-invitations";
 import { unreadMessageCount } from "@just-us/db/messages";
 import {
 	countUnreadNotifications,
@@ -28,17 +29,30 @@ export default async function DashboardLayout({
 
 	// Flag state is read here and handed down, so the client sidebar stays a pure
 	// render of what the server decided rather than fetching flags itself. (JUS-13)
-	const [flags, messageUnreadCount, rows, notificationUnreadCount] =
-		await Promise.all([
-			getFlags(),
-			role === "plaintiff" || role === "attorney"
-				? unreadMessageCount(session.user.id)
-				: Promise.resolve(0),
-			// The bell and its badge both come from the unified Notification store,
-			// so every role sees the events that concern it (JUS email-notifications).
-			listNotifications(session.user.id, 15),
-			countUnreadNotifications(session.user.id),
-		]);
+	const [
+		flags,
+		messageUnreadCount,
+		rows,
+		notificationUnreadCount,
+		intakeNewInvites,
+	] = await Promise.all([
+		getFlags(),
+		role === "plaintiff" || role === "attorney"
+			? unreadMessageCount(session.user.id)
+			: Promise.resolve(0),
+		// The bell and its badge both come from the unified Notification store,
+		// so every role sees the events that concern it (JUS email-notifications).
+		listNotifications(session.user.id, 15),
+		countUnreadNotifications(session.user.id),
+		// The "New" intake requests for an attorney: plaintiffs who named them and
+		// are waiting on a decision. Same source as the queue's New tab, so the
+		// sidebar count and that tab's count are always the same number.
+		role === "attorney"
+			? pendingInvitationsForEmail(session.user.email)
+			: Promise.resolve([]),
+	]);
+
+	const intakeNewCount = intakeNewInvites.length;
 
 	const notifications: BellNotification[] = rows.map((n) => ({
 		id: n.id,
@@ -60,6 +74,7 @@ export default async function DashboardLayout({
 			defaultOpen={sidebarState !== "false"}
 			flags={flags}
 			messageUnreadCount={messageUnreadCount}
+			intakeNewCount={intakeNewCount}
 			notifications={notifications}
 			notificationUnreadCount={notificationUnreadCount}
 		>

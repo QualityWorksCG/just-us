@@ -109,6 +109,11 @@ export type WizardInitial = {
 	 *  to have one. Seeded from the server so the payout step is right on first
 	 *  paint rather than after a round-trip. */
 	payout?: CasePayoutReadiness | null;
+	/** The address a still-pending invitation went to, when the case is seeking a
+	 *  named attorney. Its presence resumes the wizard on the invitation-sent
+	 *  "waiting on your attorney" screen rather than the editor — so "Manage
+	 *  invitation" shows who was asked and where things stand. */
+	invitedEmail?: string | null;
 };
 
 type View =
@@ -220,7 +225,15 @@ export function CaseWizard({
 		if (initial.status === "pending_payout") return 6;
 		return 5;
 	})();
-	const [view, setView] = useState<View>("wizard");
+	// A resumed case that is seeking a named attorney (a pending invitation to a
+	// specific address) opens on the invitation-sent waiting screen rather than the
+	// editor — that is what "Manage invitation" is for. Everything else starts in
+	// the wizard proper.
+	const seedView: View =
+		initial?.status === "seeking" && initial?.invitedEmail
+			? "invited"
+			: "wizard";
+	const [view, setView] = useState<View>(seedView);
 	const [step, setStep] = useState(seedStep);
 
 	// The draft row this wizard is bound to (created on first save / publish).
@@ -311,8 +324,12 @@ export function CaseWizard({
 	const [checking, setChecking] = useState(false);
 	const payoutReady = !!payout?.attorney?.transfersEnabled;
 
-	// The address the invitation went to, for the confirmation screen.
-	const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
+	// The address the invitation went to, for the confirmation screen. Seeded when
+	// resuming a case that already has a pending invitation, so "Manage invitation"
+	// shows who was asked rather than a blank.
+	const [invitedEmail, setInvitedEmail] = useState<string | null>(
+		initial?.invitedEmail ?? null,
+	);
 
 	const coverInput = useRef<HTMLInputElement>(null);
 	const moreInput = useRef<HTMLInputElement>(null);

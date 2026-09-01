@@ -86,6 +86,7 @@ export function AppShell({
 	defaultOpen,
 	flags,
 	messageUnreadCount = 0,
+	intakeNewCount = 0,
 	notifications = [],
 	notificationUnreadCount = 0,
 	children,
@@ -101,6 +102,9 @@ export function AppShell({
 	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
 	flags: FlagState;
 	messageUnreadCount?: number;
+	/** New intake requests for an attorney — plaintiffs who named them and are
+	 *  waiting on a decision. Badges the "Intake requests" nav item. */
+	intakeNewCount?: number;
 	/** Recent notification rows for the header bell (any role). */
 	notifications?: BellNotification[];
 	/** Total unread notifications — the bell badge count. */
@@ -224,6 +228,11 @@ export function AppShell({
 											{item.slug === "messages" && messageUnreadCount > 0 && (
 												<span className="ml-auto rounded-full bg-brass px-1.5 py-0.5 font-bold text-[11px] text-brass-ink">
 													{messageUnreadCount}
+												</span>
+											)}
+											{item.slug === "queue" && intakeNewCount > 0 && (
+												<span className="ml-auto flex size-5 items-center justify-center rounded-full bg-brass font-bold text-[11px] text-brass-ink tabular-nums">
+													{intakeNewCount}
 												</span>
 											)}
 										</SidebarMenuButton>

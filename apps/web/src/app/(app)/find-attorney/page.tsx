@@ -130,6 +130,13 @@ export default async function DashboardAttorneysPage({
 					profileBasePath="/find-attorney"
 					showMessageAction
 					conversationByAttorney={conversationByAttorney}
+					// Enable "Request to represent" only when they arrived with a case
+					// that can still take one — a matched/live/closed case cannot.
+					requestCaseId={
+						draft && (draft.status === "draft" || draft.status === "seeking")
+							? draft.id
+							: undefined
+					}
 				/>
 			</div>
 		</div>

@@ -63,7 +63,7 @@ export default async function StartNewCasePage() {
 	}
 
 	return (
-		<div className="flex max-w-[1120px] flex-col gap-8">
+		<div className="flex flex-col gap-8">
 			<div>
 				<BackLink
 					href={"/my-cases" as Route}

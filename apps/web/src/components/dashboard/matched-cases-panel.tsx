@@ -10,7 +10,7 @@ import {
 	money,
 	PayoutChip,
 	payoutStage,
-} from "@/components/dashboard/attorney-cases";
+} from "@/components/dashboard/attorney-payout";
 import { CaseUpdateComposer } from "@/components/dashboard/case-update-composer";
 
 /** How many matched cases to surface on the dashboard before deferring to the

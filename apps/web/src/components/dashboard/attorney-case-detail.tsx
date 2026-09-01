@@ -25,7 +25,7 @@ import {
 	money,
 	type PayoutStage,
 	payoutStage,
-} from "@/components/dashboard/attorney-cases";
+} from "@/components/dashboard/attorney-payout";
 import { CaseTabs } from "@/components/dashboard/case-tabs";
 
 /**

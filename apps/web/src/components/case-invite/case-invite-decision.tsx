@@ -1,14 +1,21 @@
 "use client";
 
 import { Button } from "@just-us/ui/components/button";
+import { Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import {
+	type CaseInviteActionResult,
 	confirmCaseInviteAction,
 	declineCaseInviteAction,
 } from "@/app/case-invite/actions";
 import type { CaseInviteRef } from "@/lib/case-invite-ref";
+
+/** How a decline is carried out. Defaults to the emailed-invite action, which
+ *  redirects to the invite screen's terminal state; the in-app queue passes its
+ *  own, which settles the same invitation but stays inside the app. */
+type DeclineAction = (invite: CaseInviteRef) => Promise<CaseInviteActionResult>;
 
 /**
  * The answer, and the way out of it.
@@ -19,7 +26,22 @@ import type { CaseInviteRef } from "@/lib/case-invite-ref";
  * on an email link would otherwise cost the plaintiff their chosen attorney.
  */
 
-export function CaseInviteDecision({ invite }: { invite: CaseInviteRef }) {
+export function CaseInviteDecision({
+	invite,
+	confirmLabel = "Confirm I represent this case",
+	declineLabel = "Decline this case",
+	confirmIcon = false,
+	declineAction,
+}: {
+	invite: CaseInviteRef;
+	/** Overridable so the same accept/decline reads naturally in both the emailed
+	 *  invite screen and the in-app case view. */
+	confirmLabel?: string;
+	declineLabel?: string;
+	confirmIcon?: boolean;
+	/** Where a decline is sent. Defaults to the emailed-invite action. */
+	declineAction?: DeclineAction;
+}) {
 	const [pending, setPending] = useState<"confirm" | "decline" | null>(null);
 
 	async function confirm() {
@@ -40,13 +62,15 @@ export function CaseInviteDecision({ invite }: { invite: CaseInviteRef }) {
 				disabled={pending !== null}
 				onClick={confirm}
 			>
-				{pending === "confirm"
-					? "Confirming…"
-					: "Confirm I represent this case"}
+				{confirmIcon && pending !== "confirm" && (
+					<Check data-icon="inline-start" aria-hidden="true" />
+				)}
+				{pending === "confirm" ? "Confirming…" : confirmLabel}
 			</Button>
 			<DeclineInviteButton
 				invite={invite}
-				label="Decline this case"
+				label={declineLabel}
+				action={declineAction}
 				disabled={pending === "confirm"}
 				onBusyChange={(busy) => setPending(busy ? "decline" : null)}
 			/>
@@ -69,11 +93,15 @@ export function CaseInviteDecision({ invite }: { invite: CaseInviteRef }) {
 export function DeclineInviteButton({
 	invite,
 	label = "Decline this case",
+	action = declineCaseInviteAction,
 	disabled = false,
 	onBusyChange,
 }: {
 	invite: CaseInviteRef;
 	label?: string;
+	/** The decline to run. Defaults to the emailed-invite action; the in-app queue
+	 *  overrides it with one that keeps the attorney inside the app. */
+	action?: DeclineAction;
 	disabled?: boolean;
 	onBusyChange?: (busy: boolean) => void;
 }) {
@@ -83,7 +111,7 @@ export function DeclineInviteButton({
 	async function decline() {
 		setPending(true);
 		onBusyChange?.(true);
-		const result = await declineCaseInviteAction(invite);
+		const result = await action(invite);
 		if (!result.ok) {
 			toast.error(result.error);
 			setPending(false);

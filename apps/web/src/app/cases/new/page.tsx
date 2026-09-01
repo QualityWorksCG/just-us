@@ -1,3 +1,4 @@
+import { getPendingInvitationForCase } from "@just-us/db/case-invitations";
 import { getOwnedCase } from "@just-us/db/cases";
 import { getCasePayoutOptions } from "@just-us/db/payouts";
 import { getCaseMatch } from "@just-us/db/requests";
@@ -26,12 +27,18 @@ export default async function NewCasePage({
 	// is most often here to find out whether that attorney is done, and making
 	// them press "Check again" to learn it would be a poor answer to the question
 	// they arrived with.
-	const [attorneyConfirmed, payout] = source
+	const [attorneyConfirmed, payout, pendingInvite] = source
 		? await Promise.all([
 				getCaseMatch(source.id, session.user.id).then(Boolean),
 				getCasePayoutOptions(source.id, session.user.id),
+				// A case seeking a *named* attorney has a pending invitation; one out to
+				// the open queue does not. The invitation is what tells the wizard to
+				// open on its "waiting on the attorney" screen rather than the editor.
+				source.status === "seeking"
+					? getPendingInvitationForCase(source.id)
+					: null,
 			])
-		: [false, null];
+		: [false, null, null];
 
 	const initial: WizardInitial | null = source
 		? {
@@ -65,6 +72,9 @@ export default async function NewCasePage({
 				attorneyConfirmed,
 				status: source.status,
 				payout,
+				// The address the invitation went to, when one is pending. Its presence
+				// is what opens the wizard on the invitation-sent waiting screen.
+				invitedEmail: pendingInvite?.email ?? null,
 			}
 		: null;
 

@@ -155,6 +155,39 @@ export async function notifyExpressionOfInterest(interestId: string) {
 	);
 }
 
+/**
+ * The plaintiff's chosen attorney declined the invitation → tell the plaintiff.
+ *
+ * Their named attorney said no, and the case has gone straight back in front of
+ * other attorneys, so the plaintiff needs to know to expect fresh interest or to
+ * name someone else. In-app only: a nudge to look, not a document to keep, so no
+ * email. Deduped on the invitation, so a second attorney declining a re-invited
+ * case still notifies.
+ */
+export async function notifyInvitationDeclined(
+	caseId: string,
+	invitationId: string,
+	attorneyName?: string | null,
+) {
+	const ctx = await getCaseNotifyContext(caseId);
+	if (!ctx) return;
+
+	const who = attorneyName?.trim() || "The attorney you named";
+	const href = `/my-cases/${caseId}/requests`;
+	await createNotifications([
+		{
+			recipientId: ctx.ownerId,
+			type: "case_status",
+			caseId,
+			actorName: attorneyName ?? null,
+			title: "Your attorney declined this case",
+			body: `${who} declined to represent “${ctx.title || "your case"}”. It's back in front of other attorneys, and you can name someone else.`,
+			href,
+			dedupeKey: `invite_declined:${invitationId}`,
+		},
+	]);
+}
+
 const STATUS_COPY: Record<
 	string,
 	{
