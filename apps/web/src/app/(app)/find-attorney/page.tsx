@@ -99,7 +99,7 @@ export default async function DashboardAttorneysPage({
 		<div>
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 				{screen?.sub ??
-					"Browse bar-verified attorneys and choose who represents you."}
+					"Browse state bar-verified attorneys and connect with the one who fits."}
 			</p>
 
 			{back && (

@@ -10,13 +10,15 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth-server";
 
 export default async function MessagesPage() {
-	const { session } = await requireRole("plaintiff", "attorney");
+	const { session, role } = await requireRole("plaintiff", "attorney");
 	const conversations = await listMessageConversations(session.user.id);
+	const isAttorney = role === "attorney";
 	return (
 		<div className="flex min-h-0 flex-1 flex-col bg-paper">
 			<p className="shrink-0 px-6 pt-5 pb-4 text-[14.5px] text-ink-soft leading-relaxed sm:px-10 lg:px-12">
-				Private one-to-one conversations with the attorneys or plaintiffs you
-				message.
+				{isAttorney
+					? "Private one-to-one conversations with the plaintiffs who've reached out to you."
+					: "Private one-to-one conversations with the attorneys you've contacted."}
 			</p>
 			<div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 sm:px-10 lg:px-12">
 				<Card className="rounded-[var(--radius-card-lg)] border border-border bg-surface py-0 shadow-[var(--shadow-rest)] ring-0">
@@ -66,7 +68,9 @@ export default async function MessagesPage() {
 							<div className="mt-1 rounded-[var(--radius-card)] border border-border border-dashed bg-paper-alt px-6 py-12 text-center">
 								<p className="font-bold text-ink">No conversations yet</p>
 								<p className="mt-2 text-[13px] text-muted-foreground">
-									Find a verified attorney to send your first message.
+									{isAttorney
+										? "When a plaintiff reaches out about an intake, your conversation with them shows up here."
+										: "Find a verified attorney to send your first message."}
 								</p>
 							</div>
 						)}

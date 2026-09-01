@@ -49,8 +49,8 @@ export default async function RepresentationPage() {
 					</span>
 					<p className="font-bold text-[16px] text-ink">Nothing to show yet</p>
 					<p className="max-w-[44ch] text-[13.5px] text-muted-foreground leading-relaxed">
-						Start a case and choose who represents you. You'll see them here,
-						with the fee you agreed and how the funding is going.
+						Start a case and connect with an attorney directly. You'll see them
+						here, with the fee you agreed and how the funding is going.
 					</p>
 					<Link
 						href={"/my-cases/new" as Route}
@@ -154,8 +154,8 @@ export default async function RepresentationPage() {
 					className="mt-0.5 size-4 shrink-0 text-brass-deep"
 					aria-hidden="true"
 				/>
-				You choose your attorney. JustUs never assigns one, and never ranks them
-				for your case. Donations are paid to your attorney's firm, into an
+				You connect with your own attorney. JustUs never assigns one, and never
+				ranks them for your case. Donations are paid to your attorney's firm, into an
 				account opened for your case alone, and applied to your fee under their
 				state bar's trust rules. JustUs never holds the money.
 			</div>

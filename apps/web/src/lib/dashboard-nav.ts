@@ -133,7 +133,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Find an attorney",
 				icon: Gavel,
 				title: "Find an attorney",
-				sub: "Browse bar-verified attorneys and choose who represents you.",
+				sub: "Browse state bar-verified attorneys and connect with the one who fits.",
 			},
 			{
 				slug: "representation",

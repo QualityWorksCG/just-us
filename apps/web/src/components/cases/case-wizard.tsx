@@ -2131,8 +2131,9 @@ export function CaseWizard({
 									Do you have an attorney?
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
-									You always choose who represents you. Already found someone?
-									Add them. If not, we'll help you get in front of attorneys.
+									You connect with your own attorney directly. Already found
+									someone? Add them. If not, we'll help you get in front of
+									attorneys.
 								</p>
 
 								<div className="mt-8 grid gap-4 sm:grid-cols-2">
