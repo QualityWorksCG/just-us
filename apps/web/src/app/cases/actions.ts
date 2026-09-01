@@ -699,7 +699,7 @@ export async function commitCaseWithInviteAction(
 			ok: false,
 			caseId: id,
 			error: inviteeStates.length
-				? `That attorney is admitted in ${formatStates(inviteeStates)}, not ${rest.location}, so they couldn't confirm this case. Check the address, or choose an attorney admitted in ${rest.location}.`
+				? `That attorney is admitted in ${formatStates(inviteeStates)}, not ${rest.location}, so they couldn't confirm this case. Check the address, or connect with an attorney admitted in ${rest.location}.`
 				: `That attorney hasn't recorded any states they're admitted in yet, so they couldn't confirm a case in ${rest.location}. Ask them to add ${rest.location} to their JustUs profile first.`,
 		};
 	}

@@ -807,7 +807,7 @@ export function ManageCase({
 								</span>
 								<div>
 									<p className="font-bold text-[15px] text-ink">
-										{data.attorneyName || "No attorney chosen yet"}
+										{data.attorneyName || "No attorney connected yet"}
 									</p>
 									<p className="text-[12.5px] text-muted-foreground">
 										{data.attorneyName

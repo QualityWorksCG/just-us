@@ -30,7 +30,7 @@ const MAX_SHOWN = 6;
  */
 function caseBadge(c: AttorneyCase): { label: string; cls: string } {
 	if (c.status === "live") {
-		return { label: "Live", cls: "bg-green-soft text-green-deep" };
+		return { label: "Active", cls: "bg-green-soft text-green-deep" };
 	}
 	if (c.status === "closed") {
 		return { label: "Closed", cls: "bg-surface-2 text-ink-soft" };

@@ -24,7 +24,7 @@ const STEPS: { icon: LucideIcon; title: string; body: string }[] = [
 	},
 	{
 		icon: Scale,
-		title: "Choose your attorney",
+		title: "Connect with your attorney",
 		body: "Accept an interested one, or pick from the directory.",
 	},
 	{
@@ -41,7 +41,7 @@ const STEPS: { icon: LucideIcon; title: string; body: string }[] = [
 
 const ASSURANCES = [
 	"Free to start",
-	"You choose your attorney",
+	"You connect with your own attorney",
 	"Funds land in your account",
 ];
 
@@ -74,8 +74,8 @@ export default async function StartNewCasePage() {
 					Start a new case
 				</h2>
 				<p className="mt-2.5 max-w-[620px] text-[15px] text-ink-soft leading-relaxed">
-					Tell your story, choose your own attorney, and let the public fund
-					your day in court. Free to start. Nothing goes public until you
+					Tell your story, connect with your own attorney, and let the public
+					fund your day in court. Free to start. Nothing goes public until you
 					publish.
 				</p>
 			</div>

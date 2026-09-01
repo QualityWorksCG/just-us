@@ -113,7 +113,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Dashboard",
 				icon: LayoutDashboard,
 				title: "Your case dashboard",
-				sub: "One flow from start to finish: submit, choose your attorney, agree the fee, and raise it.",
+				sub: "One flow from start to finish: submit, connect with your own attorney, agree the fee, and raise it.",
 			},
 			{
 				slug: "cases",
@@ -174,7 +174,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Dashboard",
 				icon: LayoutDashboard,
 				title: "Dashboard",
-				sub: "Your caseload at a glance: what's live, what needs you, and what's raised.",
+				sub: "Your intakes at a glance: what's active, what needs you, and what's raised.",
 			},
 			{
 				slug: "cases",

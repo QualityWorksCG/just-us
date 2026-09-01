@@ -97,7 +97,7 @@ export function AttorneyDashboard({
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<Stat
 					icon={Briefcase}
-					label="Active cases"
+					label="Active intakes"
 					value={String(activeCases)}
 					sub={
 						activeCases === 0
@@ -114,7 +114,7 @@ export function AttorneyDashboard({
 				/>
 				<Stat
 					icon={TrendingUp}
-					label="Raised · all cases"
+					label="Raised · all intakes"
 					value={money(raisedCents)}
 					sub={`across ${raisedCasesCount} ${
 						raisedCasesCount === 1 ? "intake" : "intakes"
@@ -194,7 +194,7 @@ export function AttorneyDashboard({
 				<aside className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
 					<div className="flex items-center justify-between gap-2">
 						<h2 className="font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.08em]">
-							Your caseload
+							Your intakes
 						</h2>
 						<Link
 							href={"/my-cases" as Route}

@@ -218,7 +218,7 @@ export default async function MyCasesPage({
 					<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
 						{filter === "deleted"
 							? "Deleted cases stay here as a record. Deleting is permanent. A deleted case can't be restored."
-							: "Start your first case: tell your story, choose your attorney, and raise the agreed fee."}
+							: "Start your first case: tell your story, connect with your own attorney, and raise the agreed fee."}
 					</p>
 					{filter !== "deleted" && (
 						<Link
@@ -254,7 +254,7 @@ export default async function MyCasesPage({
 						const badge = isDeleted
 							? { text: "Deleted", dot: "bg-danger" }
 							: isLive
-								? { text: "Live", dot: "bg-success" }
+								? { text: "Active", dot: "bg-success" }
 								: isClosed
 									? { text: "Closed", dot: "bg-ink-soft" }
 									: invite

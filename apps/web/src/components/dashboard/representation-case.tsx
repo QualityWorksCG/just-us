@@ -550,7 +550,7 @@ function NoAttorneyPanel({ view }: { view: RepresentationView }) {
 		: isSeeking
 			? interested > 0
 				? "None of them can contact you. You reach out by choosing one, which sets your attorney and moves you on to agree the fee."
-				: "Bar-verified attorneys can see this case and put themselves forward. You'll see them here, and you can choose an attorney yourself at any time."
+				: "Bar-verified attorneys can see this case and put themselves forward. You'll see them here, and you can connect with an attorney yourself at any time."
 			: "Your case needs an attorney before it can name a fee or raise anything. Browse the directory, or publish it out to attorneys and let them come to you.";
 
 	const Icon = invited

@@ -1009,7 +1009,7 @@ export function CaseWizard({
 					</h1>
 					<p className="mx-auto mt-3 max-w-[460px] text-[15px] text-ink-soft leading-relaxed">
 						Bar-listed attorneys on JustUs can now review your case and request
-						to represent you. You choose who takes it on.
+						to represent you. You decide who takes it on.
 					</p>
 
 					<div className="mt-8 flex items-center justify-between gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 text-left shadow-[var(--shadow-rest)]">
@@ -1329,7 +1329,7 @@ export function CaseWizard({
 								<p className="text-[13px] text-muted-foreground">
 									{attorney
 										? `${attorney.firm} · ${attorney.area} · ${attorney.location}`
-										: "Choose your attorney in the previous step."}
+										: "Connect with your attorney in the previous step."}
 								</p>
 							</div>
 						</div>
@@ -2122,7 +2122,7 @@ export function CaseWizard({
 									className="mt-4 inline-flex items-center gap-1.5 font-semibold text-[13.5px] text-brass-deep transition-colors hover:text-brass"
 								>
 									<Search className="size-4" aria-hidden="true" />
-									Choose a different attorney
+									Connect with a different attorney
 								</button>
 							</>
 						) : step === 3 ? (
@@ -2373,7 +2373,7 @@ export function CaseWizard({
 												</h3>
 												<p className="mt-1 mb-4 flex-1 text-[13px] text-ink-soft leading-relaxed">
 													Don't want to wait? Browse the directory and message
-													attorneys who fit. You choose who to talk to.
+													attorneys who fit. You decide who to talk to.
 												</p>
 												<Button
 													type="button"
@@ -2694,7 +2694,7 @@ export function CaseWizard({
 												label: `Evidence attached (${evidence.length} item${evidence.length === 1 ? "" : "s"})`,
 												done: true,
 											},
-											{ label: "Attorney chosen · fee agreed", done: true },
+											{ label: "Attorney connected · fee agreed", done: true },
 											{
 												label: payoutReady
 													? `Payout account ready · ${payout?.attorney?.firmName ?? attorneyName}`

@@ -233,8 +233,8 @@ function NoCase() {
 				</span>
 				<p className="font-bold text-[16px] text-ink">Start your case</p>
 				<p className="max-w-[44ch] text-[13.5px] text-muted-foreground leading-relaxed">
-					Submit your story, choose your attorney, and raise the agreed fee. You
-					decide when it goes live.
+					Submit your story, connect with your own attorney, and raise the
+					agreed fee. You decide when it goes live.
 				</p>
 				<Link
 					href={"/cases/new" as Route}
@@ -280,7 +280,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 		{
 			ok: hasAttorney,
 			weight: 25,
-			tip: "Choose the attorney who'll represent you.",
+			tip: "Connect with the attorney who'll represent you.",
 		},
 		{
 			ok: hasGoal,
@@ -527,7 +527,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 									href={"/cases/new" as Route}
 									className={cn(buttonVariants(), "mt-4 w-full")}
 								>
-									Choose an attorney
+									Connect with an attorney
 									<ArrowRight data-icon="inline-end" aria-hidden="true" />
 								</Link>
 							</>
@@ -939,7 +939,7 @@ function StepTracker({
 	const isPending = status === "pending_payout";
 	const steps = [
 		{ label: "Submit your case", done: true },
-		{ label: "Choose your attorney", done: hasAttorney },
+		{ label: "Connect with your attorney", done: hasAttorney },
 		{ label: "Agree the fee", done: hasGoal },
 		{ label: "Go live", done: isLive },
 	];
@@ -954,9 +954,9 @@ function StepTracker({
 	let next: { text: string; href: Route; cta: string };
 	if (!hasAttorney)
 		next = {
-			text: "Choose who represents you.",
+			text: "Connect with your own attorney.",
 			href: resume,
-			cta: "Choose an attorney",
+			cta: "Connect with an attorney",
 		};
 	else if (!hasGoal)
 		next = {

@@ -236,7 +236,7 @@ export function PublicCaseView({
 							<div>
 								<p className="font-bold text-[15px] text-ink">{owner}</p>
 								<p className="font-mono text-[10.5px] text-muted-foreground uppercase tracking-[0.07em]">
-									Plaintiff · raising this case
+									Plaintiff · bringing this case
 								</p>
 							</div>
 						</div>
