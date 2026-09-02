@@ -10,11 +10,11 @@ import {
 	Flag,
 	Folder,
 	Gauge,
-	Heart,
+	Hand,
+	HandCoins,
 	Hourglass,
 	type LucideIcon,
 	Megaphone,
-	MessageCircle,
 	Scale,
 	Search,
 	Share2,
@@ -27,6 +27,8 @@ import {
 import type { Route } from "next";
 import Link from "next/link";
 import { toast } from "sonner";
+
+import { MessageAttorneyButton } from "@/components/messages/message-attorney-button";
 
 export type CaseSummary = {
 	id: string;
@@ -44,7 +46,15 @@ export type CaseSummary = {
 	attorneyFirm: string | null;
 	attorneyArea: string | null;
 	attorneyLocation: string | null;
+	/** Present only when the case is matched to a JustUs attorney account. */
+	attorneyId: string | null;
+	attorneyConversationId: string | null;
 	createdAt: string;
+	/** Attorneys who have expressed interest in representing this case and are
+	 *  still awaiting a decision (JUS-25). */
+	interestCount: number;
+	/** How many of those the plaintiff hasn't seen yet — the "new" badge. */
+	newInterestCount: number;
 };
 
 function readinessOf(c: CaseSummary) {
@@ -210,26 +220,21 @@ function EmptyState({
 }
 
 // No case row yet — the plaintiff hasn't started the wizard.
-function NoCase({ firstName }: { firstName: string }) {
+function NoCase() {
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Welcome, {firstName}
-				</h1>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					You haven't started a case yet. Tell us what happened and we'll take
-					it from there.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				You haven't started a case yet. Tell us what happened and we'll take it
+				from there.
+			</p>
 			<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface px-6 py-14 text-center shadow-[var(--shadow-rest)]">
 				<span className="flex size-12 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
 					<FilePlus2 className="size-6" aria-hidden="true" />
 				</span>
 				<p className="font-bold text-[16px] text-ink">Start your case</p>
 				<p className="max-w-[44ch] text-[13.5px] text-muted-foreground leading-relaxed">
-					Submit your story, choose your attorney, and raise the agreed fee —
-					you decide when it goes live.
+					Submit your story, connect with your own attorney, and raise the
+					agreed fee. You decide when it goes live.
 				</p>
 				<Link
 					href={"/cases/new" as Route}
@@ -243,31 +248,18 @@ function NoCase({ firstName }: { firstName: string }) {
 	);
 }
 
-export function PlaintiffDashboard({
-	name,
-	cases,
-}: {
-	name: string;
-	cases: CaseSummary[];
-}) {
-	const firstName = name.trim().split(" ")[0] || "there";
+export function PlaintiffDashboard({ cases }: { cases: CaseSummary[] }) {
 	const first = cases[0];
-	if (!first) return <NoCase firstName={firstName} />;
+	if (!first) return <NoCase />;
 	// A plaintiff can run several cases. With one, show the detailed view; with
 	// more, show a portfolio so nothing implies there's only a single case.
-	if (cases.length > 1)
-		return <CasesOverview firstName={firstName} cases={cases} />;
-	return <SingleCaseDashboard firstName={firstName} c={first} />;
+	if (cases.length > 1) return <CasesOverview cases={cases} />;
+	return <SingleCaseDashboard c={first} />;
 }
 
-function SingleCaseDashboard({
-	firstName,
-	c,
-}: {
-	firstName: string;
-	c: CaseSummary;
-}) {
+function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 	const isLive = c.status === "live";
+	const isSeeking = c.status === "seeking";
 	const goal = c.goalCents / 100;
 	const raised = c.raisedCents / 100;
 	const pct = goal > 0 ? Math.round((raised / goal) * 100) : 0;
@@ -288,7 +280,7 @@ function SingleCaseDashboard({
 		{
 			ok: hasAttorney,
 			weight: 25,
-			tip: "Choose the attorney who'll represent you.",
+			tip: "Connect with the attorney who'll represent you.",
 		},
 		{
 			ok: hasGoal,
@@ -298,12 +290,12 @@ function SingleCaseDashboard({
 		{
 			ok: c.hasCover,
 			weight: 15,
-			tip: "Add a cover image — campaigns with one raise far more.",
+			tip: "Add a cover image. Campaigns with one raise far more.",
 		},
 		{
 			ok: c.evidenceCount > 0,
 			weight: 10,
-			tip: "Attach evidence — optional, but it strengthens your case.",
+			tip: "Attach evidence. It's optional, but it strengthens your case.",
 		},
 	];
 	const readiness = checks.reduce((sum, x) => sum + (x.ok ? x.weight : 0), 0);
@@ -312,16 +304,11 @@ function SingleCaseDashboard({
 	return (
 		<div className="flex flex-col gap-6">
 			{/* Header */}
-			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Welcome back, {firstName}
-				</h1>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					{isLive
-						? "Your campaign is live — here's how it's going."
-						: "Your case at a glance — where it stands and what needs you next."}
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				{isLive
+					? "Your campaign is live. Here's how it's going."
+					: "Your case at a glance: where it stands and what needs you next."}
+			</p>
 
 			{/* Stat row — all values from the case row */}
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -333,13 +320,33 @@ function SingleCaseDashboard({
 					tone="green"
 					bar={pct}
 				/>
-				<StatCard
-					icon={Users}
-					label="Donors"
-					value={String(c.donorsCount)}
-					sub={c.donorsCount === 0 ? "no backers yet" : "backers so far"}
-					tone="cream"
-				/>
+				{/* A case still out to attorneys can't have donors — that slot is worth
+				    more showing who has put themselves forward. */}
+				{isSeeking && !hasAttorney ? (
+					<StatCard
+						icon={Hand}
+						label="Attorneys interested"
+						value={String(c.interestCount)}
+						sub={
+							c.interestCount === 0
+								? "none yet, though you can also choose one yourself"
+								: c.newInterestCount > 0
+									? `${c.newInterestCount} you haven't seen yet`
+									: "waiting on your decision"
+						}
+						tone="cream"
+					/>
+				) : (
+					<StatCard
+						icon={Users}
+						label="Donors"
+						value={String(c.donorsCount)}
+						sub={
+							c.donorsCount === 0 ? "no supporters yet" : "supporters so far"
+						}
+						tone="cream"
+					/>
+				)}
 				<StatCard
 					icon={Gauge}
 					label="Case readiness"
@@ -378,7 +385,7 @@ function SingleCaseDashboard({
 								Share campaign
 							</button>
 							<Link
-								href={`/dashboard/cases/${c.id}` as Route}
+								href={`/my-cases/${c.id}` as Route}
 								className={cn(
 									buttonVariants({ variant: "outline", size: "sm" }),
 									"h-9",
@@ -410,13 +417,13 @@ function SingleCaseDashboard({
 				{c.donorsCount === 0 && (
 					<p className="mt-3 text-[13px] text-muted-foreground">
 						{isLive
-							? "No donations yet — share your campaign to reach your first backer."
+							? "No donations yet. Share your campaign to reach your first supporter."
 							: "Donations start once your case is live."}
 					</p>
 				)}
 			</section>
 
-			<div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+			<div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 				{/* Left: next steps + updates */}
 				<div className="flex flex-col gap-5">
 					<StepTracker
@@ -431,7 +438,7 @@ function SingleCaseDashboard({
 						<EmptyState
 							icon={Megaphone}
 							title="No updates yet"
-							body="Once you're live, your attorney posts progress here — and backers get notified."
+							body="Once you're live, your attorney posts progress here, and supporters get notified."
 						/>
 					</section>
 				</div>
@@ -449,23 +456,62 @@ function SingleCaseDashboard({
 										{/* biome-ignore lint/style/noNonNullAssertion: hasAttorney guards it */}
 										{initials(c.attorneyName!)}
 									</span>
-									<div>
-										<p className="font-bold text-[15px] text-ink">
+									<div className="min-w-0">
+										<p className="truncate font-bold text-[15px] text-ink">
 											{c.attorneyName}
 										</p>
-										<p className="text-[12.5px] text-muted-foreground">
+										<p className="truncate text-[12.5px] text-muted-foreground">
 											{attorneyMeta}
 										</p>
 									</div>
 								</div>
-								<button
-									type="button"
-									onClick={() => toast.success("Messaging isn't wired up yet.")}
+								{c.attorneyId ? (
+									<MessageAttorneyButton
+										attorneyId={c.attorneyId}
+										attorneyName={c.attorneyName ?? "your attorney"}
+										caseId={c.id}
+										existingConversationId={c.attorneyConversationId}
+										className="mt-4 w-full"
+									/>
+								) : (
+									<p className="mt-4 text-[12.5px] text-muted-foreground">
+										Messaging is available when your attorney has a JustUs
+										account.
+									</p>
+								)}
+							</>
+						) : isSeeking ? (
+							/* Out to attorneys: what matters here is who has put themselves
+							   forward, which is the only thing that moves this case on. The
+							   plaintiff makes contact from the inbox — an attorney cannot
+							   reach them (JUS-25). */
+							<>
+								<div className="flex items-center gap-3">
+									<span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
+										<Hand className="size-4" aria-hidden="true" />
+									</span>
+									<div>
+										<p className="font-bold text-[15px] text-ink">
+											{c.interestCount === 0
+												? "No interest yet"
+												: `${c.interestCount} ${c.interestCount === 1 ? "attorney" : "attorneys"} interested`}
+										</p>
+										<p className="text-[12.5px] text-muted-foreground">
+											{c.interestCount === 0
+												? "your case is out to attorneys"
+												: c.newInterestCount > 0
+													? `${c.newInterestCount} you haven't seen yet`
+													: "you decide who to approach"}
+										</p>
+									</div>
+								</div>
+								<Link
+									href={`/my-cases/${c.id}/requests` as Route}
 									className={cn(buttonVariants(), "mt-4 w-full")}
 								>
-									<MessageCircle data-icon="inline-start" aria-hidden="true" />
-									Message {c.attorneyName?.split(" ")[0]}
-								</button>
+									{c.interestCount === 0 ? "View your case" : "Review interest"}
+									<ArrowRight data-icon="inline-end" aria-hidden="true" />
+								</Link>
 							</>
 						) : (
 							<>
@@ -481,7 +527,7 @@ function SingleCaseDashboard({
 									href={"/cases/new" as Route}
 									className={cn(buttonVariants(), "mt-4 w-full")}
 								>
-									Choose an attorney
+									Connect with an attorney
 									<ArrowRight data-icon="inline-end" aria-hidden="true" />
 								</Link>
 							</>
@@ -540,13 +586,13 @@ function SingleCaseDashboard({
 function TrustFooter() {
 	return (
 		<div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-border bg-surface/60 px-5 py-3.5 text-[12.5px] text-ink-soft leading-relaxed">
-			<Heart
+			<HandCoins
 				className="mt-0.5 size-4 shrink-0 text-brass-deep"
 				aria-hidden="true"
 			/>
-			Donations fund the agreed fee and land in your account — you pay the
-			attorney you chose. One transparent 5% fee, shown to each donor before
-			they give.
+			Donations fund the agreed fee and are paid to your attorney's firm, which
+			applies them to that fee. You never have to handle the money. One
+			transparent 5% fee, shown to each donor before they give.
 		</div>
 	);
 }
@@ -554,13 +600,7 @@ function TrustFooter() {
 // Portfolio view for plaintiffs running more than one case: aggregate totals up
 // top, then every case listed with its own status so none of it reads as "your
 // one case".
-function CasesOverview({
-	firstName,
-	cases,
-}: {
-	firstName: string;
-	cases: CaseSummary[];
-}) {
+function CasesOverview({ cases }: { cases: CaseSummary[] }) {
 	const totalRaised = cases.reduce((s, c) => s + c.raisedCents, 0) / 100;
 	const totalGoal = cases.reduce((s, c) => s + c.goalCents, 0) / 100;
 	const totalDonors = cases.reduce((s, c) => s + c.donorsCount, 0);
@@ -569,14 +609,9 @@ function CasesOverview({
 
 	return (
 		<div className="flex flex-col gap-6">
-			<div>
-				<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
-					Welcome back, {firstName}
-				</h1>
-				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					You have {cases.length} cases — here's your portfolio at a glance.
-				</p>
-			</div>
+			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+				You have {cases.length} cases. Here's your portfolio at a glance.
+			</p>
 
 			{/* Totals across every case */}
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -596,14 +631,14 @@ function CasesOverview({
 					icon={Users}
 					label="Total donors"
 					value={String(totalDonors)}
-					sub={totalDonors === 0 ? "no backers yet" : "across all cases"}
+					sub={totalDonors === 0 ? "no supporters yet" : "across all cases"}
 					tone="cream"
 				/>
 				<StatCard
 					icon={Megaphone}
 					label="Live campaigns"
 					value={String(liveCount)}
-					sub={liveCount === 0 ? "none live yet" : "raising right now"}
+					sub={liveCount === 0 ? "none live yet" : "funding right now"}
 					tone="dark"
 				/>
 				<StatCard
@@ -616,7 +651,7 @@ function CasesOverview({
 			</div>
 
 			{/* Your cases (top 3) beside the attorneys card */}
-			<div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+			<div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 				<section className="flex flex-col rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">
 					<div className="mb-2 flex items-center justify-between">
 						<h2 className="font-bold text-ink text-lg">Your cases</h2>
@@ -630,7 +665,7 @@ function CasesOverview({
 						))}
 					</ul>
 					<Link
-						href={"/dashboard/cases" as Route}
+						href={"/my-cases" as Route}
 						className="mt-3 inline-flex items-center justify-center gap-1 border-border border-t pt-4 font-semibold text-[13px] text-brass-deep hover:underline"
 					>
 						{cases.length > 3
@@ -655,7 +690,7 @@ function CasesOverview({
 					</div>
 					{cases.length > 3 && (
 						<Link
-							href={"/dashboard/cases" as Route}
+							href={"/my-cases" as Route}
 							className="mt-4 inline-flex items-center justify-center gap-1 border-border border-t pt-4 font-semibold text-[13px] text-brass-deep hover:underline"
 						>
 							View all {cases.length} cases
@@ -671,7 +706,7 @@ function CasesOverview({
 				<EmptyState
 					icon={Megaphone}
 					title="No updates yet"
-					body="Once your cases are live, updates from each attorney appear here — each tagged with the case it belongs to."
+					body="Once your cases are live, updates from each attorney appear here, each tagged with the case it belongs to."
 				/>
 			</section>
 
@@ -683,6 +718,8 @@ function CasesOverview({
 function CaseRow({ c }: { c: CaseSummary }) {
 	const isLive = c.status === "live";
 	const isSeeking = c.status === "seeking";
+	const isClosed = c.status === "closed";
+	const isPending = c.status === "pending_payout";
 	const goal = c.goalCents / 100;
 	const raised = c.raisedCents / 100;
 	const pct = goal > 0 ? Math.round((raised / goal) * 100) : 0;
@@ -691,32 +728,57 @@ function CaseRow({ c }: { c: CaseSummary }) {
 
 	const badge = isLive
 		? {
-				text: "Live · Raising",
+				text: "Active Case",
 				cls: "bg-green-soft text-green-deep",
 				dot: "bg-success",
 			}
-		: isSeeking
+		: isClosed
 			? {
-					text: "Seeking attorney",
-					cls: "bg-brass-wash text-brass-deep",
-					dot: "bg-brass-deep",
-				}
-			: {
-					text: "Draft",
+					text: "Closed",
 					cls: "bg-surface-2 text-ink-soft",
 					dot: "bg-ink-soft",
-				};
-
-	// Drafts resume in the wizard; live cases open Manage; seeking opens requests.
-	const href = (
-		isLive
-			? `/dashboard/cases/${c.id}`
+				}
 			: isSeeking
-				? `/dashboard/cases/${c.id}/requests`
-				: `/cases/new?draft=${c.id}`
+				? {
+						// The count is on the badge because it's the one thing on this row
+						// that needs the plaintiff, and the row is otherwise inert.
+						text:
+							c.interestCount > 0
+								? `${c.interestCount} interested`
+								: "Seeking attorney",
+						cls: "bg-brass-wash text-brass-deep",
+						dot: "bg-brass-deep",
+					}
+				: isPending
+					? {
+							text: "Awaiting firm",
+							cls: "bg-gold-bright/20 text-gold-bright-ink",
+							dot: "bg-gold-bright",
+						}
+					: {
+							text: "Draft",
+							cls: "bg-surface-2 text-ink-soft",
+							dot: "bg-ink-soft",
+						};
+
+	// Drafts resume in the wizard; live/closed open Manage; seeking opens requests.
+	const href = (
+		isLive || isClosed
+			? `/my-cases/${c.id}`
+			: isSeeking
+				? `/my-cases/${c.id}/requests`
+				: isPending
+					? `/cases/new?draft=${c.id}`
+					: `/cases/new?draft=${c.id}`
 	) as Route;
 
-	const cta = isLive ? "Manage" : isSeeking ? "Requests" : "Continue";
+	const cta = isLive
+		? "Manage"
+		: isClosed
+			? "View"
+			: isSeeking
+				? "Requests"
+				: "Continue";
 
 	return (
 		<li>
@@ -741,10 +803,12 @@ function CaseRow({ c }: { c: CaseSummary }) {
 					</p>
 					<p className="truncate text-[12px] text-muted-foreground">
 						{meta}
-						{isLive
+						{isLive || isClosed
 							? ` · ${money(raised)} of ${money(goal)} · ${pct}%`
 							: isSeeking
-								? " · out to attorneys"
+								? c.newInterestCount > 0
+									? ` · ${c.newInterestCount} new to review`
+									: " · out to attorneys"
 								: ` · ${readiness}% ready`}
 					</p>
 				</div>
@@ -779,32 +843,46 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 				{initials(attorneyName)}
 			</span>
 		);
-		action = (
-			<button
-				type="button"
-				onClick={() => toast.success("Messaging isn't wired up yet.")}
-				className={cn(buttonVariants({ size: "sm" }), "h-9 shrink-0")}
-			>
-				<MessageCircle data-icon="inline-start" aria-hidden="true" />
-				Message
-			</button>
+		action = c.attorneyId ? (
+			<MessageAttorneyButton
+				attorneyId={c.attorneyId}
+				attorneyName={attorneyName}
+				caseId={c.id}
+				existingConversationId={c.attorneyConversationId}
+				className="w-full justify-center sm:w-auto"
+			/>
+		) : (
+			<span className="text-[12px] text-muted-foreground leading-snug sm:max-w-32 sm:text-right">
+				Not on JustUs messaging
+			</span>
 		);
 	} else if (isSeeking) {
-		heading = "Seeking representation";
+		const interested = c.interestCount;
+		heading =
+			interested > 0
+				? `${interested} ${interested === 1 ? "attorney" : "attorneys"} interested`
+				: "Seeking representation";
 		avatar = (
 			<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
-				<Hourglass className="size-5" aria-hidden="true" />
+				{interested > 0 ? (
+					<Hand className="size-5" aria-hidden="true" />
+				) : (
+					<Hourglass className="size-5" aria-hidden="true" />
+				)}
 			</span>
 		);
 		action = (
 			<Link
-				href={`/dashboard/cases/${c.id}/requests` as Route}
+				href={`/my-cases/${c.id}/requests` as Route}
 				className={cn(
-					buttonVariants({ variant: "outline", size: "sm" }),
-					"h-9 shrink-0",
+					buttonVariants({
+						variant: interested > 0 ? "default" : "outline",
+						size: "sm",
+					}),
+					"h-9 w-full justify-center sm:w-auto",
 				)}
 			>
-				Review requests
+				{interested > 0 ? "Review interest" : "View case"}
 				<ArrowRight data-icon="inline-end" aria-hidden="true" />
 			</Link>
 		);
@@ -820,7 +898,7 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 				href={`/cases/new?draft=${c.id}` as Route}
 				className={cn(
 					buttonVariants({ variant: "outline", size: "sm" }),
-					"h-9 shrink-0",
+					"h-9 w-full justify-center sm:w-auto",
 				)}
 			>
 				<Search data-icon="inline-start" aria-hidden="true" />
@@ -829,17 +907,21 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 		);
 	}
 
+	// Stacks on the narrowest screens so the (wide) action never has to fight the
+	// case text for room; side by side once there's space.
 	return (
-		<div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface-2/40 p-3">
-			{avatar}
-			<div className="min-w-0 flex-1">
-				<p className="truncate font-bold text-[14px] text-ink">{heading}</p>
-				<p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-					<Folder className="size-3.5 shrink-0" aria-hidden="true" />
-					<span className="truncate">{caseTitle}</span>
-				</p>
+		<div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface-2/40 p-3 sm:flex-row sm:items-center">
+			<div className="flex min-w-0 items-center gap-3 sm:flex-1">
+				{avatar}
+				<div className="min-w-0 flex-1">
+					<p className="truncate font-bold text-[14px] text-ink">{heading}</p>
+					<p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+						<Folder className="size-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">{caseTitle}</span>
+					</p>
+				</div>
 			</div>
-			{action}
+			<div className="sm:shrink-0">{action}</div>
 		</div>
 	);
 }
@@ -856,9 +938,12 @@ function StepTracker({
 	hasGoal: boolean;
 }) {
 	const isLive = status === "live";
+	// Finished and sent, waiting on the firm's payout account. The last step is
+	// underway rather than untouched, and it is not the plaintiff's to finish.
+	const isPending = status === "pending_payout";
 	const steps = [
 		{ label: "Submit your case", done: true },
-		{ label: "Choose your attorney", done: hasAttorney },
+		{ label: "Connect with your attorney", done: hasAttorney },
 		{ label: "Agree the fee", done: hasGoal },
 		{ label: "Go live", done: isLive },
 	];
@@ -867,15 +952,15 @@ function StepTracker({
 
 	// Resume this case's wizard while it's in progress; once live, manage it.
 	const resume = `/cases/new?draft=${caseId}` as Route;
-	const manage = `/dashboard/cases/${caseId}` as Route;
+	const manage = `/my-cases/${caseId}` as Route;
 
 	// The one thing that needs the plaintiff next — always with somewhere to go.
 	let next: { text: string; href: Route; cta: string };
 	if (!hasAttorney)
 		next = {
-			text: "Choose who represents you.",
+			text: "Connect with your own attorney.",
 			href: resume,
-			cta: "Choose an attorney",
+			cta: "Connect with an attorney",
 		};
 	else if (!hasGoal)
 		next = {
@@ -885,9 +970,17 @@ function StepTracker({
 		};
 	else if (isLive)
 		next = {
-			text: "Your campaign is live — keep sharing to reach your goal.",
+			text: "Your campaign is live. Keep sharing to reach your goal.",
 			href: manage,
 			cta: "Manage your case",
+		};
+	else if (isPending)
+		// The only state where the next move is not theirs. Say so plainly rather
+		// than offering a "finish your case" they cannot finish.
+		next = {
+			text: "Your case is ready and private. It goes public as soon as your attorney's payout account can receive donations.",
+			href: manage,
+			cta: "Check payout setup",
 		};
 	else
 		next = {

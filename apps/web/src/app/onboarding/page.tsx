@@ -1,18 +1,45 @@
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import { requireVerifiedSession } from "@/lib/auth-server";
+import { safeNextPath } from "@/lib/next-path";
 
 export const metadata = { title: "Welcome" };
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+	searchParams,
+}: {
+	searchParams: Promise<{ next?: string }>;
+}) {
 	// Verified session required, but NOT requireOnboarded — this is the page that
 	// completes onboarding, so gating on it would loop.
 	const session = await requireVerifiedSession();
 
+	// Sent here mid-way through something else — a case invitation, typically,
+	// which is unanswerable until onboarding is done. Honoured on the way out and
+	// for someone who is already onboarded, so neither ends on a dashboard with no
+	// route back. Same-site paths only; see `safeNextPath`.
+	const { next } = await searchParams;
+	const destination = safeNextPath(next);
+
 	if ((session.user as { onboarded?: boolean }).onboarded) {
-		redirect("/dashboard");
+		redirect((destination ?? "/home") as Route);
 	}
 
-	return <OnboardingFlow name={session.user.name} />;
+	// An attorney invited to a case has their account created as an attorney
+	// (createInvitedAttorneyAccount); every other pre-onboarding account defaults to
+	// "donor". So an attorney role at this point means it was set by the invite, not
+	// chosen here — lock it, so onboarding can't let them pick the wrong role and
+	// strand the invitation on an unrecoverable account.
+	const currentRole = (session.user as { role?: string }).role;
+	const lockedRole = currentRole === "attorney" ? "attorney" : undefined;
+
+	return (
+		<OnboardingFlow
+			name={session.user.name}
+			next={destination}
+			lockedRole={lockedRole}
+		/>
+	);
 }

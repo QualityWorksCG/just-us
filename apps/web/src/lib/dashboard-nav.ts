@@ -9,29 +9,37 @@ import {
 	Compass,
 	Folder,
 	Gavel,
-	HeartHandshake,
+	HandCoins,
 	Inbox,
 	LayoutDashboard,
 	type LucideIcon,
 	Megaphone,
 	MessageSquare,
+	Receipt,
 	Scale,
 	ScrollText,
 	Settings,
 	ShieldAlert,
-	ShieldCheck,
 	SlidersHorizontal,
 	TrendingUp,
 	Users,
 } from "lucide-react";
 
 export type NavItem = {
-	/** Path segment after /dashboard; "" is the role home. */
+	/** The screen's identity, used to look it up and to key the sidebar. "" is the
+	 *  role home. Not the URL — see `path`. */
 	slug: string;
 	label: string;
 	icon: LucideIcon;
 	title: string;
 	sub: string;
+	/**
+	 * URL for this screen, when it isn't simply `/<slug>`. App screens live at the
+	 * top level rather than behind a shared prefix, which means a couple of them
+	 * would otherwise claim a path the public site already owns — so those say
+	 * where they really live instead. Read it through `navPath`, never directly.
+	 */
+	path?: string;
 	/**
 	 * Gate this screen behind a feature flag (JUS-13). Absent means always shown.
 	 * The flag hides the nav entry AND the route rejects when off — see
@@ -49,36 +57,50 @@ export type RoleNav = {
 
 export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 	donor: {
-		eyebrow: "DONOR",
-		roleLabel: "Donor",
+		eyebrow: "JustUs Member",
+		roleLabel: "JustUs Member",
 		items: [
 			{
 				slug: "",
-				label: "Browse cases",
+				label: "Dashboard",
+				icon: LayoutDashboard,
+				title: "Your giving dashboard",
+				sub: "Your giving at a glance. Here's the difference you're making.",
+			},
+			{
+				slug: "discover",
+				label: "Discover Profiles",
 				icon: Compass,
-				title: "Browse cases",
-				sub: "Every case here has a bar-verified attorney the plaintiff chose, and an agreed fee. Donations are gifts.",
+				title: "Discover cases",
+				sub: "Find a case that matters to you: save it, share it, or support it today.",
 			},
 			{
 				slug: "saved",
-				label: "Saved cases",
+				label: "Saved",
 				icon: Bookmark,
 				title: "Saved cases",
-				sub: "Cases you've saved to come back to.",
+				sub: "",
 			},
 			{
 				slug: "donations",
 				label: "My donations",
-				icon: HeartHandshake,
+				icon: HandCoins,
 				title: "My donations",
-				sub: "Every case you've backed, with its latest status.",
+				sub: "Every gift you've given, and the causes behind them.",
+			},
+			{
+				slug: "updates",
+				label: "Updates",
+				icon: Megaphone,
+				title: "Updates",
+				sub: "Automated updates from independent representatives and system events.",
 			},
 			{
 				slug: "settings",
 				label: "Profile & settings",
 				icon: Settings,
 				title: "Profile & settings",
-				sub: "Manage your account, notifications, and privacy.",
+				sub: "Manage your account details and privacy.",
 			},
 		],
 	},
@@ -91,21 +113,27 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Dashboard",
 				icon: LayoutDashboard,
 				title: "Your case dashboard",
-				sub: "One flow from start to finish: submit, choose your attorney, agree the fee, and raise it.",
+				sub: "One flow from start to finish: submit, connect with your own attorney, agree the fee, and raise it.",
 			},
 			{
 				slug: "cases",
+				// `/cases` is the public browse-cases page, so the plaintiff's own
+				// cases live at `/my-cases`.
+				path: "/my-cases",
 				label: "My cases",
 				icon: Folder,
 				title: "My cases",
-				sub: "Every case you've started — draft, raising, or resolved.",
+				sub: "Every case you've started: draft, raising, or resolved.",
 			},
 			{
 				slug: "attorneys",
+				// `/attorneys` is the public directory. This is the same directory
+				// inside the app shell, so it needs a path of its own.
+				path: "/find-attorney",
 				label: "Find an attorney",
 				icon: Gavel,
 				title: "Find an attorney",
-				sub: "Browse bar-verified attorneys and choose who represents you.",
+				sub: "Browse state bar-verified attorneys and connect with the one who fits.",
 			},
 			{
 				slug: "representation",
@@ -129,18 +157,11 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				sub: "Your conversation with your attorney.",
 			},
 			{
-				slug: "verification",
-				label: "Verification",
-				icon: ShieldCheck,
-				title: "Verification",
-				sub: "Verify your identity so your case can be listed and funded.",
-			},
-			{
 				slug: "settings",
 				label: "Profile & settings",
 				icon: Settings,
 				title: "Profile & settings",
-				sub: "Manage your account, notifications, and privacy.",
+				sub: "Manage your account details and privacy.",
 			},
 		],
 	},
@@ -150,17 +171,30 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 		items: [
 			{
 				slug: "",
-				label: "Representation queue",
-				icon: Inbox,
-				title: "Representation queue",
-				sub: "Plaintiffs seeking representation in your jurisdiction and practice areas.",
+				label: "Dashboard",
+				icon: LayoutDashboard,
+				title: "Dashboard",
+				sub: "Your intakes at a glance: what's active, what needs you, and what's raised.",
 			},
 			{
 				slug: "cases",
-				label: "My cases",
+				// Shares `/my-cases` with the plaintiff screen of the same name; that
+				// route serves each role its own view.
+				path: "/my-cases",
+				label: "My intakes",
 				icon: Briefcase,
-				title: "My cases",
-				sub: "Cases matched to you — detail, evidence, and funding.",
+				title: "My intakes",
+				sub: "Intakes matched to you: detail, evidence, and funding.",
+			},
+			{
+				slug: "queue",
+				label: "Intake requests",
+				icon: Inbox,
+				title: "Intake requests",
+				// Says "browse and filter" rather than promising the queue is already
+				// narrowed to this attorney: nothing is filtered unless they ask, so
+				// they can see every intake that needs someone (JUS-25).
+				sub: "Intakes matched to you, plus open cases seeking an attorney. You decide who to put yourself forward for.",
 			},
 			{
 				slug: "messages",
@@ -181,7 +215,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Profile & settings",
 				icon: Settings,
 				title: "Profile & settings",
-				sub: "Manage your account, notifications, and privacy.",
+				sub: "Manage your account details and privacy.",
 			},
 		],
 	},
@@ -211,6 +245,13 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				sub: "Every case on the platform and its funding status.",
 			},
 			{
+				slug: "revenue",
+				label: "Revenue",
+				icon: Receipt,
+				title: "Revenue & donations",
+				sub: "Platform-fee revenue and donation activity across the platform.",
+			},
+			{
 				slug: "users",
 				label: "Users",
 				icon: Users,
@@ -231,7 +272,7 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Investors",
 				icon: TrendingUp,
 				title: "Investors",
-				sub: "Investor accounts and the cases they are backing.",
+				sub: "Investor accounts and the cases they are supporting.",
 				flag: "investorTrack",
 			},
 			{
@@ -246,11 +287,65 @@ export const DASHBOARD_NAV: Record<Role, RoleNav> = {
 				label: "Profile & settings",
 				icon: Settings,
 				title: "Profile & settings",
-				sub: "Manage your account, notifications, and privacy.",
+				sub: "Manage your account details and privacy.",
 			},
 		],
 	},
 };
+
+/** Where every signed-in user starts. Each role's home renders different
+ *  content, but they share one URL — `/` belongs to the marketing site. */
+export const HOME_PATH = "/home";
+
+/**
+ * The URL for a nav item. `/<slug>` for most screens, `HOME_PATH` for the role
+ * home, or the item's own `path` where the obvious name is already taken by a
+ * public page.
+ *
+ * Everything that links to a screen goes through this, so the sidebar and the
+ * routes can't disagree about where a screen lives.
+ */
+export function navPath(item: NavItem): string {
+	if (item.path) return item.path;
+	return item.slug ? `/${item.slug}` : HOME_PATH;
+}
+
+/**
+ * The nav item a URL belongs to, for highlighting the sidebar. Matches the
+ * longest path first, so `/my-cases/abc/requests` resolves to the My cases entry
+ * rather than to whichever item happens to be checked first.
+ */
+export function findScreenByPath(
+	role: Role | string | null | undefined,
+	pathname: string,
+): NavItem | undefined {
+	const items = [...getRoleNav(role).items].sort(
+		(a, b) => navPath(b).length - navPath(a).length,
+	);
+	return items.find((item) => {
+		const path = navPath(item);
+		return pathname === path || pathname.startsWith(`${path}/`);
+	});
+}
+
+/**
+ * Every top-level path the app shell owns.
+ *
+ * The marketing header uses this to stay out of the way. It already hides itself
+ * for a signed-in user, but the client session arrives a beat after the first
+ * paint — without this the marketing header would flash across an app screen on
+ * every hard load, which is what the old `/dashboard` prefix used to prevent for
+ * free.
+ */
+export const APP_PATHS: string[] = [
+	...new Set(
+		Object.values(DASHBOARD_NAV).flatMap((nav) => nav.items.map(navPath)),
+	),
+	// Not a nav entry: the attorney's case view, reached from the queue (JUS-25).
+	"/queue",
+	// Not a nav entry: the full notification list, reached from the header bell.
+	"/notifications",
+];
 
 const FALLBACK_ROLE: Role = "donor";
 

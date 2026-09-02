@@ -1,0 +1,178 @@
+// Where donated money goes.
+//
+// JustUs never takes custody: a donation is a Stripe Connect *destination
+// charge*, so the full amount transfers to the recipient's connected account and
+// only the platform fee comes back to us. That part of the promise (terms §4) is
+// true regardless of who the recipient is. This file holds the account money
+// lands in; the donation ledger itself is `Donation` in case.prisma, next to the
+// case it funds.
+//
+// **The recipient is the representing law firm's operating account.** Donations
+// land in the business checking account of the firm that represents the case, and
+// the attorney moves them into their own IOLTA/trust account as an advance of
+// fees under their state bar's rules. Two things follow, and both are why this is
+// the model rather than paying the plaintiff:
+//
+//   - The platform never routes crowd-raised legal fees to a private individual,
+//     which is what created the liability the previous model carried.
+//   - The trust-accounting obligation lands where the professional duty already
+//     is — with the attorney, under bar supervision — instead of on JustUs.
+//
+// A trust account is deliberately *not* what Stripe is pointed at: IOLTA accounts
+// carry restrictions banks reject an automated debit relationship against, so the
+// operating account is both the compliant and the technically viable destination.
+// To Stripe this is an ordinary business receiving funds — an EIN, a firm name,
+// and a business checking account through the standard hosted flow.
+
+/// A Stripe Connect (Express) account donations can be sent to — the law firm's
+/// operating account, held by the attorney who onboarded it.
+///
+/// **One account per case, not per person and not per firm.** A firm running three
+/// cases onboards three times and holds three `acct_…` ids. That is more work for the
+/// attorney than a single firm-wide account, and it is deliberate:
+///
+///   - **Funds never mix.** Each case's donations land in their own balance, so a
+///     chargeback or refund on one case cannot be taken out of another case's money.
+///     Sharing a balance means one donor's dispute reduces a different client's fund.
+///   - **Separate bank routing.** Each account carries its own external bank account,
+///     so a firm can route one case's funds to one internal account and another's
+///     elsewhere. A single connected account has one destination and no way to split.
+///   - **Clean per-case accounting** on Stripe's side as well as ours, with no
+///     reconciling of one balance against our ledger to work out whose money is whose.
+///
+/// The cost is a full Stripe onboarding — identity, EIN, bank account, review — per
+/// case, and an Express dashboard per case rather than one. That is accepted as the
+/// price of the isolation above.
+///
+/// Held by a `User` because the account is opened by a verifiable individual: an
+/// attorney with a bar number on file, who bears the professional obligation for the
+/// money afterwards.
+///
+/// Every column except `stripeAccountId` is a **cache of Stripe's own view**,
+/// written only by the `account.updated` webhook and the initial create call.
+/// Nothing here is form-editable, because anyone who could set `chargesEnabled`
+/// themselves could open donations against an account that cannot receive them.
+model PayoutAccount {
+  id String @id @default(cuid())
+
+  /// The case this account was opened for. Unique — one account per case — and the
+  /// **resume key**: an attorney who abandons the hosted flow and comes back must land
+  /// on the account already created for this case, not a second one.
+  ///
+  /// Deliberately distinct from `Case.payoutAccountId`, which is the destination the
+  /// case is *bound* to. The two point at each other in the ordinary path and differ
+  /// in exactly the two situations that need the distinction: between creating an
+  /// account and opening donations (created, not yet bound), and after a change of
+  /// counsel, where the new firm's account is opened while the old one still holds
+  /// what was already raised.
+  ///
+  /// Nullable only for accounts predating per-case onboarding — one firm-wide account
+  /// with cases already bound to it. Every account created from now on has one.
+  /// `SetNull`, not `Cascade`: a hard-deleted case must not take an account that
+  /// received real money with it.
+  case   Case?   @relation("PayoutAccountCase", fields: [caseId], references: [id], onDelete: SetNull)
+  caseId String? @unique
+
+  /// The attorney who onboarded and holds this account. **Not unique** — one attorney
+  /// holds one of these per case they represent.
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// Stripe's `acct_…` id. The only column not derived from Stripe.
+  stripeAccountId String @unique
+
+  /// Nothing is outstanding on Stripe's side — derived from there being no
+  /// requirement entry awaiting the holder. Deliberately separate from
+  /// `transfersEnabled`: someone can complete the hosted flow and still be held
+  /// for review, so this answers "should we keep nagging them" while
+  /// `transfersEnabled` answers "can a case take money". Conflating the two opens
+  /// donations against an account that cannot receive them.
+  detailsSubmitted Boolean @default(false)
+  /// **The donation gate.** Nothing may be charged toward a case whose bound
+  /// account does not have this true.
+  ///
+  /// Mirrors the Accounts v2 `recipient` capability
+  /// `stripe_balance.stripe_transfers` — the one that lets an account *receive* a
+  /// destination transfer. Deliberately not "charges enabled": these accounts
+  /// never charge anyone. JustUs is the merchant of record and the recipient only
+  /// receives, which is why the `recipient` configuration is requested and
+  /// `merchant` is not.
+  transfersEnabled Boolean @default(false)
+  /// Whether Stripe will pay the balance out to their bank
+  /// (`stripe_balance.payouts`). False here means money can still arrive and
+  /// simply sits in the Stripe balance — worth surfacing to the holder, but it
+  /// does not block donations. Read-only: unlike transfers, it cannot be
+  /// requested at creation, only observed.
+  payoutsEnabled   Boolean @default(false)
+
+  /// When Stripe last told us about this account. A stale timestamp next to a
+  /// half-onboarded account is how a stuck recipient becomes visible instead of
+  /// silently never receiving money.
+  syncedAt DateTime?
+
+  /// Cases *bound* to this account as their destination. A list rather than one
+  /// because the legacy firm-wide accounts still carry several; every account created
+  /// per-case has exactly the one it was opened for.
+  cases Case[] @relation("CasePayoutDestination")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  /// "Every account this attorney holds" — the settings screen's query, and what the
+  /// nudge counts. Indexed rather than unique since per-case onboarding: Postgres does
+  /// not index foreign keys on its own.
+  @@index([userId])
+  @@map("payout_account")
+}
+
+/// Who a given case pays out to.
+///
+/// **Only `attorney` is written now.** Donations go to the operating account of the
+/// firm representing the case; the attorney moves them into trust themselves.
+///
+///   attorney  — the matched attorney's firm receives. The only value new binds write.
+///   plaintiff — **historical.** Paying the case owner directly was the model until
+///               the pivot to firm operating accounts. Rows already bound this way
+///               keep it: donors were shown that recipient before they gave, and
+///               rewriting the column would make a delivered disclosure retroactively
+///               false. Nothing writes it any more, and `bindCasePayout` cannot.
+///
+/// This is the value the **donor-facing disclosure reads from**. A donor is told who
+/// receives before they confirm, so it must be set and stated, never inferred at
+/// render time — and a legacy `plaintiff` case must keep telling the truth about
+/// itself rather than inheriting the new wording.
+enum PayoutRecipient {
+  plaintiff
+  attorney
+}
+
+/// Lifecycle of a donation.
+///
+///   pending   — Checkout Session created, donor has not finished paying. The row
+///               exists from this moment so a completed payment always has a row
+///               to land on, rather than the webhook inventing one.
+///   succeeded — payment captured; the only state that counts toward
+///               `Case.raisedCents`.
+///   failed    — the donor's payment did not go through, or they abandoned it.
+///   refunded  — captured then returned, in full or in part.
+enum DonationStatus {
+  pending
+  succeeded
+  failed
+  refunded
+}
+
+/// Outcome of the donor acknowledgement for one donation — see
+/// `DonationAcknowledgement`.
+///
+///   sent    — handed to the email provider and accepted.
+///   skipped — deliberately not sent, and why is on the row. A guest checkout
+///             that yielded no email is the usual cause; there is nowhere to
+///             send, and that is a fact about the donation, not a failure.
+///   failed  — the provider rejected it. Terminal: the reservation is already
+///             taken, so nothing retries on its own.
+enum DonationAcknowledgementStatus {
+  sent
+  skipped
+  failed
+}

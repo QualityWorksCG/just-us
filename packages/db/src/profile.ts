@@ -1,0 +1,112 @@
+import prisma from "./index";
+
+const JURISDICTION_ROLE_SET = new Set(["plaintiff", "attorney"]);
+
+export class ProfileAccessError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "ProfileAccessError";
+	}
+}
+
+export type ProfileUpdate = {
+	/** Always derived from the authenticated session by the server action. */
+	userId: string;
+	name: string;
+	/** Undefined preserves the current state; null intentionally clears it. */
+	jurisdiction?: string | null;
+	/** Undefined preserves the current image; null removes it. */
+	image?: string | null;
+};
+
+/** The account details displayed on the self-service settings page. */
+export async function getOwnProfile(userId: string) {
+	return prisma.user.findUnique({
+		where: { id: userId },
+		select: {
+			id: true,
+			name: true,
+			email: true,
+			emailVerified: true,
+			image: true,
+			role: true,
+			jurisdiction: true,
+			donationsAnonymous: true,
+			createdAt: true,
+		},
+	});
+}
+
+/** Set whether this account's donations appear as "Anonymous" on public supporter
+ *  lists. Scoped to the signed-in user's own row. */
+export async function setDonationAnonymous(userId: string, anonymous: boolean) {
+	return prisma.user.update({
+		where: { id: userId },
+		data: { donationsAnonymous: anonymous },
+	});
+}
+
+/** Updates only the row identified by the signed-in user's id. */
+export async function updateOwnProfile(input: ProfileUpdate) {
+	return prisma.$transaction(async (tx) => {
+		const current = await tx.user.findUnique({
+			where: { id: input.userId },
+			select: { id: true, role: true, jurisdiction: true, image: true },
+		});
+
+		if (!current) {
+			throw new ProfileAccessError("Your account could not be found.");
+		}
+
+		if (
+			input.jurisdiction !== undefined &&
+			!JURISDICTION_ROLE_SET.has(current.role)
+		) {
+			throw new ProfileAccessError(
+				"Jurisdiction is not available for this account type.",
+			);
+		}
+
+		// The primary state has to be one the attorney actually holds an admission
+		// in. This used to be a free text column that settings could set to any state
+		// on the list, which is now a way to make `User.jurisdiction` disagree with the
+		// admissions every matching gate reads — and the disagreeing value is the one
+		// the directory would show. Where they practise is managed on the directory
+		// profile; this only chooses which of those states leads.
+		if (input.jurisdiction) {
+			const admission = await tx.attorneyAdmission.findUnique({
+				where: {
+					userId_state: { userId: input.userId, state: input.jurisdiction },
+				},
+				select: { id: true },
+			});
+			if (!admission) {
+				throw new ProfileAccessError(
+					`Add ${input.jurisdiction} to the states you practise in first — you can do that on your directory profile.`,
+				);
+			}
+		}
+
+		const profile = await tx.user.update({
+			where: { id: input.userId },
+			data: {
+				name: input.name,
+				...(input.jurisdiction !== undefined
+					? { jurisdiction: input.jurisdiction }
+					: {}),
+				...(input.image !== undefined ? { image: input.image } : {}),
+			},
+			select: {
+				id: true,
+				name: true,
+				image: true,
+				jurisdiction: true,
+			},
+		});
+
+		return {
+			profile,
+			previousImage: current.image,
+		};
+	});
+}

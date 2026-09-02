@@ -12,7 +12,7 @@ import { Switch } from "@just-us/ui/components/switch";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { toggleFlagAction } from "@/app/dashboard/flag-actions";
+import { toggleFlagAction } from "@/app/(app)/flag-actions";
 
 /**
  * Administrator control for feature flags (JUS-13).
@@ -46,7 +46,7 @@ export function FeatureFlags({ initial }: { initial: FlagState }) {
 				<h2 className="font-bold text-[15px] text-ink">Feature flags</h2>
 				<p className="mt-1 text-[13.5px] text-ink-soft leading-relaxed">
 					Turn upcoming capabilities on or off. Changes take effect immediately
-					— no deploy required — and apply to this environment only.
+					(no deploy required) and apply to this environment only.
 				</p>
 			</div>
 

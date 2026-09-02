@@ -15,17 +15,34 @@ model User {
   // (welcome + role selection). Gates access to the app until done.
   onboarded Boolean @default(false)
 
-  // Home jurisdiction (US state), captured at sign-up for plaintiffs and
-  // attorneys only (JUS-12) — see JURISDICTION_ROLES in the auth package. Drives
-  // attorney-availability checks downstream. Null for donors and administrators,
-  // and for accounts created before JUS-12.
+  // Donor privacy: when true, this account's donations show as "Anonymous" in a
+  // case's public supporter list instead of by name. Default false — names show,
+  // which is what most donors expect and what makes the supporter list feel human.
+  donationsAnonymous Boolean @default(false)
+
+  // The attorney's *primary* licensing jurisdiction (US state) — the first state
+  // they were admitted in, and the one the directory leads with. Captured at
+  // sign-up for attorneys only (JUS-12) — see JURISDICTION_ROLES in the auth
+  // package.
+  //
+  // NOT the authority on where they may act. An attorney can be admitted in
+  // several states, and each admission carries its own bar number and its own
+  // bar check, so that lives in AttorneyAdmission — which every matching gate
+  // reads. This column is kept pointing at one of those rows (see
+  // `setAdmissions` in src/admissions.ts); it is a label, not a permission.
+  //
+  // Not a plaintiff field: a plaintiff's jurisdiction belongs to the case, not
+  // the person, and lives on `Case.location`. Null for every non-attorney role —
+  // including plaintiff rows created before this became per-case, which may
+  // still carry a stale value.
   jurisdiction String?
 
   // Attorney profile fields — only populated when role = attorney (captured at sign-up).
   firmName  String?
   barNumber String?
 
-  // Better Auth admin plugin: ban state (used here for account lockout too).
+  // Administrator-initiated block, distinct from the automated lockout below.
+  // Null banExpires means indefinite; a past banExpires means the block lapsed.
   banned     Boolean?
   banReason  String?
   banExpires DateTime?
@@ -34,9 +51,51 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  // Written by the session.create hook in packages/auth on every sign-in.
+  lastSignInAt DateTime?
+
   sessions Session[]
   accounts Account[]
   cases    Case[]
+
+  // Public directory profile. Only attorneys have one, and only once they've
+  // filled it in — see AttorneyProfile.
+  attorneyProfile AttorneyProfile?
+
+  // Every state this attorney is admitted in, each with its own bar standing.
+  // This is what decides which cases they may take — see AttorneyAdmission.
+  admissions AttorneyAdmission[]
+
+  // Attorney side of representation (JUS-25). Seeking cases this attorney has
+  // expressed interest in, and the cases they were matched to.
+  representationInterests AttorneyRequest[]
+  matches                 Match[]
+
+  // Stripe Connect destinations for donations — the firm's operating account, one
+  // per case this attorney represents, so no two cases share a balance. Only
+  // attorneys onboard these; a plaintiff's cases pay out to the firm representing
+  // them. Some plaintiff rows still carry a single account from before that pivot,
+  // which nothing routes to. See PayoutAccount.
+  payoutAccounts PayoutAccount[]
+
+  // Administration (JUS-67): invitations this user sent, and their audit trail.
+  sentAdminInvitations AdminInvitation[] @relation("AdminInvitationInviter")
+  auditEntries         AuditLog[]        @relation("AuditLogActor")
+
+  // JUS-66 private messaging. Conversations are always one plaintiff and one
+  // attorney; these named relations keep that invariant explicit in the schema.
+  plaintiffConversations      Conversation[]                    @relation("ConversationPlaintiff")
+  attorneyConversations       Conversation[]                    @relation("ConversationAttorney")
+  sentMessages                Message[]                         @relation("MessageAuthor")
+  messageEmailDeliveries      MessageEmailDelivery[]
+  messagePreference           MessageNotificationPreference?
+  conversationSettings        ConversationNotificationSetting[]
+  reportedConversations       ConversationReport[]              @relation("ConversationReportReporter")
+  resolvedConversationReports ConversationReport[]              @relation("ConversationReportResolver")
+
+  // Assistant conversations. Model spend has no back-relation here on purpose —
+  // see AiUsage.
+  chats Chat[]
 
   @@unique([email])
   @@map("user")

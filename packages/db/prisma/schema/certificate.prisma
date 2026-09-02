@@ -1,0 +1,59 @@
+// Certificate of appreciation issued to a case's backers when the case is marked
+// Closed (JUS: case-closing workflow).
+//
+// One row per (case, backer). A "backer" is anyone with a succeeded donation to
+// the case — including guests, who have no account (`donorId` null) and are
+// identified by `donorEmail`. Closing a case is not a refund: the certificate is
+// the acknowledgement donors receive, and the copy everywhere says so.
+//
+// Generation is idempotent. `dedupeKey` is unique per (case, backer), so
+// re-running the close fan-out — a retried action, a re-close — inserts nothing
+// new. `serial` and `accessToken` are minted once, at insert.
+//
+// Access. `accessToken` is an unguessable capability: the certificate page is a
+// public route keyed by it, so a guest with no account still reaches their
+// certificate from the emailed link. Account backers reach the same page from
+// their donations screen and an in-app notification.
+//
+// Email is claimed exactly once via `emailedAt` under a status-conditional
+// update — the same reserve-then-send discipline the notification and donation
+// emails use — so a redelivery or re-close never double-sends. The reservation
+// lives here rather than on a Notification row because guest backers have no
+// account and so no notification to reserve against.
+model Certificate {
+  id     String @id @default(cuid())
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId String
+
+  // The backer's account, when they had one. Null for guest donations — see the
+  // Donation model. `donorEmail` is always the identity we can reach them at.
+  donorId    String?
+  donorEmail String?
+
+
+  // Snapshots taken at issue time, so the certificate stays truthful even if the
+  // case is later edited or the donor renames their account.
+  recipientName String
+  caseTitle     String
+  // The backer's total succeeded contribution to this case, in cents. Aggregated
+  // across every gift they made — one certificate acknowledges the person, not
+  // the transaction.
+  amountCents   Int
+
+  // Human-facing certificate number shown on the certificate (e.g. JU-2K4F9).
+  serial String @unique
+  // Unguessable capability that gates the public certificate page.
+  accessToken String @unique
+
+  // One (case, backer) = one row; unique so a re-close skips duplicates.
+  dedupeKey String @unique
+
+  issuedAt  DateTime  @default(now())
+  createdAt DateTime  @default(now())
+  // Stamped when the "your certificate is ready" email is claimed for sending.
+  emailedAt DateTime?
+
+  @@index([caseId])
+  @@index([donorId])
+  @@map("certificate")
+}

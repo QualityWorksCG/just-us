@@ -1,0 +1,23 @@
+{
+	"name": "@just-us/payments",
+	"type": "module",
+	"exports": {
+		".": {
+			"default": "./src/index.ts"
+		},
+		"./*": {
+			"default": "./src/*.ts"
+		}
+	},
+	"scripts": {
+		"check-types": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@just-us/env": "workspace:*",
+		"stripe": "^22.4.0"
+	},
+	"devDependencies": {
+		"@just-us/config": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

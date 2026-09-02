@@ -1,0 +1,314 @@
+// How an attorney charges for the work. Drives whether a fee range is
+// meaningful: a flat/hourly/quoted attorney can state one, a contingency
+// attorney charges a share of the recovery instead.
+enum FeeApproach {
+  flat
+  hourly
+  contingency
+  quoted_per_case
+}
+
+// Review state of attorney-written free text. Free text is held back from the
+// public directory until an administrator approves it, and drops back to
+// `pending` whenever the attorney edits it.
+enum ModerationStatus {
+  pending
+  approved
+  rejected
+}
+
+/// Outcome of a bar-standing check (JUS attorney verification).
+///
+///   unverified   — never checked, or the check found nothing usable.
+///   pending      — a check is running.
+///   verified     — corroborated against an official source; earns the badge.
+///   needs_review — evidence was weak, conflicting, or unofficial. Deliberately
+///                  NOT a badge: an administrator decides.
+///   rejected     — evidence says this person is not a licensed attorney, or is
+///                  not in good standing.
+enum VerificationStatus {
+  unverified
+  pending
+  verified
+  needs_review
+  rejected
+}
+
+/// Where an attorney is admitted to practise — one row per jurisdiction.
+///
+/// A licence is per state, and so is the check behind it: an attorney admitted in
+/// New York and New Jersey holds two licences, two bar numbers, and has two bar
+/// records to be verified against. A single column could not say that, which is
+/// why this replaced `User.jurisdiction` as the authority on where an attorney
+/// may act. That column remains, as the primary state (see `auth.prisma`), and is
+/// kept pointing at one of these rows.
+///
+/// **This is the record every matching gate reads.** A case may only be taken by
+/// an attorney holding a `verified` admission in the case's own `location`: the
+/// queue shows nothing else, and `expressInterest`, `acceptInterest` and
+/// `confirmCaseInvitation` each re-check it inside their own transaction. An
+/// unverified admission is a claim rather than a licence — it earns the state's
+/// cases a place in that attorney's queue and nothing more.
+model AttorneyAdmission {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// A US_STATES value (see @just-us/auth/jurisdiction), held as the same string
+  /// `Case.location` holds so the two compare directly — the same contract
+  /// `User.jurisdiction` and `AttorneyProfile.officeState` already keep.
+  state String
+
+  /// The licence number in this state. Per-jurisdiction by nature: the number
+  /// that identifies an attorney in New York says nothing about New Jersey.
+  /// Optional because the bar check searches on name and state rather than on the
+  /// number (see `AttorneyVerification.checkedName`).
+  barNumber String?
+
+  /// Bar standing in *this* state — a cache of the newest check that ran against
+  /// it, written in the same transaction, exactly as
+  /// `AttorneyProfile.verificationStatus` caches the profile-wide badge.
+  verificationStatus VerificationStatus @default(unverified)
+  /// When this admission last reached `verified`. Kept when a later re-check
+  /// downgrades it, so "was verified until X" stays answerable.
+  verifiedAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One row per state per attorney: "admitted in New York" is a fact about them,
+  /// not a list of attempts at it.
+  @@unique([userId, state])
+  @@index([userId])
+  @@index([state])
+  @@map("attorney_admission")
+}
+
+/// The attorney's public directory profile — everything the attorney enters
+/// themselves and can edit at will ("Group A"). Separate from `User` because it
+/// is public-facing, moderated, and only exists for attorneys; the account
+/// fields captured at sign-up (bar number, jurisdiction) stay on `User`.
+///
+/// A row is created the first time the attorney saves their profile, so its
+/// absence means "not filled in yet" rather than "empty profile".
+///
+/// Every attorney-entered column is nullable, because the form autosaves as a
+/// draft — the same split the case wizard uses (see `saveDraft` vs
+/// `publishCase` in cases.ts). "Required" fields are required to be
+/// *directory-ready*, not to be stored, so a half-filled profile persists
+/// rather than being lost. Readiness is derived from the columns, not stored, so
+/// it can never drift from the values it describes.
+model AttorneyProfile {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  // Identity. legalName must match the bar record — it is what the directory
+  // shows and what bar verification is checked against.
+  legalName String?
+  firmName  String?
+
+  // Single primary office. officeState holds a US_STATES value (see
+  // @just-us/auth/jurisdiction) — stored as a string like `User.jurisdiction`
+  // so the two compare directly.
+  officeCity  String?
+  officeState String?
+
+  contactEmail String?
+  contactPhone String?
+  websiteUrl   String?
+
+  /// Vercel Blob URL of the attorney's headshot.
+  headshotUrl String?
+
+  /// Controlled vocabulary only — see PRACTICE_AREAS in the web app's
+  /// attorney-profile lib. At least one is needed to be directory-ready.
+  practiceAreas String[] @default([])
+
+  /// Optional share of practice per area, as `{ "<area>": <pct> }`. Either left
+  /// empty or set for the selected areas totalling 100 — never partial.
+  practiceAreaShares Json?
+
+  /// Year admitted to the bar. Drives "N years licensed" in the directory, which
+  /// is derived rather than stored so it can never go stale.
+  admittedYear Int?
+
+  /// Law school line as the attorney words it, e.g. "J.D., UC Davis School of
+  /// Law · 2017". Free text because degree naming varies and this is displayed,
+  /// not matched on. Distinct from `background`, which is longer prose.
+  education String?
+
+  /// Controlled vocabulary only — see LANGUAGES.
+  languages String[] @default([])
+
+  /// Whether the attorney is currently taking on new matters. Drives whether
+  /// they surface in the representation queue.
+  acceptingNewCases   Boolean @default(true)
+  /// Whether they will meet a prospective client remotely.
+  virtualConsultation Boolean @default(false)
+
+  feeApproach FeeApproach?
+
+  /// Indicative fee range in whole cents (like `Case.goalCents`). Not collected
+  /// for contingency work, where the fee is a share of the recovery.
+  feeRangeMinCents Int?
+  feeRangeMaxCents Int?
+
+  /// Attorney-written blurb, 600 chars max. Moderated before it can appear
+  /// publicly — see `bioStatus`.
+  bio        String?
+  /// Education and prior roles, 400 chars max.
+  background String?
+
+  /// Current bar-standing state — the badge shown in the directory. A cache of
+  /// the newest `verifications` row, written in the same transaction so the two
+  /// cannot drift. Derived, never attorney-editable.
+  verificationStatus VerificationStatus     @default(unverified)
+  /// When the profile last reached `verified`. Kept when a later re-check
+  /// downgrades it, so "was verified until X" is answerable.
+  verifiedAt         DateTime?
+  /// Newest check first — the full evidence trail behind the badge.
+  verifications      AttorneyVerification[]
+
+  /// Client reviews and self-reported outcomes shown on the public profile.
+  reviews     AttorneyReview[]
+  caseRecords AttorneyCaseRecord[]
+
+  /// Moderation state of `bio`. Reset to `pending` on every edit, so an
+  /// approved bio cannot be swapped for unreviewed text after the fact.
+  bioStatus     ModerationStatus @default(pending)
+  bioReviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([officeState])
+  @@index([acceptingNewCases])
+  @@map("attorney_profile")
+}
+
+/// One bar-standing check and the evidence behind it.
+///
+/// Rows are kept rather than overwritten: licence status changes over time, and
+/// "what did we know, when, and on what basis" has to be answerable long after
+/// the fact — particularly for a check that granted a public trust badge.
+///
+/// The determination is made in code from these fields, not taken from the
+/// model's own verdict. The model gathers evidence; policy decides.
+model AttorneyVerification {
+  id        String          @id @default(cuid())
+  profile   AttorneyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+
+  status     VerificationStatus
+  /// The model's self-reported confidence, 0–100. Recorded as context for a
+  /// human reviewer; deliberately not part of the badge decision.
+  confidence Int                @default(0)
+
+  /// What the search actually established.
+  isLicensedAttorney  Boolean?
+  inGoodStanding      Boolean?
+  /// Verbatim status wording from the source, e.g. "Active — in good standing".
+  licenseStatusText   String?
+  /// What the sources said, for comparison against what the attorney entered.
+  matchedName         String?
+  matchedBarNumber    String?
+  matchedJurisdiction String?
+  /// Any discipline, suspension, or sanction the search surfaced.
+  disciplinaryNotes   String?
+
+  /// Plain-language account of how the conclusion was reached, shown to the
+  /// attorney and to whoever reviews an ambiguous result.
+  summary String
+
+  /// The individual licensee record the model reported actually reading, or null
+  /// when it could not reach one. This is what the badge turns on — see
+  /// `decideStatus`. It replaced counting official-looking domains, which could
+  /// not distinguish a licensee record from the registry's own search page.
+  officialRecordUrl String?
+
+  /// Citations backing the check: `[{ url, title, official }]`. `official` is a
+  /// heuristic on the hostname (state bar / court / .gov), not a guarantee.
+  sources Json
+
+  /// What the check ran against, so a stale result is recognisable as stale. No
+  /// bar number: checks search on name and jurisdiction, and any number found
+  /// comes back as evidence instead.
+  checkedName         String?
+  checkedJurisdiction String?
+
+  /// Model that produced the evidence, for reproducibility.
+  model       String
+  /// User who triggered the check — the attorney themselves or an administrator.
+  triggeredBy String?
+
+  /// Set when an administrator overrides the automatic determination.
+  overriddenBy     String?
+  overriddenReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([profileId, createdAt])
+  @@map("attorney_verification")
+}
+
+/// How a self-reported matter concluded.
+enum CaseOutcome {
+  won
+  settled
+  ongoing
+  other
+}
+
+/// A review left by a former client.
+///
+/// Attorney-facing screens never write these — the directory's promise is that
+/// ratings come from clients, not from the attorney and not from JustUs. There is
+/// no submission flow yet, so rows are seeded; the model is here so the display
+/// isn't built on invented shapes.
+model AttorneyReview {
+  id        String          @id @default(cuid())
+  profile   AttorneyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+
+  /// Whole stars, 1–5. Averaged for the directory's rating.
+  rating Int
+  /// The review body as the client wrote it.
+  quote  String
+  /// How the reviewer is described, e.g. "former client, wrongful termination".
+  /// Never a name — reviewers stay anonymous.
+  byline String
+
+  /// Unpublished reviews are excluded from both the average and the count, so a
+  /// held-back review can't silently move a rating.
+  published Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([profileId, published])
+  @@map("attorney_review")
+}
+
+/// A matter the attorney reports having handled.
+///
+/// Self-reported and labelled as such wherever it appears: JustUs verifies bar
+/// standing, not case histories. Kept separate from `Case` — these are outcomes
+/// from the attorney's wider practice, not campaigns run on this platform.
+model AttorneyCaseRecord {
+  id        String          @id @default(cuid())
+  profile   AttorneyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+
+  /// Year the matter concluded. Sorted newest first.
+  year    Int
+  title   String
+  /// Recovery as the attorney words it, e.g. "$340,000 class recovery". Free
+  /// text, not a number: awards come with qualifiers that a bare amount loses.
+  amount  String?
+  outcome CaseOutcome @default(other)
+
+  createdAt DateTime @default(now())
+
+  @@index([profileId, year])
+  @@map("attorney_case_record")
+}
