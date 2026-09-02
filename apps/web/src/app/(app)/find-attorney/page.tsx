@@ -99,7 +99,7 @@ export default async function DashboardAttorneysPage({
 		<div>
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 				{screen?.sub ??
-					"Browse bar-verified attorneys and choose who represents you."}
+					"Browse state bar-verified attorneys and connect with the one who fits."}
 			</p>
 
 			{back && (
@@ -130,6 +130,13 @@ export default async function DashboardAttorneysPage({
 					profileBasePath="/find-attorney"
 					showMessageAction
 					conversationByAttorney={conversationByAttorney}
+					// Enable "Request to represent" only when they arrived with a case
+					// that can still take one — a matched/live/closed case cannot.
+					requestCaseId={
+						draft && (draft.status === "draft" || draft.status === "seeking")
+							? draft.id
+							: undefined
+					}
 				/>
 			</div>
 		</div>

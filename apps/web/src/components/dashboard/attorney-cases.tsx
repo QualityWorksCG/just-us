@@ -1,18 +1,27 @@
+"use client";
+
 import type { AttorneyCase } from "@just-us/db/representation";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	ArrowRight,
-	BadgeCheck,
 	Briefcase,
-	Hourglass,
 	Landmark,
+	MapPin,
 	Megaphone,
 	Search,
 	Users,
+	X,
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
+import { useId, useMemo, useState } from "react";
+
+import {
+	blocking,
+	money,
+	PayoutChip,
+} from "@/components/dashboard/attorney-payout";
 
 /**
  * Cases this attorney is acting on.
@@ -23,77 +32,51 @@ import Link from "next/link";
  * follows on the case's own screen.
  */
 
-export function money(cents: number) {
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-		maximumFractionDigits: 0,
-	}).format(cents / 100);
-}
+type StatusKey = "active" | "fee" | "awaiting" | "closed";
 
-export type PayoutStage = "not_started" | "incomplete" | "in_review" | "ready";
-
-export function payoutStage(c: AttorneyCase): PayoutStage {
-	if (!c.payout.hasAccount) return "not_started";
-	if (c.payout.transfersEnabled) return "ready";
-	if (c.payout.detailsSubmitted) return "in_review";
-	return "incomplete";
-}
-
-const STAGE_LABEL: Record<PayoutStage, string> = {
-	not_started: "Payouts not set up",
-	incomplete: "Payout setup unfinished",
-	in_review: "Payouts in review",
-	ready: "Payouts active",
+const STATUS_LABELS: Record<StatusKey, string> = {
+	active: "Active",
+	fee: "Fee not agreed",
+	awaiting: "Awaiting payout",
+	closed: "Closed",
 };
 
-/** A case whose account can't receive is the state the attorney themselves is
- *  blocking — that is what earns the loud treatment.
- *
- *  Two flavours, and `pending_payout` is the worse one: that client's case is not
- *  merely unable to take money, it is not public at all, and cannot be until this
- *  is done. A `live` case at least raises the moment the account clears. */
-function blocking(c: AttorneyCase) {
-	return (
-		(c.status === "live" || c.status === "pending_payout") &&
-		!c.payout.transfersEnabled
-	);
-}
-
-export function PayoutChip({ case: c }: { case: AttorneyCase }) {
-	const stage = payoutStage(c);
-	// A closed matter is not waiting on anyone's bank details. Reporting one as
-	// "not set up" would be work that no longer exists, sitting next to cases where
-	// the same words mean a client cannot be paid.
-	if (c.status === "closed" && stage !== "ready") return null;
-	const ready = stage === "ready";
-	const review = stage === "in_review";
-	return (
-		<span
-			className={cn(
-				"inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 font-semibold text-[11.5px]",
-				ready
-					? "bg-green-soft text-green-deep"
-					: review
-						? "bg-brass-wash text-brass-deep"
-						: blocking(c)
-							? "bg-danger/10 text-danger"
-							: "bg-surface-2 text-ink-soft",
-			)}
-		>
-			{ready ? (
-				<BadgeCheck className="size-3.5" aria-hidden="true" />
-			) : review ? (
-				<Hourglass className="size-3.5" aria-hidden="true" />
-			) : (
-				<Landmark className="size-3.5" aria-hidden="true" />
-			)}
-			{STAGE_LABEL[stage]}
-		</span>
-	);
+/** The filter bucket a row falls in — the same four the row's badge shows. */
+function statusKey(c: AttorneyCase): StatusKey {
+	if (c.status === "live") return "active";
+	if (c.status === "closed") return "closed";
+	if (c.status === "pending_payout") return "awaiting";
+	return "fee";
 }
 
 export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
+	const searchId = useId();
+	const [query, setQuery] = useState("");
+	const [selStates, setSelStates] = useState<string[]>([]);
+	const [status, setStatus] = useState<StatusKey | "all">("all");
+
+	// Holding-up first, then live, then the rest; publication order within a group.
+	const ordered = useMemo(
+		() => [...cases].sort((a, b) => rank(a) - rank(b)),
+		[cases],
+	);
+	// The states an attorney can filter by are only the ones they actually have
+	// intakes in — a multi-state practice sees each, a single-state one sees none.
+	const states = useMemo(
+		() =>
+			[...new Set(cases.map((c) => c.state).filter(Boolean))].sort((a, b) =>
+				a.localeCompare(b),
+			),
+		[cases],
+	);
+	// Likewise only offer status chips that match something, in a stable order.
+	const statuses = useMemo(() => {
+		const present = new Set(cases.map(statusKey));
+		return (["active", "fee", "awaiting", "closed"] as StatusKey[]).filter(
+			(s) => present.has(s),
+		);
+	}, [cases]);
+
 	if (cases.length === 0) {
 		return (
 			<div className="flex flex-col gap-6">
@@ -123,11 +106,37 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		);
 	}
 
-	// Cases the attorney is holding up come first, then live, then the rest. Within
-	// a group the list keeps its publication order.
-	const ordered = [...cases].sort((a, b) => rank(a) - rank(b));
 	const blocked = cases.filter(blocking).length;
 	const raised = cases.reduce((sum, c) => sum + c.raisedCents, 0);
+
+	const q = query.trim().toLowerCase();
+	const filtered = ordered.filter((c) => {
+		if (selStates.length && !selStates.includes(c.state)) return false;
+		if (status !== "all" && statusKey(c) !== status) return false;
+		if (
+			q &&
+			!`${c.title} ${c.category} ${c.state} ${c.plaintiffName}`
+				.toLowerCase()
+				.includes(q)
+		)
+			return false;
+		return true;
+	});
+
+	const hasFilters = !!q || selStates.length > 0 || status !== "all";
+	// The filter bar earns its space only once there's more than one intake to sift.
+	const showFilters = cases.length > 1;
+
+	function toggleState(s: string) {
+		setSelStates((prev) =>
+			prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
+		);
+	}
+	function clearFilters() {
+		setQuery("");
+		setSelStates([]);
+		setStatus("all");
+	}
 
 	return (
 		<div className="flex flex-col gap-6">
@@ -157,12 +166,128 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 				</div>
 			)}
 
-			<div className="flex flex-col gap-4">
-				{ordered.map((c) => (
-					<CaseRow key={c.id} case={c} />
-				))}
-			</div>
+			{showFilters && (
+				<div className="flex flex-col gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-4 shadow-[var(--shadow-rest)]">
+					<div className="flex flex-wrap items-center gap-3">
+						<div className="relative min-w-[220px] flex-1">
+							<Search
+								className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+								aria-hidden="true"
+							/>
+							<input
+								id={searchId}
+								type="search"
+								value={query}
+								onChange={(e) => setQuery(e.target.value)}
+								placeholder="Search intakes by title, client, or state…"
+								className="h-10 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface pr-3 pl-9 text-[14px] text-ink outline-none focus:border-brass-deep"
+							/>
+						</div>
+						<div className="flex flex-wrap items-center gap-1.5">
+							<FilterPill
+								active={status === "all"}
+								onClick={() => setStatus("all")}
+							>
+								All
+							</FilterPill>
+							{statuses.map((s) => (
+								<FilterPill
+									key={s}
+									active={status === s}
+									onClick={() => setStatus(s)}
+								>
+									{STATUS_LABELS[s]}
+								</FilterPill>
+							))}
+						</div>
+					</div>
+
+					{states.length > 1 && (
+						<div className="flex flex-wrap items-center gap-1.5 border-border border-t pt-3">
+							<span className="mr-1 inline-flex items-center gap-1 font-mono font-semibold text-[10.5px] text-muted-foreground uppercase tracking-[0.08em]">
+								<MapPin className="size-3.5" aria-hidden="true" />
+								States
+							</span>
+							{states.map((s) => (
+								<FilterPill
+									key={s}
+									active={selStates.includes(s)}
+									onClick={() => toggleState(s)}
+								>
+									{s}
+								</FilterPill>
+							))}
+							{hasFilters && (
+								<button
+									type="button"
+									onClick={clearFilters}
+									className="ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5 font-semibold text-[12.5px] text-ink-soft transition-colors hover:bg-brass-wash hover:text-brass-deep"
+								>
+									<X className="size-3.5" aria-hidden="true" />
+									Clear
+								</button>
+							)}
+						</div>
+					)}
+				</div>
+			)}
+
+			{filtered.length === 0 ? (
+				<div className="flex flex-col items-center gap-3 rounded-[var(--radius-card-lg)] border border-border border-dashed bg-paper-alt px-6 py-14 text-center">
+					<span className="flex size-11 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
+						<Search className="size-5" aria-hidden="true" />
+					</span>
+					<p className="font-bold text-[15px] text-ink">
+						No intakes match those filters
+					</p>
+					<button
+						type="button"
+						onClick={clearFilters}
+						className="font-semibold text-[13px] text-brass-deep hover:underline"
+					>
+						Clear filters
+					</button>
+				</div>
+			) : (
+				<div className="flex flex-col gap-4">
+					{showFilters && hasFilters && (
+						<p className="text-[12.5px] text-muted-foreground">
+							Showing {filtered.length} of {cases.length} intakes
+						</p>
+					)}
+					{filtered.map((c) => (
+						<CaseRow key={c.id} case={c} />
+					))}
+				</div>
+			)}
 		</div>
+	);
+}
+
+/** A toggle chip in the intake filter bar. */
+function FilterPill({
+	active,
+	onClick,
+	children,
+}: {
+	active: boolean;
+	onClick: () => void;
+	children: React.ReactNode;
+}) {
+	return (
+		<button
+			type="button"
+			aria-pressed={active}
+			onClick={onClick}
+			className={cn(
+				"rounded-[var(--radius-pill)] px-3 py-1.5 font-semibold text-[12.5px] transition-colors",
+				active
+					? "bg-ink text-paper"
+					: "border border-border bg-surface text-ink-soft hover:border-brass-deep hover:text-brass-deep",
+			)}
+		>
+			{children}
+		</button>
 	);
 }
 

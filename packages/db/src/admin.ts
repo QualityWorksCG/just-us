@@ -32,7 +32,7 @@ export async function adminOverviewStats() {
 		casesByStatus,
 		realised,
 		openReports,
-		attorneysPending,
+		pendingAdmissionUsers,
 	] = await Promise.all([
 		prisma.user.count(),
 		prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
@@ -47,8 +47,16 @@ export async function adminOverviewStats() {
 			_count: { _all: true },
 		}),
 		prisma.conversationReport.count({ where: { status: "open" } }),
-		prisma.attorneyProfile.count({
-			where: { verificationStatus: { in: ["pending", "needs_review"] } },
+		// Distinct attorneys with *any* state not yet verified — grouped by user, not
+		// counted off `AttorneyProfile.verificationStatus`, because that badge reads
+		// "verified" the moment one licence clears (best-standing-wins), which would
+		// hide an attorney whose second state still needs one. Everything but
+		// `verified` (done) and `rejected` (decided) is an outstanding jurisdiction.
+		prisma.attorneyAdmission.groupBy({
+			by: ["userId"],
+			where: {
+				verificationStatus: { in: ["unverified", "pending", "needs_review"] },
+			},
 		}),
 	]);
 
@@ -67,7 +75,7 @@ export async function adminOverviewStats() {
 		netToFirmsCents: realised._sum.netCents ?? 0,
 		donationCount: realised._count._all,
 		openReports,
-		attorneysPending,
+		attorneysPending: pendingAdmissionUsers.length,
 	};
 }
 

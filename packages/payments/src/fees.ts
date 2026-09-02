@@ -126,6 +126,24 @@ export type DonationAmountCheck =
 	| { ok: false; reason: DonationAmountRejection; message: string };
 
 /**
+ * The largest gift whose *total charge* (gift + fee) still fits under Stripe's
+ * per-charge ceiling. The ceiling is on the total, not the gift, so this is the
+ * number the "too large" copy should quote: quoting the ceiling itself reads as
+ * the gift limit and rejects a gift a cent under it once the fee is added on top.
+ */
+function maxGiftUnderCeiling(feeBps: number): number {
+	if (feeBps <= 0) return MAX_DONATION_CENTS;
+	let gift = Math.floor(MAX_DONATION_CENTS / (1 + feeBps / 10000));
+	// Fee rounding can nudge the total across the line either way; settle it exactly
+	// with a couple of one-cent steps rather than trusting the continuous bound.
+	while (breakdownAtBps(gift, feeBps).amountCents > MAX_DONATION_CENTS)
+		gift -= 1;
+	while (breakdownAtBps(gift + 1, feeBps).amountCents <= MAX_DONATION_CENTS)
+		gift += 1;
+	return gift;
+}
+
+/**
  * Whether a selected gift amount may be donated, given the configured floor and
  * the fee rate (so gift + fee cannot exceed Stripe's charge ceiling).
  *
@@ -163,7 +181,16 @@ export function checkDonationAmount(
 		return {
 			ok: false,
 			reason: "above_maximum",
-			message: `A single donation cannot exceed ${formatUsd(MAX_DONATION_CENTS)}.`,
+			// The ceiling is on the total charge (gift + fee), so name the largest gift
+			// that fits under it rather than the ceiling itself — otherwise a gift a
+			// cent below the ceiling is rejected by the fee on top and the message
+			// contradicts the number it just quoted.
+			message:
+				feeBps > 0
+					? `The most you can give is ${formatUsd(
+							maxGiftUnderCeiling(feeBps),
+						)}. The platform fee is added on top.`
+					: `A single donation cannot exceed ${formatUsd(MAX_DONATION_CENTS)}.`,
 		};
 	}
 	return { ok: true };

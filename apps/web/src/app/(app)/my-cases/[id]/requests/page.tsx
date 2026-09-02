@@ -23,7 +23,12 @@ import { AttorneyInterestCard } from "@/components/dashboard/attorney-interest-c
 import { BackLink } from "@/components/dashboard/back-link";
 import { requireRole } from "@/lib/auth-server";
 
-const STEPS = ["Published", "Interest received", "You choose", "Live"] as const;
+const STEPS = [
+	"Published",
+	"Interest received",
+	"You connect",
+	"Live",
+] as const;
 
 function initials(name: string) {
 	return (
@@ -67,16 +72,16 @@ export default async function CaseRequestsPage({
 					/>
 					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-green-soft px-3 py-1 font-mono font-semibold text-[11px] text-green-deep uppercase tracking-[0.06em]">
 						<span className="size-1.5 rounded-full bg-success" />
-						Attorney chosen
+						Attorney connected
 					</span>
 					<h2 className="mt-3 font-extrabold text-[clamp(1.75rem,3.4vw,2.375rem)] text-ink tracking-[-0.03em]">
-						You've chosen {attorneyName}
+						You've connected with {attorneyName}
 					</h2>
 					<p className="mt-2 text-[14.5px] text-ink-soft leading-relaxed">
 						Your attorney is set for “{c.title || "your case"}”. Finish agreeing
 						the fee and publish to take your campaign live. This choice is
 						saved. If something went wrong while publishing, you won't have to
-						choose again.
+						do this again.
 					</p>
 				</div>
 
@@ -129,7 +134,7 @@ export default async function CaseRequestsPage({
 						<div className="min-w-0">
 							<p className="font-bold text-[15px] text-ink">{attorneyName}</p>
 							<p className="font-mono text-[10.5px] text-muted-foreground uppercase tracking-[0.07em]">
-								Your chosen attorney
+								Your attorney
 							</p>
 						</div>
 					</div>
@@ -203,7 +208,7 @@ export default async function CaseRequestsPage({
 				<p className="mt-2 text-[14.5px] text-ink-soft leading-relaxed">
 					{hasInterest
 						? "These attorneys have put themselves forward. None of them can contact you. You reach out by choosing one, which sets your attorney and moves you to agree the fee. Nothing's final until you publish."
-						: `Bar-verified attorneys can put themselves forward to represent “${c.title || "your case"}”. You'll see them here, or choose an attorney yourself anytime.`}
+						: `Bar-verified attorneys can put themselves forward to represent “${c.title || "your case"}”. You'll see them here, or connect with an attorney yourself anytime.`}
 				</p>
 			</div>
 
@@ -272,7 +277,7 @@ export default async function CaseRequestsPage({
 						className={cn(buttonVariants({ size: "lg" }), "mt-1 px-5")}
 					>
 						<Search data-icon="inline-start" aria-hidden="true" />
-						Choose an attorney yourself
+						Connect with an attorney yourself
 					</Link>
 				</div>
 			)}
@@ -286,8 +291,8 @@ export default async function CaseRequestsPage({
 				Bar-verified attorneys can read your case (your account of what
 				happened, the evidence you filed, and your name), which is how they
 				decide whether they can help. Your contact details are never shared, and
-				they can't message you: nothing reaches you until you choose. Passing on
-				one is final; you can keep waiting, and more may still come forward.
+				they can't message you: nothing reaches you until you reach out. Passing
+				on one is final; you can keep waiting, and more may still come forward.
 			</div>
 		</div>
 	);

@@ -1,5 +1,9 @@
 import type { Role } from "@just-us/auth";
-import { pendingInvitationsForEmail } from "@just-us/db/case-invitations";
+import { hashInviteToken } from "@just-us/auth/invite-token";
+import {
+	findCaseInvitation,
+	pendingInvitationsForEmail,
+} from "@just-us/db/case-invitations";
 import { listUpdatesForBacker } from "@just-us/db/case-updates";
 import { listOwnedCases } from "@just-us/db/cases";
 import { donorStats, listBackedCases } from "@just-us/db/donations";
@@ -9,7 +13,10 @@ import { listAttorneyCases, listMyInterests } from "@just-us/db/representation";
 import { interestCountsByCase } from "@just-us/db/requests";
 import { countSavedCases, listSavedCases } from "@just-us/db/saves";
 import type { Route } from "next";
-
+import {
+	CaseInviteResolved,
+	type InviteUser,
+} from "@/components/case-invite/case-invite-resolved";
 import { AdminOverview } from "@/components/dashboard/admin-overview";
 import {
 	type AttentionItem,
@@ -24,13 +31,73 @@ import {
 } from "@/components/dashboard/plaintiff-dashboard";
 import { ScreenPlaceholder } from "@/components/dashboard/screen-placeholder";
 import { requireOnboarded } from "@/lib/auth-server";
-import { caseInviteHref } from "@/lib/case-invite-ref";
+import { parseCaseInviteRef } from "@/lib/case-invite-ref";
 import { getRoleNav } from "@/lib/dashboard-nav";
 
-export default async function DashboardHome() {
+/**
+ * The invitation modal, when a ready attorney arrived here from an email link.
+ *
+ * `/case-invite` forwards the raw link params under `ci_*`; they are re-parsed
+ * and re-validated here exactly as that page would, so nothing is trusted for
+ * having survived the redirect. Absent params mean an ordinary dashboard visit
+ * and render nothing.
+ */
+async function renderInviteModal(
+	params: Record<string, string | string[] | undefined>,
+	session: Awaited<ReturnType<typeof requireOnboarded>>,
+): Promise<React.ReactNode> {
+	const token =
+		typeof params.ci_token === "string" ? params.ci_token : undefined;
+	const id = typeof params.ci_id === "string" ? params.ci_id : undefined;
+	if (!token && !id) return null;
+
+	const ref = parseCaseInviteRef({ token, invitation: id });
+	const invitation = ref
+		? await findCaseInvitation(
+				"token" in ref
+					? { tokenHash: hashInviteToken(ref.token) }
+					: { invitationId: ref.invitationId },
+			)
+		: null;
+
+	return (
+		<CaseInviteResolved
+			inviteRef={ref}
+			invitation={invitation}
+			user={session.user as InviteUser}
+			declined={params.ci_declined === "1"}
+			asModal
+		/>
+	);
+}
+
+export default async function DashboardHome({
+	searchParams,
+}: {
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
 	const session = await requireOnboarded();
 	const role = ((session.user as { role?: Role }).role ?? "donor") as Role;
+	// A ready attorney who opened an email invitation is routed here (see
+	// `/case-invite`); the invitation shows as a modal over whichever dashboard
+	// this render produces.
+	const inviteModal = await renderInviteModal(await searchParams, session);
 
+	return (
+		<>
+			<DashboardBody session={session} role={role} />
+			{inviteModal}
+		</>
+	);
+}
+
+async function DashboardBody({
+	session,
+	role,
+}: {
+	session: Awaited<ReturnType<typeof requireOnboarded>>;
+	role: Role;
+}) {
 	if (role === "plaintiff") {
 		const [owned, interests, conversations] = await Promise.all([
 			listOwnedCases(session.user.id),
@@ -160,7 +227,9 @@ export default async function DashboardHome() {
 				title: "New case request",
 				sub: `${inv.caseTitle || "Untitled intake"} · ${inv.category} · ${inv.location}`,
 				cta: "Review",
-				href: caseInviteHref({ invitationId: inv.id }) as Route,
+				// In-app review opens the intake's own page, where the accept/decline
+				// lives inline. The emailed link is the only thing that opens the modal.
+				href: `/queue/${inv.caseId}` as Route,
 			})),
 			...(payoutPending > 0
 				? [

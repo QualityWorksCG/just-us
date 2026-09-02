@@ -87,7 +87,7 @@ export function RepresentationCaseCard({ view }: { view: RepresentationView }) {
 		<section className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
 			<CardHeader view={view} />
 			{view.attorney ? (
-				<div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.1fr_1fr]">
+				<div className="grid grid-cols-1 gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
 					<AttorneyPanel view={view} />
 					<FundingPanel view={view} />
 				</div>
@@ -550,7 +550,7 @@ function NoAttorneyPanel({ view }: { view: RepresentationView }) {
 		: isSeeking
 			? interested > 0
 				? "None of them can contact you. You reach out by choosing one, which sets your attorney and moves you on to agree the fee."
-				: "Bar-verified attorneys can see this case and put themselves forward. You'll see them here, and you can choose an attorney yourself at any time."
+				: "Bar-verified attorneys can see this case and put themselves forward. You'll see them here, and you can connect with an attorney yourself at any time."
 			: "Your case needs an attorney before it can name a fee or raise anything. Browse the directory, or publish it out to attorneys and let them come to you.";
 
 	const Icon = invited

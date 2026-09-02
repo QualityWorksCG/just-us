@@ -198,68 +198,78 @@ function GiftsTable({ rows }: { rows: DonationRows }) {
 					</p>
 				</div>
 			) : (
-				<table className="w-full text-left text-[13.5px]">
-					<thead>
-						<tr className="border-border border-b text-[11px] text-muted-foreground uppercase tracking-[0.06em]">
-							<th className="px-5 py-3 font-semibold">Case</th>
-							<th className="px-5 py-3 font-semibold">Type & location</th>
-							<th className="px-5 py-3 text-right font-semibold">
-								To the case
-							</th>
-							<th className="px-5 py-3 text-right font-semibold">You paid</th>
-							<th className="px-5 py-3 font-semibold">Date</th>
-							<th className="px-5 py-3 font-semibold">Receipt</th>
-						</tr>
-					</thead>
-					<tbody>
-						{rows.map((d) => (
-							<tr key={d.id} className="border-border border-b last:border-0">
-								<td className="px-5 py-4 font-bold text-ink">{d.case.title}</td>
-								<td className="px-5 py-4 text-muted-foreground">
-									{d.case.category} · {d.case.location}
-								</td>
-								<td className="px-5 py-4 text-right font-bold text-ink tabular-nums">
-									{money(d.netCents / 100)}
-								</td>
-								<td className="px-5 py-4 text-right text-muted-foreground tabular-nums">
-									{money(d.amountCents / 100)}
-									{d.feeCents > 0 ? (
-										<span className="mt-0.5 block text-[11px]">
-											incl. {money(d.feeCents / 100)} fee
-										</span>
-									) : null}
-								</td>
-								<td className="px-5 py-4 text-muted-foreground">
-									{formatDate(d.createdAt)}
-								</td>
-								<td className="px-5 py-4">
-									{/* Stripe's own receipt for the charge. Absent for gifts made
+				// The ledger is wider than a phone, so it scrolls on its own axis
+				// rather than being clipped by the card's rounded overflow-hidden.
+				<div className="overflow-x-auto">
+					<table className="w-full min-w-[640px] text-left text-[13.5px]">
+						<thead>
+							<tr className="border-border border-b text-[11px] text-muted-foreground uppercase tracking-[0.06em]">
+								<th className="px-5 py-3 font-semibold">Case</th>
+								<th className="whitespace-nowrap px-5 py-3 font-semibold">
+									Type & location
+								</th>
+								<th className="whitespace-nowrap px-5 py-3 text-right font-semibold">
+									To the case
+								</th>
+								<th className="whitespace-nowrap px-5 py-3 text-right font-semibold">
+									You paid
+								</th>
+								<th className="px-5 py-3 font-semibold">Date</th>
+								<th className="px-5 py-3 font-semibold">Receipt</th>
+							</tr>
+						</thead>
+						<tbody>
+							{rows.map((d) => (
+								<tr key={d.id} className="border-border border-b last:border-0">
+									<td className="px-5 py-4 font-bold text-ink">
+										{d.case.title}
+									</td>
+									<td className="whitespace-nowrap px-5 py-4 text-muted-foreground">
+										{d.case.category} · {d.case.location}
+									</td>
+									<td className="px-5 py-4 text-right font-bold text-ink tabular-nums">
+										{money(d.netCents / 100)}
+									</td>
+									<td className="px-5 py-4 text-right text-muted-foreground tabular-nums">
+										{money(d.amountCents / 100)}
+										{d.feeCents > 0 ? (
+											<span className="mt-0.5 block whitespace-nowrap text-[11px]">
+												incl. {money(d.feeCents / 100)} fee
+											</span>
+										) : null}
+									</td>
+									<td className="whitespace-nowrap px-5 py-4 text-muted-foreground">
+										{formatDate(d.createdAt)}
+									</td>
+									<td className="px-5 py-4">
+										{/* Stripe's own receipt for the charge. Absent for gifts made
 									    before receipts were recorded, and for payment methods that
 									    produce none — so the cell degrades to a dash rather than a
 									    link that goes nowhere. */}
-									{d.stripeReceiptUrl ? (
-										<a
-											href={d.stripeReceiptUrl}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="inline-flex items-center gap-1 font-semibold text-[12.5px] text-brass-deep transition-colors hover:text-ink"
-										>
-											View
-											<ExternalLink className="size-3.5" aria-hidden="true" />
-										</a>
-									) : (
-										<span
-											className="text-muted-foreground"
-											title="No receipt was recorded for this gift."
-										>
-											—
-										</span>
-									)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
+										{d.stripeReceiptUrl ? (
+											<a
+												href={d.stripeReceiptUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="inline-flex items-center gap-1 font-semibold text-[12.5px] text-brass-deep transition-colors hover:text-ink"
+											>
+												View
+												<ExternalLink className="size-3.5" aria-hidden="true" />
+											</a>
+										) : (
+											<span
+												className="text-muted-foreground"
+												title="No receipt was recorded for this gift."
+											>
+												—
+											</span>
+										)}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
 			)}
 		</section>
 	);

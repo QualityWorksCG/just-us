@@ -79,6 +79,21 @@ export async function listUsers(
 			// Bar-standing badge for attorney rows — the status the admin table shows
 			// for a lawyer, distinct from `emailVerified`. Null for other roles.
 			attorneyProfile: { select: { verificationStatus: true } },
+			// States this attorney has claimed but not had checked yet. Surfaced
+			// separately because the badge above reads "verified" as soon as one
+			// licence clears, so it alone would never tell the admin a second state
+			// is still waiting — they'd only find it by opening the attorney.
+			_count: {
+				select: {
+					admissions: {
+						where: {
+							verificationStatus: {
+								in: ["unverified", "pending", "needs_review"],
+							},
+						},
+					},
+				},
+			},
 		},
 	});
 }

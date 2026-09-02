@@ -10,7 +10,7 @@ import {
 	money,
 	PayoutChip,
 	payoutStage,
-} from "@/components/dashboard/attorney-cases";
+} from "@/components/dashboard/attorney-payout";
 import { CaseUpdateComposer } from "@/components/dashboard/case-update-composer";
 
 /** How many matched cases to surface on the dashboard before deferring to the
@@ -30,7 +30,7 @@ const MAX_SHOWN = 6;
  */
 function caseBadge(c: AttorneyCase): { label: string; cls: string } {
 	if (c.status === "live") {
-		return { label: "Live", cls: "bg-green-soft text-green-deep" };
+		return { label: "Active", cls: "bg-green-soft text-green-deep" };
 	}
 	if (c.status === "closed") {
 		return { label: "Closed", cls: "bg-surface-2 text-ink-soft" };

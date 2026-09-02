@@ -128,7 +128,7 @@ export async function AdminOverview() {
 		{
 			label: "Attorneys to verify",
 			value: stats.attorneysPending,
-			hint: "Bar-standing checks pending review",
+			hint: "Have a claimed jurisdiction not yet verified",
 			href: "/users?role=attorney" as Route,
 			icon: BadgeCheck,
 		},

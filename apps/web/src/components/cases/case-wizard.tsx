@@ -109,6 +109,11 @@ export type WizardInitial = {
 	 *  to have one. Seeded from the server so the payout step is right on first
 	 *  paint rather than after a round-trip. */
 	payout?: CasePayoutReadiness | null;
+	/** The address a still-pending invitation went to, when the case is seeking a
+	 *  named attorney. Its presence resumes the wizard on the invitation-sent
+	 *  "waiting on your attorney" screen rather than the editor — so "Manage
+	 *  invitation" shows who was asked and where things stand. */
+	invitedEmail?: string | null;
 };
 
 type View =
@@ -220,7 +225,15 @@ export function CaseWizard({
 		if (initial.status === "pending_payout") return 6;
 		return 5;
 	})();
-	const [view, setView] = useState<View>("wizard");
+	// A resumed case that is seeking a named attorney (a pending invitation to a
+	// specific address) opens on the invitation-sent waiting screen rather than the
+	// editor — that is what "Manage invitation" is for. Everything else starts in
+	// the wizard proper.
+	const seedView: View =
+		initial?.status === "seeking" && initial?.invitedEmail
+			? "invited"
+			: "wizard";
+	const [view, setView] = useState<View>(seedView);
 	const [step, setStep] = useState(seedStep);
 
 	// The draft row this wizard is bound to (created on first save / publish).
@@ -311,8 +324,12 @@ export function CaseWizard({
 	const [checking, setChecking] = useState(false);
 	const payoutReady = !!payout?.attorney?.transfersEnabled;
 
-	// The address the invitation went to, for the confirmation screen.
-	const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
+	// The address the invitation went to, for the confirmation screen. Seeded when
+	// resuming a case that already has a pending invitation, so "Manage invitation"
+	// shows who was asked rather than a blank.
+	const [invitedEmail, setInvitedEmail] = useState<string | null>(
+		initial?.invitedEmail ?? null,
+	);
 
 	const coverInput = useRef<HTMLInputElement>(null);
 	const moreInput = useRef<HTMLInputElement>(null);
@@ -1009,7 +1026,7 @@ export function CaseWizard({
 					</h1>
 					<p className="mx-auto mt-3 max-w-[460px] text-[15px] text-ink-soft leading-relaxed">
 						Bar-listed attorneys on JustUs can now review your case and request
-						to represent you. You choose who takes it on.
+						to represent you. You decide who takes it on.
 					</p>
 
 					<div className="mt-8 flex items-center justify-between gap-3 rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 text-left shadow-[var(--shadow-rest)]">
@@ -1329,7 +1346,7 @@ export function CaseWizard({
 								<p className="text-[13px] text-muted-foreground">
 									{attorney
 										? `${attorney.firm} · ${attorney.area} · ${attorney.location}`
-										: "Choose your attorney in the previous step."}
+										: "Connect with your attorney in the previous step."}
 								</p>
 							</div>
 						</div>
@@ -1466,58 +1483,35 @@ export function CaseWizard({
 						Discard case
 					</button>
 				</div>
-
-				{discardOpen && (
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-						<button
-							type="button"
-							aria-label="Keep editing"
-							disabled={discarding}
-							onClick={() => setDiscardOpen(false)}
-							className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
-						/>
-						<div
-							role="dialog"
-							aria-modal="true"
-							className="relative w-full max-w-[400px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 text-left shadow-[var(--shadow-modal)]"
-						>
-							<div className="mb-3 flex size-11 items-center justify-center rounded-full bg-danger/10 text-danger">
-								<X className="size-5" aria-hidden="true" />
-							</div>
-							<h2 className="font-bold text-[17px] text-ink">
-								Discard this case?
-							</h2>
-							<p className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed">
-								You'll lose anything you haven't saved
-								{caseId ? ", and this draft will be removed" : ""}. This can't
-								be undone.
-							</p>
-							<div className="mt-5 flex justify-end gap-2.5">
-								<Button
-									variant="outline"
-									disabled={discarding}
-									onClick={() => setDiscardOpen(false)}
-								>
-									Keep editing
-								</Button>
-								<Button
-									disabled={discarding}
-									onClick={discard}
-									className={cn("bg-danger text-white hover:bg-danger/90")}
-								>
-									<X data-icon="inline-start" aria-hidden="true" />
-									{discarding ? "Discarding…" : "Discard case"}
-								</Button>
-							</div>
-						</div>
-					</div>
-				)}
 			</aside>
 
 			{/* Main — only this column scrolls */}
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col bg-paper">
 				<main className="min-h-0 flex-1 overflow-y-auto px-6 py-10 sm:px-12">
 					<div className="mx-auto max-w-[720px]">
+						{/* The step sidebar (Save & exit / Discard) is hidden below lg, so
+						    surface those actions here on mobile — otherwise there's no way
+						    out of the wizard but Back. */}
+						<div className="mb-6 flex items-center justify-between gap-3 lg:hidden">
+							<button
+								type="button"
+								onClick={saveAndExit}
+								disabled={saving || discarding}
+								className="flex items-center gap-1.5 font-semibold text-[13px] text-ink-soft transition-colors hover:text-ink disabled:opacity-60"
+							>
+								<ArrowLeft className="size-4" aria-hidden="true" />
+								{saving ? "Saving…" : "Save & exit"}
+							</button>
+							<button
+								type="button"
+								onClick={() => setDiscardOpen(true)}
+								disabled={saving || discarding}
+								className="flex items-center gap-1.5 font-semibold text-[13px] text-danger/80 transition-colors hover:text-danger disabled:opacity-60"
+							>
+								<X className="size-4" aria-hidden="true" />
+								Discard
+							</button>
+						</div>
 						<p className="mb-2 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.1em]">
 							Step {step} of {LAST_STEP}
 						</p>
@@ -2122,7 +2116,7 @@ export function CaseWizard({
 									className="mt-4 inline-flex items-center gap-1.5 font-semibold text-[13.5px] text-brass-deep transition-colors hover:text-brass"
 								>
 									<Search className="size-4" aria-hidden="true" />
-									Choose a different attorney
+									Connect with a different attorney
 								</button>
 							</>
 						) : step === 3 ? (
@@ -2131,8 +2125,9 @@ export function CaseWizard({
 									Do you have an attorney?
 								</h1>
 								<p className="mt-2.5 max-w-[600px] text-[15px] text-ink-soft leading-relaxed">
-									You always choose who represents you. Already found someone?
-									Add them. If not, we'll help you get in front of attorneys.
+									You connect with your own attorney directly. Already found
+									someone? Add them. If not, we'll help you get in front of
+									attorneys.
 								</p>
 
 								<div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -2372,7 +2367,7 @@ export function CaseWizard({
 												</h3>
 												<p className="mt-1 mb-4 flex-1 text-[13px] text-ink-soft leading-relaxed">
 													Don't want to wait? Browse the directory and message
-													attorneys who fit. You choose who to talk to.
+													attorneys who fit. You decide who to talk to.
 												</p>
 												<Button
 													type="button"
@@ -2693,7 +2688,7 @@ export function CaseWizard({
 												label: `Evidence attached (${evidence.length} item${evidence.length === 1 ? "" : "s"})`,
 												done: true,
 											},
-											{ label: "Attorney chosen · fee agreed", done: true },
+											{ label: "Attorney connected · fee agreed", done: true },
 											{
 												label: payoutReady
 													? `Payout account ready · ${payout?.attorney?.firmName ?? attorneyName}`
@@ -2739,6 +2734,55 @@ export function CaseWizard({
 						)}
 					</div>
 				</main>
+
+				{/* Rendered here, in the always-visible column, rather than in the
+				    step sidebar — that sidebar is hidden below lg, and a modal nested
+				    in a hidden ancestor never shows, so mobile's Discard did nothing. */}
+				{discardOpen && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+						<button
+							type="button"
+							aria-label="Keep editing"
+							disabled={discarding}
+							onClick={() => setDiscardOpen(false)}
+							className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+						/>
+						<div
+							role="dialog"
+							aria-modal="true"
+							className="relative w-full max-w-[400px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 text-left shadow-[var(--shadow-modal)]"
+						>
+							<div className="mb-3 flex size-11 items-center justify-center rounded-full bg-danger/10 text-danger">
+								<X className="size-5" aria-hidden="true" />
+							</div>
+							<h2 className="font-bold text-[17px] text-ink">
+								Discard this case?
+							</h2>
+							<p className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed">
+								You'll lose anything you haven't saved
+								{caseId ? ", and this draft will be removed" : ""}. This can't
+								be undone.
+							</p>
+							<div className="mt-5 flex justify-end gap-2.5">
+								<Button
+									variant="outline"
+									disabled={discarding}
+									onClick={() => setDiscardOpen(false)}
+								>
+									Keep editing
+								</Button>
+								<Button
+									disabled={discarding}
+									onClick={discard}
+									className={cn("bg-danger text-white hover:bg-danger/90")}
+								>
+									<X data-icon="inline-start" aria-hidden="true" />
+									{discarding ? "Discarding…" : "Discard case"}
+								</Button>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* Action bar — pinned below the scroll area */}
 				<div className="shrink-0 border-border border-t bg-paper px-6 py-4 sm:px-12">

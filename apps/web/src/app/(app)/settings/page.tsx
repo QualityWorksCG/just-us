@@ -53,7 +53,11 @@ export default async function SettingsPage() {
 				admittedStates={admitted}
 			/>
 			<NotificationSettings emailEnabled={notificationPref.emailEnabled} />
-			<DonationPrivacySettings anonymous={profile.donationsAnonymous} />
+			{/* Only donors give, so only they have a name to show or hide on a public
+			    backer list — a plaintiff or attorney never sees this control. */}
+			{profile.role === "donor" && (
+				<DonationPrivacySettings anonymous={profile.donationsAnonymous} />
+			)}
 			{readiness ? (
 				<PayoutCasesLink
 					waitingCases={readiness.waitingCases}
