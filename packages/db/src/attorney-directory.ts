@@ -265,3 +265,49 @@ export async function listedStates(): Promise<string[]> {
 	});
 	return rows.map((row) => row.state);
 }
+
+/**
+ * The snapshot of a directory attorney to record on a case when a plaintiff
+ * requests them, by their account id. Null when the id isn't an attorney account
+ * — a plaintiff can only request an on-platform attorney (the same accounts
+ * messaging is offered for).
+ *
+ * More than the address: the case carries the same shape the wizard's
+ * bring-your-own path writes (name, firm, area, state), so every screen that
+ * reads a case's attorney — including "Manage invitation", which resumes the
+ * wizard — shows who was asked rather than a blank.
+ */
+export async function attorneyInviteContact(userId: string): Promise<{
+	email: string;
+	name: string;
+	firm: string;
+	area: string;
+	location: string;
+} | null> {
+	const u = await prisma.user.findFirst({
+		where: { id: userId, role: "attorney" },
+		select: {
+			email: true,
+			name: true,
+			attorneyProfile: {
+				select: {
+					legalName: true,
+					firmName: true,
+					officeState: true,
+					practiceAreas: true,
+				},
+			},
+		},
+	});
+	if (!u) return null;
+	const p = u.attorneyProfile;
+	return {
+		email: u.email,
+		name: p?.legalName || u.name,
+		firm: p?.firmName ?? "",
+		// The first listed practice area stands in for their area, matching the
+		// single free-text "area" the wizard captures.
+		area: p?.practiceAreas?.[0] ?? "",
+		location: p?.officeState ?? "",
+	};
+}

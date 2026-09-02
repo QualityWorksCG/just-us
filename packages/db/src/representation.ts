@@ -221,37 +221,72 @@ export type QueueCaseDetail = QueueCase & {
 	evidence: { name: string; size: number }[];
 	coverImageUrl: string | null;
 	images: string[];
+	/** Set when this attorney has a pending invitation to represent the case (the
+	 *  plaintiff named them). The detail view swaps "Express interest" for the
+	 *  accept/decline of that invitation, so a directed request and an open intake
+	 *  read on the same screen. */
+	invitationId: string | null;
 };
 
 /**
  * One queued case in full, for the attorney case view.
  *
- * Gated on the same `queueWhere` predicate as the list rather than on the id
- * alone, so a case that has since been matched, published live, withdrawn, or
- * deleted stops being readable at the moment it leaves the queue — including for
- * an attorney who already had the link. Returns null in that case, which the
- * route turns into a 404.
+ * Readable when the case is in this attorney's queue (the `queueWhere` predicate)
+ * OR when they've already put themselves forward for it — so a browsing stranger
+ * to the case is still gated by admissions and status, but an attorney following
+ * their own expression of interest from "Your requests" can always re-read the
+ * intake they acted on, even after it has left the queue (matched elsewhere, or
+ * closed). Deleted and moderation-held cases stay hidden either way. Returns null
+ * when neither holds, which the route turns into a 404.
  */
 export async function getQueueCase(
 	caseId: string,
 	attorneyId: string,
 ): Promise<QueueCaseDetail | null> {
-	// Scoped exactly as the list is: a case outside this attorney's admissions is
-	// not theirs to read in full, link or no link.
-	const states = await admittedStates(attorneyId);
+	const [states, me] = await Promise.all([
+		admittedStates(attorneyId),
+		prisma.user.findUnique({
+			where: { id: attorneyId },
+			select: { email: true },
+		}),
+	]);
+	// Invitations are keyed on the address the plaintiff named, not an account id.
+	const email = me?.email?.toLowerCase() ?? null;
+	const now = new Date();
+	// A where that matches no row, for when there's no address to match against.
+	const myPendingInvite = {
+		email: email ?? " ",
+		...pendingCaseInvitationWhere(now),
+	};
+
 	const row = await prisma.case.findFirst({
-		where: { ...queueWhere({}, states), id: caseId },
+		where: {
+			id: caseId,
+			deletedAt: null,
+			moderationStatus: "ok",
+			OR: [
+				queueWhere({}, states),
+				{ requests: { some: { attorneyId } } },
+				// A case they were named on is held out of the open queue, so it only
+				// reaches them through their own invitation — which is exactly this.
+				// Any status, not just pending: an attorney can re-open a case they
+				// declined from their "Declined" tab even after it has left the queue,
+				// the same way an expression of interest above stays re-readable.
+				...(email ? [{ invitations: { some: { email } } }] : []),
+			],
+		},
 		select: {
 			...detailSelect,
 			requests: {
 				where: { attorneyId },
 				select: { status: true, createdAt: true },
 			},
+			invitations: { where: myPendingInvite, select: { id: true }, take: 1 },
 		},
 	});
 	if (!row) return null;
 
-	const { requests, location, owner, evidence, ...rest } = row;
+	const { requests, invitations, location, owner, evidence, ...rest } = row;
 	return {
 		...rest,
 		state: location,
@@ -263,6 +298,7 @@ export async function getQueueCase(
 			size: file.size ?? 0,
 		})),
 		myInterest: requests[0] ?? null,
+		invitationId: invitations[0]?.id ?? null,
 	};
 }
 

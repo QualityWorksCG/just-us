@@ -152,7 +152,7 @@ export default async function CasePage({
 					className="mb-3"
 				/>
 				<div className="flex flex-wrap items-center gap-3">
-					<h2 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
+					<h2 className="min-w-0 break-words font-extrabold text-[26px] text-ink tracking-[-0.02em] sm:text-[30px]">
 						{c.title || "Untitled case"}
 					</h2>
 					<span
@@ -296,7 +296,7 @@ async function AttorneyView({
 								<h3 className="flex items-center gap-2 font-bold text-[15px] text-ink">
 									Posted updates
 									{updates.length > 0 && (
-										<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
+										<span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 font-bold text-[11px] text-ink-soft">
 											{updates.length}
 										</span>
 									)}

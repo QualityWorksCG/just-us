@@ -14,9 +14,10 @@ import {
 	SidebarProvider,
 	SidebarRail,
 	SidebarTrigger,
+	useSidebar,
 } from "@just-us/ui/components/sidebar";
 import { cn } from "@just-us/ui/lib/utils";
-import { LogOut } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import type { Route } from "next";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -34,6 +35,7 @@ import {
 	findScreenByPath,
 	getRoleNav,
 	HOME_PATH,
+	type NavItem,
 	navPath,
 	visibleNavItems,
 } from "@/lib/dashboard-nav";
@@ -78,6 +80,82 @@ function initials(name: string) {
 	);
 }
 
+/**
+ * The nav list. Split out so it renders inside the SidebarProvider and can close
+ * the mobile sheet the moment a link is tapped — without that, navigating left
+ * the drawer open on top of the very page it had just gone to.
+ */
+function SidebarNavMenu({
+	items,
+	activeSlug,
+	messageUnreadCount,
+	intakeNewCount,
+}: {
+	items: NavItem[];
+	activeSlug: string | undefined;
+	messageUnreadCount: number;
+	intakeNewCount: number;
+}) {
+	const { isMobile, setOpenMobile } = useSidebar();
+	return (
+		<SidebarMenu className="gap-0.5">
+			{items.map((item) => {
+				const href = navPath(item) as Route;
+				const active = item.slug === activeSlug;
+				return (
+					<SidebarMenuItem key={item.slug || "home"}>
+						<SidebarMenuButton
+							// Tooltip only surfaces while collapsed — that's the label's
+							// only home once the text is hidden.
+							tooltip={item.label}
+							isActive={active}
+							onClick={() => {
+								if (isMobile) setOpenMobile(false);
+							}}
+							className="h-auto rounded-[9px] px-3 py-2.5 font-semibold text-[13.5px]"
+							render={
+								<Link href={href} aria-current={active ? "page" : undefined} />
+							}
+						>
+							<item.icon className="size-[17px] shrink-0" />
+							<span>{item.label}</span>
+							{item.slug === "messages" && messageUnreadCount > 0 && (
+								<span className="ml-auto flex size-5 items-center justify-center rounded-full bg-brass font-bold text-[11px] text-white tabular-nums">
+									{messageUnreadCount}
+								</span>
+							)}
+							{item.slug === "queue" && intakeNewCount > 0 && (
+								<span className="ml-auto flex size-5 items-center justify-center rounded-full bg-brass font-bold text-[11px] text-white tabular-nums">
+									{intakeNewCount}
+								</span>
+							)}
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				);
+			})}
+		</SidebarMenu>
+	);
+}
+
+/**
+ * A clear way out of the mobile drawer, in its own header. The sheet's built-in
+ * close is hidden and its overlay is a thin strip beside an open menu, so a wide
+ * drawer was hard to dismiss. Hidden on desktop, where the sidebar is permanent.
+ */
+function SidebarCloseButton() {
+	const { setOpenMobile } = useSidebar();
+	return (
+		<button
+			type="button"
+			aria-label="Close menu"
+			onClick={() => setOpenMobile(false)}
+			className="absolute top-1/2 right-3 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-paper/70 transition-colors hover:bg-paper/10 hover:text-paper md:hidden"
+		>
+			<X className="size-5" aria-hidden="true" />
+		</button>
+	);
+}
+
 export function AppShell({
 	role,
 	name,
@@ -86,6 +164,7 @@ export function AppShell({
 	defaultOpen,
 	flags,
 	messageUnreadCount = 0,
+	intakeNewCount = 0,
 	notifications = [],
 	notificationUnreadCount = 0,
 	children,
@@ -101,6 +180,9 @@ export function AppShell({
 	/** Feature-flag state from the server; hides flagged-off screens. (JUS-13) */
 	flags: FlagState;
 	messageUnreadCount?: number;
+	/** New intake requests for an attorney — plaintiffs who named them and are
+	 *  waiting on a decision. Badges the "Intake requests" nav item. */
+	intakeNewCount?: number;
 	/** Recent notification rows for the header bell (any role). */
 	notifications?: BellNotification[];
 	/** Total unread notifications — the bell badge count. */
@@ -169,7 +251,7 @@ export function AppShell({
 				new — the old sidebar was `hidden md:flex` with no mobile nav at all.
 			*/}
 			<Sidebar collapsible="icon">
-				<SidebarHeader className="p-0">
+				<SidebarHeader className="relative p-0">
 					{/* The role home, not `/` — a signed-in user is redirected off the
 					    marketing page anyway (see proxy.ts), so pointing the mark there
 					    would only bounce them back via a round trip. */}
@@ -191,6 +273,10 @@ export function AppShell({
 							</span>
 						</span>
 					</Link>
+					{/* The mobile sheet hides the drawer's built-in close, and its own
+					    overlay is a thin strip beside an open menu — so give the menu its
+					    own clear way out. Mobile only; the desktop rail uses the trigger. */}
+					<SidebarCloseButton />
 				</SidebarHeader>
 
 				<SidebarContent>
@@ -200,37 +286,12 @@ export function AppShell({
 						what fits. p-3 leaves 1.5rem for a 2rem button and shoves it off-centre.
 					*/}
 					<SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
-						<SidebarMenu className="gap-0.5">
-							{items.map((item) => {
-								const href = navPath(item) as Route;
-								const active = item.slug === activeSlug;
-								return (
-									<SidebarMenuItem key={item.slug || "home"}>
-										<SidebarMenuButton
-											// Tooltip only surfaces while collapsed — that's the
-											// label's only home once the text is hidden.
-											tooltip={item.label}
-											isActive={active}
-											className="h-auto rounded-[9px] px-3 py-2.5 font-semibold text-[13.5px]"
-											render={
-												<Link
-													href={href}
-													aria-current={active ? "page" : undefined}
-												/>
-											}
-										>
-											<item.icon className="size-[17px] shrink-0" />
-											<span>{item.label}</span>
-											{item.slug === "messages" && messageUnreadCount > 0 && (
-												<span className="ml-auto rounded-full bg-brass px-1.5 py-0.5 font-bold text-[11px] text-brass-ink">
-													{messageUnreadCount}
-												</span>
-											)}
-										</SidebarMenuButton>
-									</SidebarMenuItem>
-								);
-							})}
-						</SidebarMenu>
+						<SidebarNavMenu
+							items={items}
+							activeSlug={activeSlug}
+							messageUnreadCount={messageUnreadCount}
+							intakeNewCount={intakeNewCount}
+						/>
 					</SidebarGroup>
 				</SidebarContent>
 

@@ -105,7 +105,7 @@ export function CaseTabs({
 							{tab.count !== undefined && tab.count > 0 && (
 								<span
 									className={cn(
-										"inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 font-bold text-[11px] tabular-nums",
+										"inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-bold text-[11px] tabular-nums",
 										selected
 											? "bg-paper/15 text-paper"
 											: "bg-surface-2 text-ink-soft",

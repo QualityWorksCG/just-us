@@ -7,7 +7,7 @@ import Link from "next/link";
 import { caseInviteHref } from "@/lib/case-invite-ref";
 import { withNext } from "@/lib/next-path";
 
-import { money } from "./attorney-cases";
+import { money } from "./attorney-payout";
 
 /**
  * The cases an attorney has been asked to take on, on the screen they actually

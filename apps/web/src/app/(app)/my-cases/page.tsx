@@ -159,7 +159,10 @@ export default async function MyCasesPage({
 				</div>
 				<Link
 					href="/my-cases/new"
-					className={cn(buttonVariants({ size: "lg" }), "px-5")}
+					className={cn(
+						buttonVariants({ size: "lg" }),
+						"w-full justify-center px-5 sm:w-auto",
+					)}
 				>
 					<Plus data-icon="inline-start" aria-hidden="true" />
 					Start a new case
@@ -190,7 +193,7 @@ export default async function MyCasesPage({
 							{t.label}
 							<span
 								className={cn(
-									"inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 font-bold text-[11px]",
+									"inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-bold text-[11px]",
 									active
 										? "bg-paper/20 text-paper"
 										: "bg-surface-2 text-ink-soft",
@@ -218,7 +221,7 @@ export default async function MyCasesPage({
 					<p className="max-w-[42ch] text-[13.5px] text-muted-foreground leading-relaxed">
 						{filter === "deleted"
 							? "Deleted cases stay here as a record. Deleting is permanent. A deleted case can't be restored."
-							: "Start your first case: tell your story, choose your attorney, and raise the agreed fee."}
+							: "Start your first case: tell your story, connect with your own attorney, and raise the agreed fee."}
 					</p>
 					{filter !== "deleted" && (
 						<Link
@@ -254,7 +257,7 @@ export default async function MyCasesPage({
 						const badge = isDeleted
 							? { text: "Deleted", dot: "bg-danger" }
 							: isLive
-								? { text: "Live", dot: "bg-success" }
+								? { text: "Active", dot: "bg-success" }
 								: isClosed
 									? { text: "Closed", dot: "bg-ink-soft" }
 									: invite

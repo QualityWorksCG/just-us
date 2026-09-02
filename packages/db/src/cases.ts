@@ -275,6 +275,94 @@ export async function getOwnedCase(id: string, ownerId: string) {
 }
 
 /**
+ * Send an owned case out to attorneys (status → `seeking`) — the step behind a
+ * plaintiff requesting a specific attorney from the directory rather than going
+ * through the publish wizard.
+ *
+ * A no-op when the case is already `seeking`; refused once it's matched or past
+ * seeking; and only allowed once the case carries the essentials the queue and an
+ * invited attorney need to judge it (a title, a story, a category, a state). The
+ * caller holds the case out of the open queue with a pending invitation right
+ * after this, so a directed request stays between the plaintiff and that attorney.
+ */
+export async function sendCaseToAttorneys(
+	caseId: string,
+	ownerId: string,
+): Promise<
+	| { ok: true }
+	| { ok: false; reason: "not_found" | "incomplete" | "unavailable" }
+> {
+	const c = await prisma.case.findFirst({
+		where: { id: caseId, ownerId, deletedAt: null },
+		select: {
+			status: true,
+			title: true,
+			story: true,
+			category: true,
+			location: true,
+			match: { select: { id: true } },
+		},
+	});
+	if (!c) return { ok: false, reason: "not_found" };
+	if (c.match) return { ok: false, reason: "unavailable" };
+	if (c.status === "seeking") return { ok: true };
+	if (c.status !== "draft") return { ok: false, reason: "unavailable" };
+	if (
+		!c.title?.trim() ||
+		!c.story?.trim() ||
+		!c.category?.trim() ||
+		!c.location?.trim()
+	) {
+		return { ok: false, reason: "incomplete" };
+	}
+	await prisma.case.update({
+		where: { id: caseId },
+		data: { status: "seeking", publishedAt: new Date() },
+	});
+	return { ok: true };
+}
+
+/**
+ * Record who a plaintiff invited from the directory onto the case itself.
+ *
+ * The "Request to represent" flow names an attorney by their account, not by the
+ * typed-in details the wizard captures — but the case still needs the same
+ * snapshot (name, firm, area, state, email) so every screen that reads a case's
+ * attorney shows who was asked. Without it, resuming the case in the wizard to
+ * "Manage invitation" lost the selection and dropped back to a blank attorney
+ * step. Content columns only, and scoped to a case still in the plaintiff's hands
+ * (draft or seeking), so status, match and payout binding stay untouched.
+ */
+export async function setCaseInvitedAttorney(input: {
+	caseId: string;
+	ownerId: string;
+	attorney: {
+		name: string;
+		firm: string;
+		area: string;
+		location: string;
+		email: string;
+	};
+}): Promise<boolean> {
+	const res = await prisma.case.updateMany({
+		where: {
+			id: input.caseId,
+			ownerId: input.ownerId,
+			deletedAt: null,
+			status: { in: ["draft", "seeking"] },
+		},
+		data: {
+			attorneyName: input.attorney.name,
+			attorneyFirm: input.attorney.firm,
+			attorneyArea: input.attorney.area,
+			attorneyLocation: input.attorney.location,
+			attorneyEmail: input.attorney.email,
+		},
+	});
+	return res.count > 0;
+}
+
+/**
  * The one narrow circumstance in which the plaintiff's typed `attorneyEmail` is
  * enough to reach a case — **an authorization fragment**, not a lookup.
  *

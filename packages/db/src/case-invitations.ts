@@ -494,6 +494,66 @@ export async function pendingInvitationsForEmail(
 	}));
 }
 
+export type DeclinedInvitationForAttorney = {
+	id: string;
+	caseId: string;
+	caseTitle: string;
+	category: string;
+	location: string;
+	plaintiffName: string;
+	declinedAt: Date;
+};
+
+/**
+ * The invitations this attorney has declined — the record behind the "Declined"
+ * tab of Intake requests.
+ *
+ * A plaintiff named them, they said no, and the intake leaves their "New" list;
+ * this is where it lands so a decline reads as something that happened rather
+ * than a request that silently vanished. Kept even after the case is taken or
+ * withdrawn — this is history, not an open decision, so only a deleted case
+ * drops out. Matched on the address, like the pending side.
+ */
+export async function declinedInvitationsForEmail(
+	email: string,
+): Promise<DeclinedInvitationForAttorney[]> {
+	const normalized = email.trim();
+	if (!normalized) return [];
+
+	const rows = await prisma.caseInvitation.findMany({
+		where: {
+			email: { equals: normalized, mode: "insensitive" },
+			declinedAt: { not: null },
+			case: { deletedAt: null },
+		},
+		orderBy: { declinedAt: "desc" },
+		select: {
+			id: true,
+			declinedAt: true,
+			case: {
+				select: {
+					id: true,
+					title: true,
+					category: true,
+					location: true,
+					owner: { select: { name: true } },
+				},
+			},
+		},
+	});
+
+	return rows.map((row) => ({
+		id: row.id,
+		caseId: row.case.id,
+		caseTitle: row.case.title,
+		category: row.case.category,
+		location: row.case.location,
+		plaintiffName: row.case.owner.name,
+		// Non-null: the `declinedAt: { not: null }` predicate above guarantees it.
+		declinedAt: row.declinedAt as Date,
+	}));
+}
+
 export type CreateInvitedAttorneyResult =
 	| { ok: true; userId: string; email: string }
 	| { ok: false; code: CaseInvitationTokenErrorCode | "email_taken" };

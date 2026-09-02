@@ -6,6 +6,7 @@ import { Eye } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { ContactAttorneyButton } from "@/components/attorneys/contact-attorney-button";
+import { RequestRepresentationButton } from "@/components/attorneys/request-representation-button";
 import { MessageAttorneyButton } from "@/components/messages/message-attorney-button";
 import { FEE_APPROACHES } from "@/lib/attorney-profile";
 
@@ -102,11 +103,16 @@ export function AttorneyCard({
 	profileBasePath = "/attorneys",
 	showMessageAction = false,
 	existingConversationId,
+	requestCaseId,
 }: {
 	attorney: DirectoryAttorney;
 	/** The plaintiff's existing conversation with this attorney, if any — so the
 	 *  message CTA sends them there instead of opening a fresh compose. */
 	existingConversationId?: string | null;
+	/** The plaintiff's case, when they arrived from one — enables "Request to
+	 *  represent", the ask that sends this attorney the case to accept or decline.
+	 *  Absent (public directory, or no case in hand) hides that action. */
+	requestCaseId?: string | null;
 	/**
 	 * Where this card's "View profile" link points, without the id.
 	 *
@@ -241,6 +247,17 @@ export function AttorneyCard({
 						<Eye aria-hidden="true" />
 						View profile
 					</Link>
+					{/* The ask itself — only when the plaintiff arrived with a case and the
+					    attorney is on-platform to receive it. Sits above Message: messaging
+					    is for context, this is the request to take the case on. */}
+					{requestCaseId && attorney.userId && (
+						<RequestRepresentationButton
+							attorneyId={attorney.userId}
+							attorneyName={attorney.legalName}
+							caseId={requestCaseId}
+							className="w-full justify-center"
+						/>
+					)}
 					{/* Contact routes through case submission: an attorney needs the case
 					    to decide, so there is nothing to send them without one. The button
 					    explains that before moving them, rather than dropping them into the

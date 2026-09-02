@@ -1,7 +1,10 @@
 import { listAdmissions } from "@just-us/db/admissions";
 import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import {
-	listAttorneyCases,
+	declinedInvitationsForEmail,
+	pendingInvitationsForEmail,
+} from "@just-us/db/case-invitations";
+import {
 	listMyInterests,
 	listSeekingQueue,
 	queueCategories,
@@ -18,16 +21,19 @@ import {
 } from "@/components/dashboard/seeking-queue";
 import {
 	type ExpressionIntake,
-	type MatchedIntake,
-	YourIntakes,
-} from "@/components/dashboard/your-intakes";
+	type InvitationItem,
+	YourRequests,
+} from "@/components/dashboard/your-requests";
 import { requireRole } from "@/lib/auth-server";
 
 /**
- * Intake requests — the attorney's expressions of interest and the open queue, in
- * one place (JUS-25). Two tabs:
- *   - Your intakes — what became of everything they've put themselves forward for.
- *   - Browse open  — the open queue, scoped to the states they're admitted in.
+ * Intake requests — an attorney's own expressions of interest and the open queue,
+ * in one place (JUS-25). Two tabs:
+ *   - Your requests — the intakes they've put themselves forward for that are
+ *     still open questions (awaiting a decision, or declined). Intakes they were
+ *     taken on for are live work and live on "My intakes", not here.
+ *   - Browse open   — every open intake still seeking an attorney, scoped to the
+ *     states they're admitted in.
  *
  * The heading is the shell's (the nav title); this renders the sub and the tabs.
  */
@@ -41,35 +47,44 @@ export default async function IntakeRequestsPage({
 	const tab = params.tab === "open" ? "open" : "yours";
 	const filters = readQueueParams(params);
 
-	const [cases, categories, states, interests, matched, profile, admissions] =
-		await Promise.all([
-			listSeekingQueue(session.user.id, {
-				category: filters.category,
-				state: filters.state,
-				sort: toQueueSort(filters.sort),
-			}),
-			queueCategories(session.user.id),
-			queueStates(session.user.id),
-			listMyInterests(session.user.id),
-			listAttorneyCases({ userId: session.user.id, email: session.user.email }),
-			getAttorneyProfile(session.user.id),
-			listAdmissions(session.user.id),
-		]);
+	const [
+		cases,
+		categories,
+		states,
+		interests,
+		profile,
+		admissions,
+		invites,
+		declinedInvites,
+	] = await Promise.all([
+		listSeekingQueue(session.user.id, {
+			category: filters.category,
+			state: filters.state,
+			sort: toQueueSort(filters.sort),
+		}),
+		queueCategories(session.user.id),
+		queueStates(session.user.id),
+		listMyInterests(session.user.id),
+		getAttorneyProfile(session.user.id),
+		listAdmissions(session.user.id),
+		// Plaintiffs who named this attorney and are waiting on their decision —
+		// the "New" tab, incoming and actionable, the opposite direction from the
+		// attorney's own expressions of interest below.
+		pendingInvitationsForEmail(session.user.email),
+		// Invitations this attorney has since declined — kept as a record on the
+		// "Declined" tab, alongside interests a plaintiff turned down.
+		declinedInvitationsForEmail(session.user.email),
+	]);
 
-	// Matched intakes are the cases they're actually acting on — those carry
-	// funding, so they come from the caseload read, not the bare interest rows.
-	// Accepted interests are the same cases, so the interest list here is only the
-	// still-open and the passed-on, to avoid showing a matched case twice.
-	const matchedIntakes: MatchedIntake[] = matched.map((c) => ({
-		id: c.id,
-		title: c.title,
-		status: c.status,
-		category: c.category,
-		state: c.state,
-		raisedCents: c.raisedCents,
-		goalCents: c.goalCents,
-		donorsCount: c.donorsCount,
+	const invitations: InvitationItem[] = invites.map((inv) => ({
+		id: inv.id,
+		caseId: inv.caseId,
+		title: inv.caseTitle,
+		category: inv.category,
+		state: inv.location,
+		plaintiffName: inv.plaintiffName,
 	}));
+
 	const toExpression = (i: (typeof interests)[number]): ExpressionIntake => ({
 		id: i.id,
 		caseId: i.case.id,
@@ -77,28 +92,41 @@ export default async function IntakeRequestsPage({
 		category: i.case.category,
 		state: i.case.state,
 	});
-	const interested = interests
+	// The attorney's own expressions of interest, split by what became of each:
+	// still awaiting the plaintiff (Interest sent), Accepted, or Declined.
+	const awaiting = interests
 		.filter((i) => i.status === "pending" || i.status === "viewed")
 		.map(toExpression);
-	const passed = interests
-		.filter((i) => i.status === "declined")
+	const accepted = interests
+		.filter((i) => i.status === "accepted")
 		.map(toExpression);
-
-	const expressionsOut = matchedIntakes.length + interested.length;
+	// Two kinds of "declined" share this tab: an expression of interest a plaintiff
+	// turned down, and an invitation this attorney declined themselves. Both are a
+	// closed record of the same case, so they read as one list.
+	const declined = [
+		...interests.filter((i) => i.status === "declined").map(toExpression),
+		...declinedInvites.map((d) => ({
+			id: d.id,
+			caseId: d.caseId,
+			title: d.caseTitle,
+			category: d.category,
+			state: d.location,
+		})),
+	];
 
 	return (
 		<div className="flex flex-col gap-6">
 			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 				{tab === "open"
-					? "Open intakes seeking an attorney. Express interest and the plaintiff decides whether to take it further."
-					: "Intakes matched to you, plus open cases seeking an attorney. You decide who to put yourself forward for."}
+					? "Open intakes still seeking an attorney. Express interest and the plaintiff decides whether to take it further."
+					: "New requests from plaintiffs who named you, and the expressions of interest you've sent out. Intakes you now represent live under My intakes."}
 			</p>
 
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<div className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-surface-2 p-1">
 					<TabLink
 						href={"/queue" as Route}
-						label="Your intakes"
+						label="Your requests"
 						active={tab === "yours"}
 					/>
 					<TabLink
@@ -110,11 +138,7 @@ export default async function IntakeRequestsPage({
 				<span className="text-[13px] text-muted-foreground">
 					{tab === "open"
 						? "Open intakes in your states · never ranked, never assigned"
-						: `${expressionsOut + passed.length} ${
-								expressionsOut + passed.length === 1
-									? "expression"
-									: "expressions"
-							} · ${interested.length} awaiting · ${matchedIntakes.length} taken forward`}
+						: `${invitations.length} new · ${awaiting.length} sent · ${accepted.length} accepted · ${declined.length} declined`}
 				</span>
 			</div>
 
@@ -131,17 +155,18 @@ export default async function IntakeRequestsPage({
 					canExpressInterest={profile?.verificationStatus === "verified"}
 				/>
 			) : (
-				<YourIntakes
-					matched={matchedIntakes}
-					interested={interested}
-					passed={passed}
+				<YourRequests
+					invitations={invitations}
+					awaiting={awaiting}
+					accepted={accepted}
+					declined={declined}
 				/>
 			)}
 		</div>
 	);
 }
 
-/** A pill tab in the segmented Your intakes / Browse open control. */
+/** A pill tab in the segmented Your requests / Browse open control. */
 function TabLink({
 	href,
 	label,

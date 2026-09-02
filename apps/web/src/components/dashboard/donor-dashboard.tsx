@@ -241,7 +241,7 @@ export function DonorDashboard({ data }: { data: DonorDashboardData }) {
 				/>
 			</div>
 
-			<div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+			<div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 				{/* Cases you're backing — the real cases this donor has given to,
 				    live or closed (closed shows a "Closed" badge so they can look back). */}
 				<section className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">

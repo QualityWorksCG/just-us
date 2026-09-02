@@ -201,7 +201,7 @@ export function PublicCaseView({
 
 			{/* Two columns — image beside the funding card; on mobile the funding card
 			    jumps above the story so donating/saving stays near the top. */}
-			<div className="mt-6 grid items-start gap-8 lg:grid-cols-[1fr_360px] lg:grid-rows-[auto_1fr]">
+			<div className="mt-6 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_1fr]">
 				{/* Cover + parties — first on mobile, top-left on desktop */}
 				<div className="order-1 lg:col-start-1 lg:row-start-1">
 					{/* Cover */}
@@ -233,10 +233,12 @@ export function PublicCaseView({
 									initials(owner)
 								)}
 							</span>
-							<div>
-								<p className="font-bold text-[15px] text-ink">{owner}</p>
+							<div className="min-w-0">
+								<p className="truncate font-bold text-[15px] text-ink">
+									{owner}
+								</p>
 								<p className="font-mono text-[10.5px] text-muted-foreground uppercase tracking-[0.07em]">
-									Plaintiff · raising this case
+									Plaintiff · bringing this case
 								</p>
 							</div>
 						</div>
@@ -253,8 +255,8 @@ export function PublicCaseView({
 										initials(c.attorneyName)
 									)}
 								</span>
-								<div>
-									<p className="font-bold text-[15px] text-ink">
+								<div className="min-w-0">
+									<p className="truncate font-bold text-[15px] text-ink">
 										{c.attorneyName}
 									</p>
 									<p className="font-mono text-[10.5px] text-muted-foreground uppercase tracking-[0.07em]">
@@ -454,7 +456,7 @@ export function PublicCaseView({
 						<h2 className="mb-3 flex items-center gap-2 font-bold text-[18px] text-ink">
 							Case updates
 							{c.updates.length > 0 && (
-								<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
+								<span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 font-bold text-[11px] text-ink-soft">
 									{c.updates.length}
 								</span>
 							)}

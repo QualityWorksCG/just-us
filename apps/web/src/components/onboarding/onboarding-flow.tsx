@@ -432,7 +432,7 @@ export function OnboardingFlow({
 										</span>
 										<p className="text-[14px] text-ink-soft leading-relaxed">
 											{isPlaintiff
-												? "You're all set. When you submit a case you'll pick the state it falls under and choose the attorney to represent you. We use that state to find attorneys licensed there."
+												? "You're all set. When you submit a case you'll pick the state it falls under and connect with the attorney to represent you. We use that state to find attorneys licensed there."
 												: "You're all set to fund cases. Give any amount to a case you believe in and follow it to the outcome. No extra details needed."}
 										</p>
 									</div>

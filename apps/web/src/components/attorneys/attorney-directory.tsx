@@ -24,6 +24,7 @@ export function AttorneyDirectory({
 	showMessageAction = false,
 	defaultState,
 	conversationByAttorney,
+	requestCaseId,
 }: {
 	attorneys: DirectoryAttorney[];
 	/** Passed to each card — see `AttorneyCard.profileBasePath`. */
@@ -38,6 +39,9 @@ export function AttorneyDirectory({
 	/** Attorney user id → the plaintiff's existing conversation with them, so a
 	 *  card whose attorney they've already messaged sends them to that thread. */
 	conversationByAttorney?: Record<string, string>;
+	/** The plaintiff's case, when they arrived from one — enables each card's
+	 *  "Request to represent". */
+	requestCaseId?: string | null;
 }) {
 	return (
 		<div className="flex flex-col gap-6">
@@ -85,6 +89,7 @@ export function AttorneyDirectory({
 								existingConversationId={
 									conversationByAttorney?.[attorney.userId]
 								}
+								requestCaseId={requestCaseId}
 							/>
 						))}
 					</div>
