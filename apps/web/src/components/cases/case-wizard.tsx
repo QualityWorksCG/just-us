@@ -58,6 +58,7 @@ import {
 	deleteCaseAction,
 	publishForAttorneysAction,
 	saveCaseDraftAction,
+	withdrawInviteAction,
 } from "@/app/cases/actions";
 import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
@@ -330,6 +331,10 @@ export function CaseWizard({
 	const [invitedEmail, setInvitedEmail] = useState<string | null>(
 		initial?.invitedEmail ?? null,
 	);
+	// The plaintiff changing their mind on the "waiting" screen: whether the
+	// confirm prompt is showing, and whether the withdraw is in flight.
+	const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+	const [withdrawing, setWithdrawing] = useState(false);
 
 	const coverInput = useRef<HTMLInputElement>(null);
 	const moreInput = useRef<HTMLInputElement>(null);
@@ -754,6 +759,39 @@ export function CaseWizard({
 		window.location.assign("/dashboard/cases");
 	}
 
+	// Change of mind on the "waiting" screen: take the invitation back and drop
+	// straight onto the attorney step to invite or pick someone else, rather than
+	// waiting out the week's expiry. The case returns to a private draft.
+	async function chooseDifferentAttorney() {
+		if (!caseId) {
+			setConfirmWithdraw(false);
+			setView("wizard");
+			setStep(3);
+			return;
+		}
+		setWithdrawing(true);
+		const res = await withdrawInviteAction(caseId);
+		setWithdrawing(false);
+		if (!res.ok) {
+			toast.error(res.error);
+			return;
+		}
+		// Clear the previous choice so the attorney step starts fresh.
+		setInvitedEmail(null);
+		setAttorney(null);
+		setAtName("");
+		setAtFirm("");
+		setAtEmail("");
+		setAtPhone("");
+		setAttorneyConfirmed(false);
+		setCommitted(false);
+		setRepChoice(null);
+		setConfirmWithdraw(false);
+		setView("wizard");
+		setStep(3);
+		toast.success("Invitation withdrawn. Choose a different attorney.");
+	}
+
 	// Polish the story with OpenAI — facts and voice preserved, clarity improved.
 	async function refineWithAI() {
 		if (story.trim().length < 20)
@@ -993,6 +1031,43 @@ export function CaseWizard({
 							Back to dashboard
 						</Link>
 					</div>
+
+					{/* Change of mind: the plaintiff doesn't have to wait out the week if
+					    the invitee is slow or they'd rather approach someone else. */}
+					{confirmWithdraw ? (
+						<div className="mx-auto mt-6 max-w-[440px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 text-left shadow-[var(--shadow-rest)]">
+							<p className="text-[13.5px] text-ink leading-relaxed">
+								Withdraw this invitation and choose someone else?{" "}
+								<span className="font-semibold">{attorneyName}</span>'s link
+								will stop working, and your case goes back to a private draft
+								you can send to a new attorney.
+							</p>
+							<div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+								<Button
+									variant="outline"
+									onClick={() => setConfirmWithdraw(false)}
+									disabled={withdrawing}
+								>
+									Keep waiting
+								</Button>
+								<Button
+									className="bg-green-deep text-white hover:bg-green-deep/90"
+									onClick={chooseDifferentAttorney}
+									disabled={withdrawing}
+								>
+									{withdrawing ? "Withdrawing…" : "Withdraw & choose another"}
+								</Button>
+							</div>
+						</div>
+					) : (
+						<button
+							type="button"
+							onClick={() => setConfirmWithdraw(true)}
+							className="mt-5 font-semibold text-[13px] text-brass-deep underline underline-offset-2 transition-colors hover:text-brass"
+						>
+							Changed your mind? Choose a different attorney
+						</button>
+					)}
 
 					<p className="mt-5 flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground">
 						<Lock className="size-3.5" aria-hidden="true" />

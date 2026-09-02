@@ -104,6 +104,7 @@ export function AttorneyCard({
 	showMessageAction = false,
 	existingConversationId,
 	requestCaseId,
+	alreadyRequested = false,
 }: {
 	attorney: DirectoryAttorney;
 	/** The plaintiff's existing conversation with this attorney, if any — so the
@@ -113,6 +114,9 @@ export function AttorneyCard({
 	 *  represent", the ask that sends this attorney the case to accept or decline.
 	 *  Absent (public directory, or no case in hand) hides that action. */
 	requestCaseId?: string | null;
+	/** True when this case already has a pending request to this attorney — the
+	 *  request button shows the sent state with a way to withdraw. */
+	alreadyRequested?: boolean;
 	/**
 	 * Where this card's "View profile" link points, without the id.
 	 *
@@ -255,6 +259,7 @@ export function AttorneyCard({
 							attorneyId={attorney.userId}
 							attorneyName={attorney.legalName}
 							caseId={requestCaseId}
+							alreadyRequested={alreadyRequested}
 							className="w-full justify-center"
 						/>
 					)}

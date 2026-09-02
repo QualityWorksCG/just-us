@@ -1,8 +1,10 @@
 import {
+	attorneyIdForEmail,
 	listDirectoryAttorneys,
 	listedPracticeAreas,
 	listedStates,
 } from "@just-us/db/attorney-directory";
+import { getPendingInvitationForCase } from "@just-us/db/case-invitations";
 import { getOwnedCase } from "@just-us/db/cases";
 import { listMessageConversations } from "@just-us/db/messages";
 import { ArrowLeft } from "lucide-react";
@@ -56,6 +58,17 @@ export default async function DashboardAttorneysPage({
 	const draftId = Array.isArray(params.draft) ? params.draft[0] : params.draft;
 	const draft = draftId ? await getOwnedCase(draftId, session.user.id) : null;
 	const defaultState = draft?.location || undefined;
+
+	// Which directory attorney the case's pending request went to, if any — so
+	// that card shows as already requested with a way to withdraw. Only a seeking
+	// case can hold a pending invitation; a draft has none.
+	const pendingInvite =
+		draft && draft.status === "seeking"
+			? await getPendingInvitationForCase(draft.id)
+			: null;
+	const requestedAttorneyId = pendingInvite
+		? await attorneyIdForEmail(pendingInvite.email)
+		: null;
 
 	// Where "back to your case" returns to, and what the banner says — it depends on
 	// where the case actually is. A still-in-progress draft goes back to the wizard
@@ -137,6 +150,9 @@ export default async function DashboardAttorneysPage({
 							? draft.id
 							: undefined
 					}
+					// The one attorney (if any) this case already has an outstanding
+					// request to — that card shows "Request sent" with a withdraw option.
+					requestedAttorneyId={requestedAttorneyId}
 				/>
 			</div>
 		</div>
