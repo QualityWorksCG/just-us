@@ -1,3 +1,4 @@
+import { getPendingInvitationForCase } from "@just-us/db/case-invitations";
 import { getOwnedCase } from "@just-us/db/cases";
 import {
 	getCaseMatch,
@@ -21,6 +22,7 @@ import { Fragment } from "react";
 
 import { AttorneyInterestCard } from "@/components/dashboard/attorney-interest-card";
 import { BackLink } from "@/components/dashboard/back-link";
+import { WithdrawRequestButton } from "@/components/dashboard/withdraw-request-button";
 import { requireRole } from "@/lib/auth-server";
 
 const STEPS = [
@@ -166,6 +168,131 @@ export default async function CaseRequestsPage({
 					/>
 					Nothing is final until you publish. Your case only goes live, and
 					starts raising, once you've agreed the fee and hit publish.
+				</div>
+			</div>
+		);
+	}
+
+	// A pending invitation means the plaintiff asked one named attorney (from the
+	// directory or the wizard), and the case is held just for them — it is NOT in
+	// the open queue, so no expressions of interest can arrive. This screen has to
+	// say that, rather than the "any bar-verified attorney can put themselves
+	// forward" copy the open-queue state uses.
+	const pendingInvite = await getPendingInvitationForCase(id);
+	if (pendingInvite) {
+		const attorneyName = c.attorneyName?.trim() || "the attorney you asked";
+		const firstName = attorneyName.split(/\s+/)[0] || attorneyName;
+		const daysLeft = Math.max(
+			0,
+			Math.ceil((pendingInvite.expiresAt.getTime() - Date.now()) / 86_400_000),
+		);
+		// A stepper true to a direct request: the request is sent and awaiting the
+		// attorney's answer, not sitting in an open queue for interest to arrive.
+		const requestedSteps = [
+			"Published",
+			"Request sent",
+			"They respond",
+			"Live",
+		] as const;
+		return (
+			<div className="flex w-full flex-col gap-6">
+				<div>
+					<BackLink
+						href={"/my-cases" as Route}
+						label="Back to my cases"
+						className="mb-3"
+					/>
+					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-brass-wash px-3 py-1 font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.06em]">
+						<Clock className="size-3" aria-hidden="true" />
+						Awaiting {firstName}'s reply
+					</span>
+					<h2 className="mt-3 font-extrabold text-[clamp(1.75rem,3.4vw,2.375rem)] text-ink tracking-[-0.03em]">
+						You asked {firstName} to represent you
+					</h2>
+					<p className="mt-2 max-w-[68ch] text-[14.5px] text-ink-soft leading-relaxed">
+						{attorneyName} has “{c.title || "your case"}” to review and will
+						accept or decline
+						{daysLeft > 0
+							? ` within about ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`
+							: " soon"}
+						. While your request is open, your case is held just for them — no
+						other attorney can see it.
+					</p>
+				</div>
+
+				<ol className="flex items-center gap-2 overflow-x-auto pb-1">
+					{requestedSteps.map((label, i) => {
+						const done = i < 2;
+						const active = i === 2;
+						return (
+							<Fragment key={label}>
+								<li className="inline-flex shrink-0 items-center gap-2">
+									<span
+										className={cn(
+											"flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]",
+											done && "bg-success text-white",
+											active && "border-2 border-brass text-brass-deep",
+											!done &&
+												!active &&
+												"border border-line-strong text-muted-foreground",
+										)}
+									>
+										{done ? (
+											<Check className="size-3" aria-hidden="true" />
+										) : null}
+									</span>
+									<span
+										className={cn(
+											"whitespace-nowrap text-[12.5px]",
+											done || active
+												? "font-semibold text-ink"
+												: "text-muted-foreground",
+										)}
+									>
+										{label}
+									</span>
+								</li>
+								{i < requestedSteps.length - 1 && (
+									<span className="h-px flex-1 bg-border" aria-hidden="true" />
+								)}
+							</Fragment>
+						);
+					})}
+				</ol>
+
+				<div className="flex flex-col gap-5 rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">
+					<div className="flex items-center gap-3">
+						<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brass font-bold text-[14px] text-white">
+							{initials(attorneyName)}
+						</span>
+						<div className="min-w-0">
+							<p className="truncate font-bold text-[15px] text-ink">
+								{attorneyName}
+							</p>
+							<p className="font-mono text-[10.5px] text-muted-foreground uppercase tracking-[0.07em]">
+								Reviewing your request
+							</p>
+						</div>
+					</div>
+					<p className="text-[13.5px] text-ink-soft leading-relaxed">
+						You'll be notified the moment they answer. If they confirm, you'll
+						move on to agree the fee and publish. Changed your mind, or don't
+						want to wait? You can take the request back and choose someone else.
+					</p>
+					<div className="border-border border-t pt-5">
+						<WithdrawRequestButton caseId={id} attorneyFirstName={firstName} />
+					</div>
+				</div>
+
+				<div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-border bg-surface/60 px-5 py-3.5 text-[12.5px] text-ink-soft leading-relaxed">
+					<ShieldCheck
+						className="mt-0.5 size-4 shrink-0 text-brass-deep"
+						aria-hidden="true"
+					/>
+					If {firstName} declines or doesn't answer in time, your case goes to
+					every bar-verified attorney, who can then read it and put themselves
+					forward — and you choose from whoever does. Your contact details are
+					never shared, and nothing reaches you until you reach out.
 				</div>
 			</div>
 		);

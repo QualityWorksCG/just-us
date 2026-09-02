@@ -311,3 +311,27 @@ export async function attorneyInviteContact(userId: string): Promise<{
 		location: p?.officeState ?? "",
 	};
 }
+
+/**
+ * The attorney account id for an email, if one is an attorney — the reverse of
+ * `attorneyInviteContact`.
+ *
+ * A case invitation is keyed on the address it was sent to, not an account id, so
+ * this is how the directory works out which of its cards the plaintiff's pending
+ * request went to (to show it as already requested, with a way to withdraw).
+ * Case-insensitive, matching how invitations are matched everywhere else.
+ */
+export async function attorneyIdForEmail(
+	email: string,
+): Promise<string | null> {
+	const normalized = email.trim();
+	if (!normalized) return null;
+	const u = await prisma.user.findFirst({
+		where: {
+			email: { equals: normalized, mode: "insensitive" },
+			role: "attorney",
+		},
+		select: { id: true },
+	});
+	return u?.id ?? null;
+}

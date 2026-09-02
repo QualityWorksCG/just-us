@@ -19,6 +19,7 @@ import {
 	publishForAttorneys,
 	revertSeekingToDraft,
 	saveDraft,
+	setCaseInvitedAttorney,
 	softDeleteCase,
 	updateOwnedCase,
 } from "@just-us/db/cases";
@@ -242,6 +243,71 @@ export async function deleteCaseAction(id: string): Promise<DeleteCaseResult> {
 	} catch {
 		return { ok: false, error: "Couldn't delete the draft. Please try again." };
 	}
+}
+
+export type WithdrawInviteResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Take back a pending bring-your-own invitation so the plaintiff can choose a
+ * different attorney.
+ *
+ * A named attorney was emailed a link and the case is held out of the queue for
+ * them until they answer or the week runs out. A plaintiff who changes their mind
+ * — the invitee is too slow, or they'd rather approach someone else — shouldn't
+ * have to wait out that expiry. This revokes the outstanding invitation (its link
+ * stops working) and returns the case to a private draft, so the wizard can drop
+ * them back on the attorney step to invite or pick someone new. Refused once the
+ * case has been taken (a match or a bound payout account), which
+ * `revertSeekingToDraft` enforces in its own conditional write.
+ */
+export async function withdrawInviteAction(
+	caseId: string,
+): Promise<WithdrawInviteResult> {
+	const { session } = await requireRole("plaintiff");
+
+	const kase = await getOwnedCase(caseId, session.user.id);
+	if (!kase || kase.deletedAt) {
+		return { ok: false, error: "We couldn't find that case." };
+	}
+	if (kase.status !== "seeking") {
+		return {
+			ok: false,
+			error: "This case isn't waiting on an invitation anymore.",
+		};
+	}
+
+	try {
+		await revokePendingInvitationsForCase({
+			caseId,
+			actorId: session.user.id,
+			reason: "owner_chose_different_attorney",
+		});
+		const reverted = await revertSeekingToDraft(caseId, session.user.id);
+		if (!reverted) {
+			return {
+				ok: false,
+				error:
+					"This case has already moved on, so its invitation can't be withdrawn.",
+			};
+		}
+		// Clear the withdrawn attorney from the case so a later resume starts on a
+		// blank attorney step rather than re-showing the one they just dropped.
+		await setCaseInvitedAttorney({
+			caseId,
+			ownerId: session.user.id,
+			attorney: { name: "", firm: "", area: "", location: "", email: "" },
+		}).catch(() => undefined);
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't withdraw the invitation. Please try again.",
+		};
+	}
+
+	revalidatePath("/my-cases");
+	revalidatePath("/representation");
+	revalidatePath("/home");
+	return { ok: true };
 }
 
 const CLOSE_REASONS: Record<string, string> = {
@@ -776,6 +842,9 @@ export async function commitCaseWithInviteAction(
 			plaintiffName: session.user.name,
 			attorneyName: attorney.name,
 			hasAccount,
+			// The plaintiff typed this attorney's email into the wizard — the "confirm
+			// you represent this case" framing, not a directory request.
+			origin: "bring_your_own",
 			expiresInDays: CASE_INVITATION_TTL_DAYS,
 		});
 	} catch {

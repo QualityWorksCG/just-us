@@ -25,6 +25,7 @@ export function AttorneyDirectory({
 	defaultState,
 	conversationByAttorney,
 	requestCaseId,
+	requestedAttorneyId,
 }: {
 	attorneys: DirectoryAttorney[];
 	/** Passed to each card — see `AttorneyCard.profileBasePath`. */
@@ -42,6 +43,9 @@ export function AttorneyDirectory({
 	/** The plaintiff's case, when they arrived from one — enables each card's
 	 *  "Request to represent". */
 	requestCaseId?: string | null;
+	/** The attorney this case already has a pending request to, so that card
+	 *  renders as requested (with a withdraw option) rather than askable. */
+	requestedAttorneyId?: string | null;
 }) {
 	return (
 		<div className="flex flex-col gap-6">
@@ -90,6 +94,10 @@ export function AttorneyDirectory({
 									conversationByAttorney?.[attorney.userId]
 								}
 								requestCaseId={requestCaseId}
+								alreadyRequested={
+									!!requestedAttorneyId &&
+									attorney.userId === requestedAttorneyId
+								}
 							/>
 						))}
 					</div>

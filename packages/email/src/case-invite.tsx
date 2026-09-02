@@ -14,6 +14,15 @@ import {
 	Text,
 } from "./_layout";
 
+/**
+ * How the invitation came about, which changes the framing an attorney reads:
+ *   - "request"        — the plaintiff found this attorney in the JustUs
+ *                        directory and asked them specifically.
+ *   - "bring_your_own" — the plaintiff typed an attorney's email into the case
+ *                        wizard; the attorney may not have an account yet.
+ */
+export type CaseInviteOrigin = "request" | "bring_your_own";
+
 type CaseInviteEmailProps = {
 	inviteUrl: string;
 	caseTitle: string;
@@ -21,20 +30,27 @@ type CaseInviteEmailProps = {
 	attorneyName: string;
 	hasAccount: boolean;
 	expiresInDays: number;
+	origin?: CaseInviteOrigin;
 };
 
 /* The subject lives here so the sender and the template can never drift apart.
- * It deliberately takes only the two fields that change the framing: an
- * attorney who already has an account is asked to confirm, a stranger is asked
- * to join. The plaintiff's name is body copy, not subject line — the subject
- * has to make sense in a crowded inbox where the case is the recognisable part. */
+ * The framing turns on how the invitation came about (a directory request reads
+ * differently from a typed-in name) and, for the bring-your-own path, whether
+ * the attorney already has an account. The plaintiff's name is body copy, not
+ * subject line — the subject has to make sense in a crowded inbox where the case
+ * is the recognisable part. */
 export function caseInviteSubject({
 	hasAccount,
 	caseTitle,
+	origin = "bring_your_own",
 }: {
 	hasAccount: boolean;
 	caseTitle: string;
+	origin?: CaseInviteOrigin;
 }) {
+	if (origin === "request") {
+		return `You've been requested to represent "${caseTitle}" on JustUs`;
+	}
 	return hasAccount
 		? `Confirm you represent "${caseTitle}" on JustUs`
 		: `You were named as the attorney on "${caseTitle}"`;
@@ -75,22 +91,31 @@ export default function CaseInviteEmail({
 	attorneyName,
 	hasAccount,
 	expiresInDays,
+	origin = "bring_your_own",
 }: CaseInviteEmailProps) {
 	const firstName = attorneyName.trim().split(" ")[0];
 	const days = `${expiresInDays} ${expiresInDays === 1 ? "day" : "days"}`;
+	// A directory request is the plaintiff choosing this attorney by name; the
+	// bring-your-own path is the plaintiff typing an address that may not have an
+	// account yet. The two read differently from the first line.
+	const isRequest = origin === "request";
 
 	return (
 		<EmailShell
 			preview={
-				hasAccount
-					? `${plaintiffName} named you as their attorney. Confirm to continue`
-					: `${plaintiffName} named you as their attorney on JustUs`
+				isRequest
+					? `${plaintiffName} requested you to represent their case on JustUs`
+					: hasAccount
+						? `${plaintiffName} named you as their attorney. Confirm to continue`
+						: `${plaintiffName} named you as their attorney on JustUs`
 			}
 		>
 			<Text style={heading}>
-				{hasAccount
-					? "Confirm you represent this case"
-					: `${plaintiffName} named you as their attorney`}
+				{isRequest
+					? `${plaintiffName} requested you to represent their case`
+					: hasAccount
+						? "Confirm you represent this case"
+						: `${plaintiffName} named you as their attorney`}
 			</Text>
 
 			<Section style={codeSection}>
@@ -101,14 +126,18 @@ export default function CaseInviteEmail({
 
 			<Text style={paragraph}>
 				{firstName ? `Hi ${firstName}, ` : "Hi, "}
-				{hasAccount
-					? `${plaintiffName} named you as their attorney on JustUs. Sign in with this email address to confirm you represent this case, or decline if you don't.`
-					: `${plaintiffName} named you as their attorney on JustUs, where supporters fund the legal costs of cases like theirs. Create your attorney account to review the case and confirm you represent it.`}
+				{isRequest
+					? `${plaintiffName} found you in the JustUs attorney directory and requested you to represent this case. Sign in with this email address to confirm you'll take it on, or decline if you can't.`
+					: hasAccount
+						? `${plaintiffName} named you as their attorney on JustUs. Sign in with this email address to confirm you represent this case, or decline if you don't.`
+						: `${plaintiffName} named you as their attorney on JustUs, where supporters fund the legal costs of cases like theirs. Create your attorney account to review the case and confirm you represent it.`}
 			</Text>
 
 			<Section style={buttonSection}>
 				<Button href={inviteUrl} style={buttonStyle}>
-					{hasAccount ? "Review and confirm" : "Create your attorney account"}
+					{isRequest || hasAccount
+						? "Review and confirm"
+						: "Create your attorney account"}
 				</Button>
 			</Section>
 
