@@ -128,7 +128,7 @@ export function AttorneyDashboard({
 				/>
 			</div>
 
-			<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+			<div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
 				{/* Needs your attention */}
 				<section>
 					<div className="flex items-center gap-2">
@@ -136,7 +136,7 @@ export function AttorneyDashboard({
 							Needs your attention
 						</h2>
 						{attention.length > 0 && (
-							<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-brass px-1.5 py-0.5 font-bold text-[11px] text-white">
+							<span className="inline-flex size-5 items-center justify-center rounded-full bg-brass font-bold text-[11px] text-white tabular-nums">
 								{attention.length}
 							</span>
 						)}

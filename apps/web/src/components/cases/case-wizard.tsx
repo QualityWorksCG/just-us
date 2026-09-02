@@ -1483,58 +1483,35 @@ export function CaseWizard({
 						Discard case
 					</button>
 				</div>
-
-				{discardOpen && (
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-						<button
-							type="button"
-							aria-label="Keep editing"
-							disabled={discarding}
-							onClick={() => setDiscardOpen(false)}
-							className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
-						/>
-						<div
-							role="dialog"
-							aria-modal="true"
-							className="relative w-full max-w-[400px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 text-left shadow-[var(--shadow-modal)]"
-						>
-							<div className="mb-3 flex size-11 items-center justify-center rounded-full bg-danger/10 text-danger">
-								<X className="size-5" aria-hidden="true" />
-							</div>
-							<h2 className="font-bold text-[17px] text-ink">
-								Discard this case?
-							</h2>
-							<p className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed">
-								You'll lose anything you haven't saved
-								{caseId ? ", and this draft will be removed" : ""}. This can't
-								be undone.
-							</p>
-							<div className="mt-5 flex justify-end gap-2.5">
-								<Button
-									variant="outline"
-									disabled={discarding}
-									onClick={() => setDiscardOpen(false)}
-								>
-									Keep editing
-								</Button>
-								<Button
-									disabled={discarding}
-									onClick={discard}
-									className={cn("bg-danger text-white hover:bg-danger/90")}
-								>
-									<X data-icon="inline-start" aria-hidden="true" />
-									{discarding ? "Discarding…" : "Discard case"}
-								</Button>
-							</div>
-						</div>
-					</div>
-				)}
 			</aside>
 
 			{/* Main — only this column scrolls */}
 			<div className="flex min-h-0 min-w-0 flex-1 flex-col bg-paper">
 				<main className="min-h-0 flex-1 overflow-y-auto px-6 py-10 sm:px-12">
 					<div className="mx-auto max-w-[720px]">
+						{/* The step sidebar (Save & exit / Discard) is hidden below lg, so
+						    surface those actions here on mobile — otherwise there's no way
+						    out of the wizard but Back. */}
+						<div className="mb-6 flex items-center justify-between gap-3 lg:hidden">
+							<button
+								type="button"
+								onClick={saveAndExit}
+								disabled={saving || discarding}
+								className="flex items-center gap-1.5 font-semibold text-[13px] text-ink-soft transition-colors hover:text-ink disabled:opacity-60"
+							>
+								<ArrowLeft className="size-4" aria-hidden="true" />
+								{saving ? "Saving…" : "Save & exit"}
+							</button>
+							<button
+								type="button"
+								onClick={() => setDiscardOpen(true)}
+								disabled={saving || discarding}
+								className="flex items-center gap-1.5 font-semibold text-[13px] text-danger/80 transition-colors hover:text-danger disabled:opacity-60"
+							>
+								<X className="size-4" aria-hidden="true" />
+								Discard
+							</button>
+						</div>
 						<p className="mb-2 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.1em]">
 							Step {step} of {LAST_STEP}
 						</p>
@@ -2757,6 +2734,55 @@ export function CaseWizard({
 						)}
 					</div>
 				</main>
+
+				{/* Rendered here, in the always-visible column, rather than in the
+				    step sidebar — that sidebar is hidden below lg, and a modal nested
+				    in a hidden ancestor never shows, so mobile's Discard did nothing. */}
+				{discardOpen && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+						<button
+							type="button"
+							aria-label="Keep editing"
+							disabled={discarding}
+							onClick={() => setDiscardOpen(false)}
+							className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+						/>
+						<div
+							role="dialog"
+							aria-modal="true"
+							className="relative w-full max-w-[400px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 text-left shadow-[var(--shadow-modal)]"
+						>
+							<div className="mb-3 flex size-11 items-center justify-center rounded-full bg-danger/10 text-danger">
+								<X className="size-5" aria-hidden="true" />
+							</div>
+							<h2 className="font-bold text-[17px] text-ink">
+								Discard this case?
+							</h2>
+							<p className="mt-1.5 text-[13.5px] text-ink-soft leading-relaxed">
+								You'll lose anything you haven't saved
+								{caseId ? ", and this draft will be removed" : ""}. This can't
+								be undone.
+							</p>
+							<div className="mt-5 flex justify-end gap-2.5">
+								<Button
+									variant="outline"
+									disabled={discarding}
+									onClick={() => setDiscardOpen(false)}
+								>
+									Keep editing
+								</Button>
+								<Button
+									disabled={discarding}
+									onClick={discard}
+									className={cn("bg-danger text-white hover:bg-danger/90")}
+								>
+									<X data-icon="inline-start" aria-hidden="true" />
+									{discarding ? "Discarding…" : "Discard case"}
+								</Button>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* Action bar — pinned below the scroll area */}
 				<div className="shrink-0 border-border border-t bg-paper px-6 py-4 sm:px-12">

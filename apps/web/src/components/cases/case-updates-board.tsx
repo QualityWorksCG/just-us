@@ -104,7 +104,7 @@ export function CaseUpdatesBoard({
 				{caseTitle || "Untitled case"} · by {plaintiffName}
 			</p>
 
-			<div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+			<div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 				{/* Left — banner + timeline */}
 				<div className="flex min-w-0 flex-col gap-6">
 					<div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card-lg)] border border-green-soft bg-green-soft/40 px-4 py-3">

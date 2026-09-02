@@ -132,7 +132,7 @@ export function NotificationBell({
 						<Bell className="size-[17px]" aria-hidden="true" />
 						{hasUnread && (
 							<span
-								className="absolute -top-1 -right-1 flex min-w-[18px] items-center justify-center rounded-full bg-brass px-1 py-0.5 font-bold text-[10px] text-brass-ink leading-none ring-2 ring-surface"
+								className="absolute -top-1 -right-1 flex size-[18px] items-center justify-center rounded-full bg-brass font-bold text-[10px] text-white leading-none ring-2 ring-surface"
 								aria-hidden="true"
 							>
 								{unreadCount > 9 ? "9+" : unreadCount}

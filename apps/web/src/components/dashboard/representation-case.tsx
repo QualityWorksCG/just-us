@@ -87,7 +87,7 @@ export function RepresentationCaseCard({ view }: { view: RepresentationView }) {
 		<section className="overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface shadow-[var(--shadow-rest)]">
 			<CardHeader view={view} />
 			{view.attorney ? (
-				<div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.1fr_1fr]">
+				<div className="grid grid-cols-1 gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
 					<AttorneyPanel view={view} />
 					<FundingPanel view={view} />
 				</div>

@@ -155,7 +155,7 @@ function InvitationRow({ inv }: { inv: InvitationItem }) {
 		<li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
 			<div className="min-w-0 flex-1">
 				<div className="flex flex-wrap items-center gap-2">
-					<p className="truncate font-bold text-[14.5px] text-ink">
+					<p className="min-w-0 truncate font-bold text-[14.5px] text-ink">
 						{inv.title || "Untitled intake"}
 					</p>
 					<span className="shrink-0 rounded-[var(--radius-pill)] bg-gold-bright/20 px-2 py-0.5 font-semibold text-[11px] text-gold-bright-ink">
@@ -211,7 +211,7 @@ function RequestRow({
 		<li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
 			<div className="min-w-0 flex-1">
 				<div className="flex flex-wrap items-center gap-2">
-					<p className="truncate font-bold text-[14.5px] text-ink">
+					<p className="min-w-0 truncate font-bold text-[14.5px] text-ink">
 						{intake.title || "Untitled intake"}
 					</p>
 					<span

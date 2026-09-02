@@ -214,7 +214,7 @@ export function AttorneyCaseDetailView({
 					</span>
 				</div>
 
-				<h2 className="font-extrabold text-[clamp(1.75rem,3.4vw,2.375rem)] text-ink leading-[1.08] tracking-[-0.03em]">
+				<h2 className="break-words font-extrabold text-[clamp(1.75rem,3.4vw,2.375rem)] text-ink leading-[1.08] tracking-[-0.03em]">
 					{item.title || "Untitled intake"}
 				</h2>
 
@@ -334,7 +334,7 @@ export function AttorneyCaseDetailView({
 						key: "case",
 						label: "The intake",
 						content: (
-							<div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+							<div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 								<div className="flex min-w-0 flex-col gap-6">
 									<Panel icon={FileText} title="What happened">
 										{paragraphs.length > 0 ? (

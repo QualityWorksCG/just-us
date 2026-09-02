@@ -423,7 +423,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 				)}
 			</section>
 
-			<div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+			<div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 				{/* Left: next steps + updates */}
 				<div className="flex flex-col gap-5">
 					<StepTracker
@@ -456,11 +456,11 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 										{/* biome-ignore lint/style/noNonNullAssertion: hasAttorney guards it */}
 										{initials(c.attorneyName!)}
 									</span>
-									<div>
-										<p className="font-bold text-[15px] text-ink">
+									<div className="min-w-0">
+										<p className="truncate font-bold text-[15px] text-ink">
 											{c.attorneyName}
 										</p>
-										<p className="text-[12.5px] text-muted-foreground">
+										<p className="truncate text-[12.5px] text-muted-foreground">
 											{attorneyMeta}
 										</p>
 									</div>
@@ -651,7 +651,7 @@ function CasesOverview({ cases }: { cases: CaseSummary[] }) {
 			</div>
 
 			{/* Your cases (top 3) beside the attorneys card */}
-			<div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+			<div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 				<section className="flex flex-col rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">
 					<div className="mb-2 flex items-center justify-between">
 						<h2 className="font-bold text-ink text-lg">Your cases</h2>
@@ -849,10 +849,10 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 				attorneyName={attorneyName}
 				caseId={c.id}
 				existingConversationId={c.attorneyConversationId}
-				className="shrink-0"
+				className="w-full justify-center sm:w-auto"
 			/>
 		) : (
-			<span className="max-w-32 text-right text-[12px] text-muted-foreground leading-snug">
+			<span className="text-[12px] text-muted-foreground leading-snug sm:max-w-32 sm:text-right">
 				Not on JustUs messaging
 			</span>
 		);
@@ -879,7 +879,7 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 						variant: interested > 0 ? "default" : "outline",
 						size: "sm",
 					}),
-					"h-9 shrink-0",
+					"h-9 w-full justify-center sm:w-auto",
 				)}
 			>
 				{interested > 0 ? "Review interest" : "View case"}
@@ -898,7 +898,7 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 				href={`/cases/new?draft=${c.id}` as Route}
 				className={cn(
 					buttonVariants({ variant: "outline", size: "sm" }),
-					"h-9 shrink-0",
+					"h-9 w-full justify-center sm:w-auto",
 				)}
 			>
 				<Search data-icon="inline-start" aria-hidden="true" />
@@ -907,17 +907,21 @@ function RepresentationRow({ c }: { c: CaseSummary }) {
 		);
 	}
 
+	// Stacks on the narrowest screens so the (wide) action never has to fight the
+	// case text for room; side by side once there's space.
 	return (
-		<div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface-2/40 p-3">
-			{avatar}
-			<div className="min-w-0 flex-1">
-				<p className="truncate font-bold text-[14px] text-ink">{heading}</p>
-				<p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-					<Folder className="size-3.5 shrink-0" aria-hidden="true" />
-					<span className="truncate">{caseTitle}</span>
-				</p>
+		<div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface-2/40 p-3 sm:flex-row sm:items-center">
+			<div className="flex min-w-0 items-center gap-3 sm:flex-1">
+				{avatar}
+				<div className="min-w-0 flex-1">
+					<p className="truncate font-bold text-[14px] text-ink">{heading}</p>
+					<p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+						<Folder className="size-3.5 shrink-0" aria-hidden="true" />
+						<span className="truncate">{caseTitle}</span>
+					</p>
+				</div>
 			</div>
-			{action}
+			<div className="sm:shrink-0">{action}</div>
 		</div>
 	);
 }

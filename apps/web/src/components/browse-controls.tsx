@@ -101,7 +101,7 @@ export function BrowseControls() {
 					/>
 				</form>
 
-				<div className="flex gap-3">
+				<div className="flex gap-3 [&>*]:flex-1 sm:[&>*]:flex-none">
 					<StateCombobox value={state} onChange={(v) => apply({ state: v })} />
 					<Dropdown
 						label={SORTS.find((s) => s.value === sort)?.label ?? "Trending"}
@@ -188,7 +188,7 @@ function StateCombobox({
 			<ComboboxInput
 				placeholder="All states"
 				aria-label="Filter by state"
-				className="h-12 w-[190px] rounded-[var(--radius-pill)] border-border px-4 font-semibold text-[13.5px]"
+				className="h-12 w-full rounded-[var(--radius-pill)] border-border px-4 font-semibold text-[13.5px] sm:w-[190px]"
 			/>
 			<ComboboxContent>
 				<ComboboxEmpty>No matches</ComboboxEmpty>
@@ -223,7 +223,7 @@ function Dropdown({
 		>
 			<SelectTrigger
 				aria-label={label}
-				className="h-12 w-auto gap-2 rounded-[var(--radius-pill)] border-border px-4 font-semibold text-[13.5px] text-ink"
+				className="h-12 w-full gap-2 rounded-[var(--radius-pill)] border-border px-4 font-semibold text-[13.5px] text-ink sm:w-auto"
 			>
 				<SelectValue />
 			</SelectTrigger>

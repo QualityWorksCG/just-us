@@ -278,7 +278,7 @@ export function ProfileSettings({
 				Manage your account details and privacy.
 			</p>
 
-			<div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+			<div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
 				<form
 					onSubmit={onSubmit}
 					className="rounded-[var(--radius-card)] border border-border bg-card p-5 sm:p-6"

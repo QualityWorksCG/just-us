@@ -361,7 +361,7 @@ export function ManageCase({
 					    overpowering; the gold now lives only in the accents (the chip, the
 					    ring, the progress fill) against a neutral surface. */}
 					<section className="relative overflow-hidden rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)] sm:p-8">
-						<div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
+						<div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
 							<div className="min-w-0">
 								<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-brass-wash px-2.5 py-1 font-mono font-semibold text-[10px] text-brass-deep uppercase tracking-[0.1em]">
 									<TrendingUp className="size-3" aria-hidden="true" />
@@ -373,7 +373,7 @@ export function ManageCase({
 												? "Ready, awaiting your firm"
 												: "Draft, not live yet"}
 								</span>
-								<div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+								<div className="mt-4 flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 sm:justify-start">
 									<span className="font-extrabold text-[44px] text-ink tabular-nums leading-none tracking-[-0.03em]">
 										{money(raised)}
 									</span>
@@ -475,7 +475,7 @@ export function ManageCase({
 								<h2 className="flex items-center gap-2 font-bold text-[15px] text-ink">
 									Case updates
 									{updates.length > 0 && (
-										<span className="inline-flex min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 font-bold text-[11px] text-ink-soft">
+										<span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-2 px-1.5 font-bold text-[11px] text-ink-soft">
 											{updates.length}
 										</span>
 									)}
@@ -801,15 +801,15 @@ export function ManageCase({
 					<section className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">
 						<h2 className="mb-4 font-bold text-ink text-lg">Attorney & fee</h2>
 						<div className="flex flex-wrap items-center justify-between gap-4">
-							<div className="flex items-center gap-3">
+							<div className="flex min-w-0 items-center gap-3">
 								<span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brass-wash text-brass-deep">
 									<Scale className="size-5" aria-hidden="true" />
 								</span>
-								<div>
-									<p className="font-bold text-[15px] text-ink">
+								<div className="min-w-0">
+									<p className="truncate font-bold text-[15px] text-ink">
 										{data.attorneyName || "No attorney connected yet"}
 									</p>
-									<p className="text-[12.5px] text-muted-foreground">
+									<p className="truncate text-[12.5px] text-muted-foreground">
 										{data.attorneyName
 											? attorneyMeta
 											: "Choose one from the wizard"}

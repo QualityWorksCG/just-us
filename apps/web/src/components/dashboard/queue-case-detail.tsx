@@ -221,7 +221,7 @@ export function QueueCaseDetailView({
 		// minmax(0,1fr) rather than 1fr: a bare 1fr takes its floor from the
 		// content, so one long unbroken line in the story could push the grid wider
 		// than the viewport. The right rail carries the decision and the facts.
-		<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
+		<div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px]">
 			{/* The matter, as the plaintiff published it. */}
 			<div className="flex min-w-0 flex-col gap-6">
 				<div>
