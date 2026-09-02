@@ -1,11 +1,10 @@
 /**
  * Bootstrap the first administrator (JUS-13).
  *
- * `administrator` is deliberately not self-selectable at sign-up. Existing
- * administrators create new ones from the in-app invitation flow on the Users
- * screen — but the very first one has to come from somewhere, hence this
- * script. It promotes an already-registered, verified user. Prefer invitations
- * for everything after the bootstrap: they carry an audit trail, this doesn't.
+ * `administrator` is deliberately not self-selectable at sign-up, and the
+ * invite-code flow (JUS-11) is not built yet, so there is no in-app way to create
+ * the first one. Feature-flag administration needs an admin to exist, hence this
+ * script. It promotes an already-registered, verified user.
  *
  *   bun promote-admin.ts someone@example.com
  *   bun promote-admin.ts someone@example.com --demote

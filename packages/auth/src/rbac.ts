@@ -33,21 +33,13 @@ export const SELF_SIGNUP_ROLES = [
 export const DEFAULT_ROLE: Role = "donor";
 
 /**
- * Roles that must supply a jurisdiction at sign-up (JUS-12).
- *
- * Only attorneys: for them it is a property of the person — where they are
- * licensed to practice — so it belongs on the profile and gates bar
- * verification and the directory.
- *
- * A plaintiff's jurisdiction is a property of the *case*, not of them. It lives
- * on `Case.location`, chosen per case in the wizard, because one plaintiff can
- * run cases in different states and a single value on the profile would be
- * wrong for all but one of them. Nothing asks a plaintiff for a jurisdiction at
- * sign-up, and `User.jurisdiction` stays null for them.
- *
- * Donors and administrators never supply one either.
+ * Roles that must supply a jurisdiction at sign-up (JUS-12). Plaintiffs need it
+ * for attorney-availability checks in their state; attorneys need it because it
+ * is where they are licensed to practice. Donors and administrators do not —
+ * jurisdiction is not captured for them and stays null on their profile.
  */
 export const JURISDICTION_ROLES = [
+	"plaintiff",
 	"attorney",
 ] as const satisfies readonly Role[];
 

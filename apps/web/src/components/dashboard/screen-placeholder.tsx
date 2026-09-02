@@ -1,15 +1,19 @@
 import { Sparkles } from "lucide-react";
 
-/**
- * Empty sample screen — the shell is real; per-screen content lands later.
- *
- * Takes no title: the shell's header bar renders the screen title, so printing it
- * here would show the same words twice on every screen.
- */
-export function ScreenPlaceholder({ sub }: { sub: string }) {
+/** Empty sample screen — the shell is real; per-screen content lands later. */
+export function ScreenPlaceholder({
+	title,
+	sub,
+}: {
+	title: string;
+	sub: string;
+}) {
 	return (
 		<div>
-			<p className="max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
+			<h1 className="font-extrabold text-[30px] text-ink tracking-[-0.02em]">
+				{title}
+			</h1>
+			<p className="mt-2 max-w-[640px] text-[14.5px] text-ink-soft leading-relaxed">
 				{sub}
 			</p>
 

@@ -7,38 +7,36 @@
 import prisma from "@just-us/db";
 
 import {
-	defaultFlagState,
+	allFlagsDisabled,
 	FLAG_KEYS,
 	type FlagKey,
 	type FlagState,
-	flagDefault,
 	isFlagKey,
 } from "./registry";
 
 export {
-	defaultFlagState,
+	allFlagsDisabled,
 	FLAG_KEYS,
 	FLAGS,
 	type FlagDefinition,
 	type FlagKey,
 	type FlagState,
-	flagDefault,
 	isFlagKey,
 } from "./registry";
 
 /**
  * Read every declared flag's state (JUS-13).
  *
- * Starts from the registry's declared defaults and layers stored rows on top,
- * which gives two properties for free: a flag nobody has toggled reads as
- * whatever it declares, and a stored row for a flag that has since been removed
- * from the registry is ignored rather than leaking into the result.
+ * Starts from all-off and layers stored rows on top, which gives two properties
+ * for free: a flag declared but never toggled reads as off, and a stored row for
+ * a flag that has since been removed from the registry is ignored rather than
+ * leaking into the result.
  *
  * Callers in the web app should use the cached wrapper in `lib/flags-server`
  * rather than calling this directly, so one request makes one query.
  */
 export async function readFlags(): Promise<FlagState> {
-	const state = defaultFlagState();
+	const state = allFlagsDisabled();
 	const rows = await prisma.featureFlag.findMany({
 		where: { key: { in: FLAG_KEYS } },
 		select: { key: true, enabled: true },
@@ -49,13 +47,13 @@ export async function readFlags(): Promise<FlagState> {
 	return state;
 }
 
-/** Whether a single flag is on. Unset flags fall back to their declared default. */
+/** Whether a single flag is on. Unset flags are off. */
 export async function isFeatureEnabled(key: FlagKey): Promise<boolean> {
 	const row = await prisma.featureFlag.findUnique({
 		where: { key },
 		select: { enabled: true },
 	});
-	return row?.enabled ?? flagDefault(key);
+	return row?.enabled ?? false;
 }
 
 /**

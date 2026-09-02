@@ -77,7 +77,7 @@ export function FeaturedCases({ cases }: { cases: LandingCase[] }) {
 						id="cases-heading"
 						className="font-extrabold text-[30px] text-ink tracking-[-0.02em]"
 					>
-						Cases being funded
+						Cases raising right now
 					</h2>
 					<Link
 						href="/cases"
@@ -111,7 +111,7 @@ export function FeaturedCases({ cases }: { cases: LandingCase[] }) {
 							)}
 							<span className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-card/95 px-3 py-1 font-semibold text-[12px] text-success shadow-[var(--shadow-float)] backdrop-blur">
 								<span className="size-1.5 rounded-full bg-success" />
-								Active Case
+								Live · raising
 							</span>
 						</div>
 						<div className="flex flex-1 flex-col p-6">

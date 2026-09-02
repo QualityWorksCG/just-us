@@ -1,9 +1,20 @@
 "use client";
 
-import { JURISDICTION_MESSAGE } from "@just-us/auth/jurisdiction";
+import {
+	JURISDICTION_MESSAGE,
+	type Jurisdiction,
+	US_STATES,
+} from "@just-us/auth/jurisdiction";
 import { requiresJurisdiction } from "@just-us/auth/rbac";
 import { Button } from "@just-us/ui/components/button";
 import { Input } from "@just-us/ui/components/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@just-us/ui/components/select";
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	ArrowLeft,
@@ -11,18 +22,16 @@ import {
 	Check,
 	CircleCheck,
 	FileText,
-	HandCoins,
-	LogOut,
+	Heart,
 	type LucideIcon,
 	Scale,
+	ShieldCheck,
 } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { completeOnboardingAction } from "@/app/onboarding/actions";
-import { AdmittedStatesField } from "@/components/attorneys/admitted-states-field";
 import { Brandmark } from "@/components/brandmark";
-import { authClient } from "@/lib/auth-client";
 import { BAR_NUMBER_MESSAGE, isValidBarNumber } from "@/lib/validation";
 
 type Role = "plaintiff" | "donor" | "attorney";
@@ -31,8 +40,6 @@ const ROLES: {
 	value: Role;
 	label: string;
 	article: string;
-	/** The step-1 button label once this card is picked. */
-	cta: string;
 	icon: LucideIcon;
 	blurb: string;
 	points: string[];
@@ -41,36 +48,37 @@ const ROLES: {
 		value: "plaintiff",
 		label: "I was wronged",
 		article: "a plaintiff",
-		cta: "Start your case",
 		icon: FileText,
 		blurb:
-			"Submit your case and raise the fee to hire the attorney you connect with.",
+			"Submit your case and raise the fee to hire the attorney you choose.",
 		points: [
 			"Submit your case in minutes",
-			"Connect with counsel",
+			"Choose your own attorney",
 			"Raise the agreed fee together",
 		],
 	},
 	{
 		value: "donor",
-		label: "Fuel the fight. Fund a case.",
+		label: "I want to help fund cases",
 		article: "a donor",
-		cta: "Become a supporter",
-		icon: HandCoins,
-		blurb: "Fund a case that matters to you with a donation of any size.",
-		points: ["Flexible giving", "One-time 5% platform fee"],
+		icon: Heart,
+		blurb:
+			"Give any amount to cases you believe in and follow them to the outcome.",
+		points: [
+			"Browse live cases",
+			"Donate any amount",
+			"Get updates until it closes",
+		],
 	},
 	{
 		value: "attorney",
 		label: "I'm an attorney",
 		article: "an attorney",
-		cta: "Join as an attorney",
 		icon: Scale,
-		blurb:
-			"Review community-funded intakes with the fee secured before you file.",
+		blurb: "Take on fundable cases with the fee raised before you file.",
 		points: [
 			"Appear in the directory",
-			"Review the intakes you want",
+			"Pick the cases you want",
 			"Fee funded up front",
 		],
 	},
@@ -78,22 +86,7 @@ const ROLES: {
 
 const STEP2_FORM_ID = "onboarding-step-2";
 
-export function OnboardingFlow({
-	name,
-	next: returnTo,
-	lockedRole,
-}: {
-	name: string;
-	/** Where they were headed before onboarding interrupted them. Already
-	 *  validated as a same-site path by the page. */
-	next?: string | null;
-	/** A role the account already carries and must not be able to change here — set
-	 *  for an attorney invited to a case, whose account is created as an attorney.
-	 *  When present, the role-choice step is skipped entirely: onboarding opens on
-	 *  the details for that role, so an invite can't be answered as the wrong role
-	 *  (which is unrecoverable — role is fixed once onboarding completes). */
-	lockedRole?: Role;
-}) {
+export function OnboardingFlow({ name }: { name: string }) {
 	const ids = {
 		firm: useId(),
 		bar: useId(),
@@ -101,21 +94,11 @@ export function OnboardingFlow({
 	};
 	const firstName = name.trim().split(" ")[0] || "there";
 
-	async function signOut() {
-		await authClient.signOut();
-		window.location.assign("/");
-	}
+	const [step, setStep] = useState<1 | 2>(1);
+	const [role, setRole] = useState<Role | null>(null);
 
-	// An invited attorney arrives with their role already set: open on the details
-	// step (2) with that role locked in, rather than the role-choice step (1).
-	const [step, setStep] = useState<1 | 2>(lockedRole ? 2 : 1);
-	const [role, setRole] = useState<Role | null>(lockedRole ?? null);
-
-	// The states they are admitted in — attorneys only (JUS-12). A list, because a
-	// licence is per state and an attorney can hold several; the first is the
-	// primary. These become `AttorneyAdmission` rows, unverified until a bar check
-	// clears each one, and they are what decide which cases reach this attorney.
-	const [jurisdictions, setJurisdictions] = useState<string[]>([]);
+	// Jurisdiction (US state) — captured for plaintiffs and attorneys only (JUS-12).
+	const [jurisdiction, setJurisdiction] = useState<Jurisdiction | "">("");
 
 	// Attorney — practice details.
 	const [firmName, setFirmName] = useState("");
@@ -125,10 +108,7 @@ export function OnboardingFlow({
 	const [pending, setPending] = useState(false);
 
 	const isAttorney = role === "attorney";
-	const isPlaintiff = role === "plaintiff";
-	// Attorneys only: a licensing state is a fact about the person. A plaintiff's
-	// jurisdiction is a fact about each case, so the case wizard asks for it and
-	// this flow never does. (JUS-12)
+	// Plaintiffs and attorneys are asked for a jurisdiction; donors are not. (JUS-12)
 	const needsJurisdiction = !!role && requiresJurisdiction(role);
 	const inputClass =
 		"h-11 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]";
@@ -148,8 +128,8 @@ export function OnboardingFlow({
 		setErrors({});
 
 		const next: Record<string, string> = {};
-		if (needsJurisdiction && jurisdictions.length === 0)
-			next.jurisdictions = JURISDICTION_MESSAGE;
+		if (needsJurisdiction && !jurisdiction)
+			next.jurisdiction = JURISDICTION_MESSAGE;
 		if (role === "attorney") {
 			if (!firmName.trim()) next.firmName = "Enter your firm";
 			if (!barNumber.trim()) next.barNumber = "Enter your bar number";
@@ -165,21 +145,20 @@ export function OnboardingFlow({
 		try {
 			const result = await completeOnboardingAction({
 				role,
-				// Dropped for roles that don't collect them, so switching lanes after
-				// picking states can't smuggle stale values through.
-				jurisdictions: needsJurisdiction ? jurisdictions : undefined,
+				// Dropped for roles that don't collect it, so switching lanes after
+				// picking a state can't smuggle a stale value through.
+				jurisdiction: needsJurisdiction ? jurisdiction : undefined,
 				firmName: firmName.trim() || undefined,
 				barNumber: barNumber.trim() || undefined,
 			});
 			if (result.ok) {
 				toast.success("You're all set. Welcome to JustUs.");
 				// Hard navigation so the destination renders with the freshly updated
-				// session (role + onboarded), avoiding any stale client cache. Whatever
-				// sent them here wins — an attorney who came from a case invitation goes
-				// back to it rather than to a dashboard. Otherwise new plaintiffs go
-				// straight into creating their case and everyone else to their dashboard.
+				// session (role + onboarded), avoiding any stale client cache. New
+				// plaintiffs go straight into creating their case; everyone else lands
+				// on their dashboard.
 				window.location.assign(
-					returnTo ?? (role === "plaintiff" ? "/cases/new" : "/home"),
+					role === "plaintiff" ? "/cases/new" : "/dashboard",
 				);
 			} else {
 				if (result.fieldErrors) setErrors(result.fieldErrors);
@@ -200,31 +179,19 @@ export function OnboardingFlow({
 					<Brandmark size={30} />
 					<span className="font-bold text-[15px] tracking-tight">JustUs</span>
 				</div>
-				<div className="flex items-center gap-4">
-					<div className="flex items-center gap-3">
-						<span className="font-mono font-semibold text-[12px] text-muted-foreground uppercase tracking-[0.1em]">
-							Step {lockedRole ? 1 : step} of {lockedRole ? 1 : 2}
-						</span>
-						<div className="flex gap-1.5">
-							<span className="h-1.5 w-7 rounded-full bg-brass" />
-							{!lockedRole && (
-								<span
-									className={cn(
-										"h-1.5 w-7 rounded-full",
-										step >= 2 ? "bg-brass" : "bg-brass-wash",
-									)}
-								/>
+				<div className="flex items-center gap-3">
+					<span className="font-mono font-semibold text-[12px] text-muted-foreground uppercase tracking-[0.1em]">
+						Step {step} of 2
+					</span>
+					<div className="flex gap-1.5">
+						<span className="h-1.5 w-7 rounded-full bg-brass" />
+						<span
+							className={cn(
+								"h-1.5 w-7 rounded-full",
+								step >= 2 ? "bg-brass" : "bg-brass-wash",
 							)}
-						</div>
+						/>
 					</div>
-					<button
-						type="button"
-						onClick={signOut}
-						className="inline-flex items-center gap-1.5 border-border border-l pl-4 font-semibold text-[13px] text-muted-foreground transition-colors hover:text-ink"
-					>
-						<LogOut className="size-4" aria-hidden="true" />
-						Sign out
-					</button>
 				</div>
 			</header>
 
@@ -240,8 +207,8 @@ export function OnboardingFlow({
 								Hi {firstName}, how are you joining?
 							</h1>
 							<p className="mt-2.5 max-w-[560px] text-[15px] text-ink-soft leading-relaxed">
-								Pick what brings you here so we can tailor your experience.
-								You'll still reach every part of JustUs. This just sets your
+								Pick what brings you here so we can tailor your experience —
+								you'll still reach every part of JustUs. This just sets your
 								home base.
 							</p>
 
@@ -329,20 +296,24 @@ export function OnboardingFlow({
 					) : (
 						<form id={STEP2_FORM_ID} onSubmit={handleSubmit}>
 							<p className="mb-2.5 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.1em]">
-								{isAttorney ? "Your practice" : "Almost there"}
+								{isAttorney
+									? "Your practice"
+									: needsJurisdiction
+										? "Your jurisdiction"
+										: "Almost there"}
 							</p>
 							<h1 className="font-extrabold text-[clamp(1.875rem,3.4vw,2.75rem)] text-ink tracking-[-0.03em]">
 								{isAttorney
 									? "Tell us about your practice"
-									: isPlaintiff
-										? "You're ready to start your case."
+									: needsJurisdiction
+										? "Where is your case based?"
 										: "You're ready to fund cases."}
 							</h1>
 							<p className="mt-2.5 max-w-[560px] text-[15px] text-ink-soft leading-relaxed">
 								{isAttorney
 									? "We verify your bar standing before your profile goes live, so cases only reach attorneys who can take them."
-									: isPlaintiff
-										? "Nothing more to set up here. You'll choose the state your case falls under while you build it, so each case you run can be in a different one."
+									: needsJurisdiction
+										? "This is the state your case falls under — we use it to match you with attorneys licensed there."
 										: "No extra details needed. Browse live cases and give what moves you, then follow every case you back to its outcome."}
 							</p>
 
@@ -354,22 +325,36 @@ export function OnboardingFlow({
 												htmlFor={ids.jurisdiction}
 												className="font-semibold text-[13px] text-ink"
 											>
-												Where are you admitted to practise?
+												Jurisdiction
 											</label>
-											<p className="text-[12.5px] text-muted-foreground leading-relaxed">
-												Add every state you hold a licence in. You'll only be
-												shown cases from these. We check each one against its
-												bar records before you can take a case there.
-											</p>
-											<AdmittedStatesField
-												addId={ids.jurisdiction}
-												value={jurisdictions}
-												onChange={setJurisdictions}
-												invalid={!!errors.jurisdictions}
-											/>
-											{errors.jurisdictions && (
+											<Select
+												value={jurisdiction}
+												onValueChange={(v: string | null) =>
+													setJurisdiction((v ?? "") as Jurisdiction | "")
+												}
+											>
+												<SelectTrigger
+													id={ids.jurisdiction}
+													className="h-11 bg-surface text-[14px]"
+													aria-invalid={!!errors.jurisdiction}
+												>
+													<SelectValue placeholder="Select your state…" />
+												</SelectTrigger>
+												<SelectContent className="max-h-[300px]">
+													{US_STATES.map((s) => (
+														<SelectItem
+															key={s}
+															value={s}
+															className="text-[14px]"
+														>
+															{s}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
+											{errors.jurisdiction && (
 												<p className="text-[12px] text-danger">
-													{errors.jurisdictions}
+													{errors.jurisdiction}
 												</p>
 											)}
 										</div>
@@ -420,20 +405,27 @@ export function OnboardingFlow({
 												</div>
 											</>
 										)}
+
+										{!isAttorney && (
+											<p className="flex gap-2.5 rounded-[var(--radius-card-sm)] bg-green-soft px-4 py-3 text-[13px] text-green-deep leading-relaxed">
+												<ShieldCheck
+													className="mt-0.5 size-4 shrink-0 text-success"
+													aria-hidden="true"
+												/>
+												We use your state only to match your case with attorneys
+												licensed there. You can change it later in settings.
+											</p>
+										)}
 									</div>
 								) : (
 									<div className="flex items-start gap-3">
 										<span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
-											{isPlaintiff ? (
-												<FileText className="size-5" aria-hidden="true" />
-											) : (
-												<HandCoins className="size-5" aria-hidden="true" />
-											)}
+											<Heart className="size-5" aria-hidden="true" />
 										</span>
 										<p className="text-[14px] text-ink-soft leading-relaxed">
-											{isPlaintiff
-												? "You're all set. When you submit a case you'll pick the state it falls under and connect with the attorney to represent you. We use that state to find attorneys licensed there."
-												: "You're all set to fund cases. Give any amount to a case you believe in and follow it to the outcome. No extra details needed."}
+											You're all set to fund cases. Give any amount to a case
+											you believe in and follow it to the outcome — no extra
+											details needed.
 										</p>
 									</div>
 								)}
@@ -449,54 +441,36 @@ export function OnboardingFlow({
 					{step === 1 ? (
 						<>
 							<p className="text-[13px] text-muted-foreground">
-								You can change how you use JustUs anytime in settings.
+								You can change your home base anytime in settings.
 							</p>
-							{/*
-								`key` is load-bearing, not cosmetic. Both branches render a
-								<Button> in this slot, so without distinct keys React reuses
-								the same DOM node and only patches its attributes — flipping
-								type="button" to type="submit" while the click that advanced
-								the step is still propagating. The browser then applies the
-								default action to the mutated node and submits step 2 on the
-								same click, so the step is never seen. Separate keys force a
-								remount instead.
-							*/}
 							<Button
-								key="step-1-continue"
 								type="button"
 								size="lg"
 								className="px-6"
 								onClick={goToStep2}
 								disabled={!role}
 							>
-								{role ? ROLES.find((r) => r.value === role)?.cta : "Continue"}
+								{role
+									? `Continue as ${ROLES.find((r) => r.value === role)?.article}`
+									: "Continue"}
 								<ArrowRight data-icon="inline-end" aria-hidden="true" />
 							</Button>
 						</>
 					) : (
 						<>
-							{lockedRole ? (
-								// Nothing to go back to — the role step was skipped. Keep the
-								// left slot filled so the submit stays right-aligned.
-								<p className="text-[13px] text-muted-foreground">
-									You were invited as an attorney.
-								</p>
-							) : (
-								<Button
-									type="button"
-									variant="outline"
-									size="lg"
-									onClick={() => {
-										setErrors({});
-										setStep(1);
-									}}
-								>
-									<ArrowLeft data-icon="inline-start" aria-hidden="true" />
-									Back
-								</Button>
-							)}
 							<Button
-								key="step-2-submit"
+								type="button"
+								variant="outline"
+								size="lg"
+								onClick={() => {
+									setErrors({});
+									setStep(1);
+								}}
+							>
+								<ArrowLeft data-icon="inline-start" aria-hidden="true" />
+								Back
+							</Button>
+							<Button
 								type="submit"
 								form={STEP2_FORM_ID}
 								size="lg"

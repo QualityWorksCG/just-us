@@ -16,21 +16,16 @@ const onboardingSchema = z
 		role: z.enum(["plaintiff", "donor", "attorney"]),
 		firmName: z.string().optional(),
 		barNumber: z.string().optional(),
-		// Every state the attorney is admitted in. Capped so a hand-made request
-		// can't ask us to write fifty admission rows for one account; nobody
-		// practises in more states than this.
-		jurisdictions: z.array(z.string()).max(12).optional(),
+		jurisdiction: z.string().optional(),
 	})
 	.superRefine((val, ctx) => {
-		// Only the roles in JURISDICTION_ROLES supply these (JUS-12), and each has to
-		// be one of the known states so downstream comparisons — against
-		// `Case.location`, in every matching gate — match the exact string.
+		// Only plaintiffs and attorneys supply a jurisdiction (JUS-12); it must be
+		// one of the known states so downstream consumers match the exact string.
 		if (requiresJurisdiction(val.role)) {
-			const states = val.jurisdictions ?? [];
-			if (states.length === 0 || !states.every(isValidJurisdiction))
+			if (!val.jurisdiction || !isValidJurisdiction(val.jurisdiction))
 				ctx.addIssue({
 					code: "custom",
-					path: ["jurisdictions"],
+					path: ["jurisdiction"],
 					message: JURISDICTION_MESSAGE,
 				});
 		}

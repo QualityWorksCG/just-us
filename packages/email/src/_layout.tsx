@@ -89,7 +89,7 @@ export const paragraph: React.CSSProperties = {
 
 export const buttonStyle: React.CSSProperties = {
 	backgroundColor: COLORS.brass,
-	color: "#ffffff",
+	color: COLORS.brassInk,
 	borderRadius: 9,
 	padding: "14px 30px",
 	fontSize: 15,
@@ -154,7 +154,7 @@ export function EmailShell({
 				<Container style={container}>
 					<Section style={brandRow}>
 						<Text style={brand}>JustUs Financial</Text>
-						<Text style={eyebrow}>Litigation intake sourcing</Text>
+						<Text style={eyebrow}>Justice, crowdfunded</Text>
 					</Section>
 					{children}
 				</Container>

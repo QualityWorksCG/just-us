@@ -40,9 +40,6 @@ lerna-debug.log*
 .turbo
 .nx
 
-# evlog local file drain
-.evlog
-
 # Better-T-Stack
 .alchemy
 .vercel
@@ -56,4 +53,3 @@ coverage
 .cache
 tmp
 temp
-.env*

@@ -12,13 +12,12 @@ import {
 	Mail,
 	TrendingUp,
 } from "lucide-react";
-import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { accountExistsAction, signUpAction } from "@/app/login/actions";
+import { signUpAction } from "@/app/login/actions";
 import { Brandmark } from "@/components/brandmark";
 import { authClient } from "@/lib/auth-client";
 
@@ -26,8 +25,8 @@ type Mode = "create" | "signin";
 
 const BULLETS = [
 	"Nothing goes public until you hit publish",
-	"Connect with your own attorney",
-	"One transparent 5% fee, and we never hold the money",
+	"You choose your own attorney",
+	"One transparent 5% fee — we never hold the money",
 ];
 
 function Field({
@@ -61,33 +60,21 @@ function Field({
 	);
 }
 
-const NO_ACCOUNT_MAGIC_LINK =
-	"No account found for that email. Create an account first, then use the magic link to sign in.";
-
 const MAGIC_LINK_ERRORS: Record<string, string> = {
-	new_user_signup_disabled: NO_ACCOUNT_MAGIC_LINK,
-	USER_NOT_FOUND: NO_ACCOUNT_MAGIC_LINK,
+	new_user_signup_disabled:
+		"No account found for that email. Create an account first, then use the magic link to sign in.",
 	INVALID_TOKEN: "That sign-in link is invalid. Request a new one.",
 	EXPIRED_TOKEN: "That sign-in link has expired. Request a new one.",
 	ATTEMPTS_EXCEEDED: "That sign-in link was already used. Request a new one.",
-	account_blocked:
-		"This account has been blocked. Contact support if you believe this is a mistake.",
 };
 
 export function AuthScreen({
 	initialMode = "signin",
 	initialError,
-	next,
 }: {
 	initialMode?: Mode;
 	initialError?: string;
-	/** Where to land after signing in, when they were interrupted on the way
-	 *  somewhere. Already validated as a same-site path by the page. */
-	next?: string | null;
 }) {
-	// One name for every post-sign-in destination, so the password form, the magic
-	// link and its callback can't drift apart.
-	const landing = next ?? "/home";
 	const router = useRouter();
 	const ids = {
 		name: useId(),
@@ -102,8 +89,7 @@ export function AuthScreen({
 	const [mode, setMode] = useState<Mode>(initialMode);
 	const [pending, setPending] = useState(false);
 
-	// Surface an error handed back on the /login URL — a magic-link verification
-	// failure, or a guard that signed a blocked account out.
+	// Surface a magic-link verification error redirected back to /login.
 	useEffect(() => {
 		if (initialError) {
 			toast.error(
@@ -124,14 +110,12 @@ export function AuthScreen({
 	// Sign-in form state
 	const [siEmail, setSiEmail] = useState("");
 	const [siPassword, setSiPassword] = useState("");
-	const [siErrors, setSiErrors] = useState<Record<string, string>>({});
 
 	const inputClass =
 		"h-10 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]";
 
 	function resetErrors() {
 		setErrors({});
-		setSiErrors({});
 	}
 
 	async function handleCreate(e: React.FormEvent) {
@@ -141,11 +125,9 @@ export function AuthScreen({
 		// Client-side pre-validation for fast feedback (server re-validates).
 		const next: Record<string, string> = {};
 		if (name.trim().length < 2) next.name = "Please enter your full name";
-		if (!email.trim()) next.email = "Email is required";
-		else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+		if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
 			next.email = "Enter a valid email address";
-		if (!password) next.password = "Password is required";
-		else if (password.length < 8)
+		if (password.length < 8)
 			next.password = "Password must be at least 8 characters";
 		else if (!/[0-9!@#$%^&*(),.?":{}|<>]/.test(password))
 			next.password = "Include at least one number or symbol";
@@ -182,46 +164,23 @@ export function AuthScreen({
 
 	async function handleSignIn(e: React.FormEvent) {
 		e.preventDefault();
-		const next: Record<string, string> = {};
-		if (!siEmail.trim()) next.email = "Email is required";
-		else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(siEmail.trim()))
-			next.email = "Enter a valid email address";
-		if (!siPassword) next.password = "Password is required";
-		if (Object.keys(next).length) {
-			setSiErrors(next);
-			return;
-		}
-		setSiErrors({});
 		setPending(true);
 		await authClient.signIn.email(
 			{
 				email: siEmail.trim(),
 				password: siPassword,
-				callbackURL: landing,
+				callbackURL: "/dashboard",
 			},
 			{
 				onSuccess: () => {
 					toast.success("Signed in");
-					router.push(landing as Route);
+					router.push("/dashboard");
 				},
 				onError: (ctx) => {
 					const msg = ctx.error.message || ctx.error.statusText;
-					// Only an unverified address belongs on /verify-email. The status
-					// alone can't identify it — a block and a lockout are 403 too, and
-					// a wrong password is a 401 that must never leave the form — so
-					// match the server's code and treat anything unrecognised as a
-					// plain sign-in failure.
-					const code: string | undefined = ctx.error.code;
-					if (code === "EMAIL_NOT_VERIFIED") {
-						toast.error("Please verify your email to sign in.");
-						// The sign-in failed, so there is no session for the prompt to
-						// read the address from — carry it over so it can offer a resend
-						// instead of dead-ending on "sign in to resend".
-						router.push(
-							`/verify-email?email=${encodeURIComponent(siEmail.trim())}`,
-						);
-					} else if (code === "INVALID_EMAIL_OR_PASSWORD") {
-						toast.error("Incorrect email or password.");
+					if (ctx.error.status === 403) {
+						toast.error(msg || "Please verify your email to sign in.");
+						router.push("/verify-email");
 					} else {
 						toast.error(msg || "Could not sign in.");
 					}
@@ -231,13 +190,6 @@ export function AuthScreen({
 		setPending(false);
 	}
 
-	function promptCreateAccount(target: string) {
-		toast.error(NO_ACCOUNT_MAGIC_LINK);
-		setEmail(target);
-		setSiEmail(target);
-		setMode("create");
-	}
-
 	async function handleMagicLink() {
 		const target = (mode === "signin" ? siEmail : email).trim();
 		if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(target)) {
@@ -245,19 +197,10 @@ export function AuthScreen({
 			return;
 		}
 		setPending(true);
-		// Magic-link signup is disabled, so an unregistered email would otherwise
-		// only fail after the user clicks the emailed link. Check up front and
-		// send them to create-account instead of a dead-end inbox message.
-		const exists = await accountExistsAction(target);
-		if (!exists) {
-			promptCreateAccount(target);
-			setPending(false);
-			return;
-		}
 		await authClient.signIn.magicLink(
 			{
 				email: target,
-				callbackURL: landing,
+				callbackURL: "/dashboard",
 				errorCallbackURL: "/login?mode=signin",
 			},
 			{
@@ -265,19 +208,7 @@ export function AuthScreen({
 					toast.success("Check your email for a one-time sign-in link.");
 				},
 				onError: (ctx) => {
-					const code = ctx.error.code;
-					if (
-						code === "USER_NOT_FOUND" ||
-						code === "new_user_signup_disabled"
-					) {
-						promptCreateAccount(target);
-						return;
-					}
-					toast.error(
-						(code && MAGIC_LINK_ERRORS[code]) ||
-							ctx.error.message ||
-							"Could not send the link.",
-					);
+					toast.error(ctx.error.message || "Could not send the link.");
 				},
 			},
 		);
@@ -325,7 +256,7 @@ export function AuthScreen({
 									JustUs Financial
 								</span>
 								<span className="mt-1 block font-mono text-[10px] text-paper/50 uppercase tracking-[0.14em]">
-									Litigation intake sourcing
+									Justice, crowdfunded
 								</span>
 							</span>
 						</Link>
@@ -335,9 +266,8 @@ export function AuthScreen({
 						Justice shouldn't depend on what's in your pocket.
 					</h1>
 					<p className="mb-6 max-w-[440px] text-[15px] text-paper/70 leading-relaxed">
-						Create your account to submit a cause, support one, or securely
-						manage client onboarding. You choose how you're joining right after
-						you sign in.
+						Create your account to submit a case, fund one, or take one on. You
+						choose how you're joining right after you sign in.
 					</p>
 					<ul className="flex flex-col gap-2.5">
 						{BULLETS.map((b) => (
@@ -378,7 +308,7 @@ export function AuthScreen({
 					<p className="mt-6 flex gap-2.5 text-[12px] text-paper/50 leading-relaxed">
 						<Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
 						<span>
-							Your sign-in is protected: passwords are encrypted, sessions use
+							Your sign-in is protected — passwords are encrypted, sessions use
 							secure cookies, and every account confirms its email before it
 							goes active.
 						</span>
@@ -454,8 +384,6 @@ export function AuthScreen({
 									onChange={(e) => setEmail(e.target.value)}
 									placeholder="you@example.com"
 									autoComplete="email"
-									required
-									aria-required="true"
 									aria-invalid={!!errors.email}
 								/>
 							</Field>
@@ -474,8 +402,6 @@ export function AuthScreen({
 									onChange={(e) => setPassword(e.target.value)}
 									placeholder="Create a password"
 									autoComplete="new-password"
-									required
-									aria-required="true"
 									aria-invalid={!!errors.password}
 								/>
 							</Field>
@@ -493,8 +419,6 @@ export function AuthScreen({
 									onChange={(e) => setConfirm(e.target.value)}
 									placeholder="Re-enter your password"
 									autoComplete="new-password"
-									required
-									aria-required="true"
 									aria-invalid={!!errors.confirm}
 								/>
 							</Field>
@@ -531,7 +455,7 @@ export function AuthScreen({
 									>
 										Privacy Policy
 									</Link>
-									, and understand donations are gifts that carry no financial
+									, and understand donations are gifts — they carry no financial
 									return and no share of any settlement.
 								</span>
 							</label>
@@ -557,12 +481,7 @@ export function AuthScreen({
 							className="flex flex-col gap-4"
 							noValidate
 						>
-							<Field
-								label="Email"
-								htmlFor={ids.siEmail}
-								required
-								error={siErrors.email}
-							>
+							<Field label="Email" htmlFor={ids.siEmail} required>
 								<Input
 									id={ids.siEmail}
 									className={inputClass}
@@ -571,28 +490,17 @@ export function AuthScreen({
 									onChange={(e) => setSiEmail(e.target.value)}
 									placeholder="you@example.com"
 									autoComplete="email"
-									required
-									aria-required="true"
-									aria-invalid={!!siErrors.email}
 								/>
 							</Field>
-							<Field
-								label="Password"
-								htmlFor={ids.siPassword}
-								required
-								error={siErrors.password}
-							>
+							<Field label="Password" htmlFor={ids.siPassword} required>
 								<Input
 									id={ids.siPassword}
 									className={inputClass}
 									type="password"
 									value={siPassword}
 									onChange={(e) => setSiPassword(e.target.value)}
-									placeholder="Enter your password"
+									placeholder="••••••••"
 									autoComplete="current-password"
-									required
-									aria-required="true"
-									aria-invalid={!!siErrors.password}
 								/>
 							</Field>
 							<button

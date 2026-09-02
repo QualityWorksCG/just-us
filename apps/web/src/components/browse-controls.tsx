@@ -1,30 +1,20 @@
 "use client";
 
 import { US_STATES } from "@just-us/auth/jurisdiction";
-import {
-	Combobox,
-	ComboboxContent,
-	ComboboxEmpty,
-	ComboboxInput,
-	ComboboxItem,
-	ComboboxList,
-} from "@just-us/ui/components/combobox";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@just-us/ui/components/select";
 import { cn } from "@just-us/ui/lib/utils";
-import { Search, X } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { CASE_CATEGORIES } from "@/lib/case-categories";
-
-const CATEGORIES = CASE_CATEGORIES;
+const CATEGORIES = [
+	"Employment",
+	"Housing",
+	"Elder care",
+	"Consumer fraud",
+	"Medical",
+	"Civil rights",
+];
 
 const SORTS = [
 	{ value: "trending", label: "Trending" },
@@ -43,7 +33,6 @@ export function BrowseControls() {
 	const sort = params.get("sort") ?? "trending";
 
 	const [search, setSearch] = useState(q);
-	const hasFilters = !!(q || state || category);
 
 	// Keep the input in sync if the URL changes elsewhere (e.g. back button).
 	useEffect(() => {
@@ -56,18 +45,8 @@ export function BrowseControls() {
 			if (value) sp.set(key, value);
 			else sp.delete(key);
 		}
-		// Any filter/search change resets pagination to the first page.
-		sp.delete("page");
 		const qs = sp.toString();
 		router.push((qs ? `${pathname}?${qs}` : pathname) as Route);
-	}
-
-	/** Back to the unfiltered list. The search input holds its own state, so it
-	 *  has to be cleared directly — otherwise the debounce effect sees text that
-	 *  the URL no longer has and immediately re-applies it. */
-	function clearFilters() {
-		setSearch("");
-		apply({ q: null, state: null, category: null });
 	}
 
 	// Debounce the free-text search so we don't push on every keystroke.
@@ -101,8 +80,16 @@ export function BrowseControls() {
 					/>
 				</form>
 
-				<div className="flex gap-3 [&>*]:flex-1 sm:[&>*]:flex-none">
-					<StateCombobox value={state} onChange={(v) => apply({ state: v })} />
+				<div className="flex gap-3">
+					<Dropdown
+						label={state || "All states"}
+						value={state}
+						onChange={(v) => apply({ state: v || null })}
+						options={[
+							{ value: "", label: "All states" },
+							...US_STATES.map((s) => ({ value: s, label: s })),
+						]}
+					/>
 					<Dropdown
 						label={SORTS.find((s) => s.value === sort)?.label ?? "Trending"}
 						value={sort}
@@ -113,7 +100,7 @@ export function BrowseControls() {
 			</div>
 
 			{/* Category pills */}
-			<div className="flex flex-wrap items-center gap-2">
+			<div className="flex flex-wrap gap-2">
 				<Pill active={!category} onClick={() => apply({ category: null })}>
 					All
 				</Pill>
@@ -126,19 +113,6 @@ export function BrowseControls() {
 						{cat}
 					</Pill>
 				))}
-
-				{/* Only shown when there's something to clear — a permanently-visible
-				    reset invites a click that does nothing. */}
-				{hasFilters && (
-					<button
-						type="button"
-						onClick={clearFilters}
-						className="ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5 font-semibold text-[13px] text-ink-soft transition-colors hover:bg-brass-wash hover:text-brass-deep"
-					>
-						<X className="size-3.5" aria-hidden="true" />
-						Clear filters
-					</button>
-				)}
 			</div>
 		</div>
 	);
@@ -170,41 +144,6 @@ function Pill({
 	);
 }
 
-/** Fifty states is too many to scroll, so this one is typed into. Clearing the
- *  field clears the filter. */
-function StateCombobox({
-	value,
-	onChange,
-}: {
-	value: string;
-	onChange: (value: string | null) => void;
-}) {
-	return (
-		<Combobox
-			items={US_STATES as unknown as string[]}
-			value={value}
-			onValueChange={(next: string | null) => onChange(next || null)}
-		>
-			<ComboboxInput
-				placeholder="All states"
-				aria-label="Filter by state"
-				className="h-12 w-full rounded-[var(--radius-pill)] border-border px-4 font-semibold text-[13.5px] sm:w-[190px]"
-			/>
-			<ComboboxContent>
-				<ComboboxEmpty>No matches</ComboboxEmpty>
-				<ComboboxList>
-					{(option: string) => (
-						<ComboboxItem key={option} value={option}>
-							{option}
-						</ComboboxItem>
-					)}
-				</ComboboxList>
-			</ComboboxContent>
-		</Combobox>
-	);
-}
-
-/** Sort has three fixed options — a menu is faster than a search field. */
 function Dropdown({
 	label,
 	value,
@@ -217,27 +156,23 @@ function Dropdown({
 	options: { value: string; label: string }[];
 }) {
 	return (
-		<Select
-			value={value}
-			onValueChange={(next: string | null) => onChange(next ?? "")}
-		>
-			<SelectTrigger
+		<div className="relative">
+			<select
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
 				aria-label={label}
-				className="h-12 w-full gap-2 rounded-[var(--radius-pill)] border-border px-4 font-semibold text-[13.5px] text-ink sm:w-auto"
+				className="h-12 cursor-pointer appearance-none rounded-[var(--radius-pill)] border border-border bg-surface pr-9 pl-4 font-semibold text-[13.5px] text-ink outline-none transition-colors focus:border-brass-deep"
 			>
-				<SelectValue />
-			</SelectTrigger>
-			<SelectContent className="max-h-[300px]">
-				{options.map((option) => (
-					<SelectItem
-						key={option.value}
-						value={option.value}
-						className="text-[14px]"
-					>
-						{option.label}
-					</SelectItem>
+				{options.map((o) => (
+					<option key={o.value} value={o.value}>
+						{o.label}
+					</option>
 				))}
-			</SelectContent>
-		</Select>
+			</select>
+			<ChevronDown
+				className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
+				aria-hidden="true"
+			/>
+		</div>
 	);
 }

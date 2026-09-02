@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
-import { APP_PATHS } from "@/lib/dashboard-nav";
 
 import { Brandmark } from "./brandmark";
 
@@ -17,21 +16,17 @@ const links = [
 	{ href: "/attorneys", label: "For attorneys" },
 ] as const;
 
-// Full-bleed auth flows and legal pages render their own chrome — hide the site
-// header there. The app's own screens are covered by APP_PATHS, which the nav
-// registry derives, so adding a screen can't leave a stray marketing header on it.
+// Full-bleed auth flows and the dashboard render their own chrome — hide the
+// site header there.
 const CHROME_LESS_ROUTES = [
-	...APP_PATHS,
+	"/dashboard",
 	"/login",
 	"/reset-password",
-	"/accept-invite",
 	"/verify-email",
 	"/onboarding",
 	"/cases/new",
 	"/terms",
 	"/privacy",
-	// The certificate of appreciation is its own full-bleed, printable page.
-	"/certificates",
 ];
 
 export default function Header() {
@@ -50,13 +45,10 @@ export default function Header() {
 		return null;
 	}
 
-	// The public content pages (home, /cases, /cases/[id], /attorneys) render this
-	// header for everyone — a signed-in visitor following a shared case link must
-	// not land on a chrome-less page with no way to navigate. App screens are
-	// already handled above by CHROME_LESS_ROUTES, so a signed-in user only ever
-	// sees this header on genuinely public pages; there we just swap the sign-in
-	// CTA for a link back into their dashboard.
-	const signedIn = !!session;
+	// Signed-in users navigate from the app shell, not the marketing header.
+	if (session) {
+		return null;
+	}
 
 	return (
 		<header
@@ -75,7 +67,7 @@ export default function Header() {
 							JustUs Financial
 						</span>
 						<span className="mt-0.5 hidden font-mono text-[10px] text-muted-foreground uppercase tracking-[0.12em] sm:block">
-							Litigation intake sourcing
+							Litigation crowdfunding
 						</span>
 					</span>
 				</Link>
@@ -84,51 +76,36 @@ export default function Header() {
 					aria-label="Primary"
 					className="hidden items-center gap-7 text-ink-soft text-sm md:flex"
 				>
-					{links
-						// "Get justice" is the start-a-case entry via /login — pointless for a
-						// signed-in visitor, so drop it while keeping the public browse links.
-						.filter((link) => !(signedIn && link.href === "/login"))
-						.map((link) => (
-							<Link
-								key={link.href}
-								href={link.href}
-								className="font-semibold transition-colors hover:text-foreground"
-							>
-								{link.label}
-							</Link>
-						))}
+					{links.map((link) => (
+						<Link
+							key={link.href}
+							href={link.href}
+							className="font-semibold transition-colors hover:text-foreground"
+						>
+							{link.label}
+						</Link>
+					))}
 				</nav>
 
 				<div className="flex items-center gap-2">
-					{signedIn ? (
-						<Link
-							href="/home"
-							className={cn(buttonVariants({ size: "sm" }), "h-9 px-4 text-sm")}
-						>
-							Go to dashboard
-						</Link>
-					) : (
-						<>
-							<Link
-								href="/login"
-								className={cn(
-									buttonVariants({ variant: "outline", size: "sm" }),
-									"hidden h-9 px-4 text-sm sm:inline-flex",
-								)}
-							>
-								Sign in
-							</Link>
-							<Link
-								href="/login?mode=create"
-								className={cn(
-									buttonVariants({ size: "sm" }),
-									"hidden h-9 px-4 text-sm sm:inline-flex",
-								)}
-							>
-								Start your case
-							</Link>
-						</>
-					)}
+					<Link
+						href="/login"
+						className={cn(
+							buttonVariants({ variant: "outline", size: "sm" }),
+							"hidden h-9 px-4 text-sm sm:inline-flex",
+						)}
+					>
+						Sign in
+					</Link>
+					<Link
+						href="/login"
+						className={cn(
+							buttonVariants({ size: "sm" }),
+							"hidden h-9 px-4 text-sm sm:inline-flex",
+						)}
+					>
+						Start your case
+					</Link>
 				</div>
 			</div>
 		</header>

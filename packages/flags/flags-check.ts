@@ -10,7 +10,7 @@
 import prisma from "@just-us/db";
 
 import { isFeatureEnabled, readFlags, setFlag } from "./src/index";
-import { FLAG_KEYS, flagDefault, isFlagKey } from "./src/registry";
+import { FLAG_KEYS, isFlagKey } from "./src/registry";
 
 let failures = 0;
 
@@ -22,14 +22,10 @@ function check(label: string, pass: boolean, detail = "") {
 }
 
 const KEY = "investorTrack";
-const DEFAULT_ON_KEY = "aiAssistant";
 const STALE = "flagsCheckRemovedFlag";
 
 // Capture existing state so a real toggle isn't clobbered by this run.
 const original = await prisma.featureFlag.findUnique({ where: { key: KEY } });
-const originalDefaultOn = await prisma.featureFlag.findUnique({
-	where: { key: DEFAULT_ON_KEY },
-});
 
 console.log("--- registry ---");
 check("declared keys present", FLAG_KEYS.length > 0, "registry is empty");
@@ -39,29 +35,10 @@ check("empty key rejected", !isFlagKey(""));
 // Guards against a prototype-key false positive, e.g. isFlagKey("toString").
 check("prototype key rejected", !isFlagKey("toString"));
 
-console.log("\n--- defaults: no row means the declared default ---");
+console.log("\n--- defaults: no row means off ---");
 await prisma.featureFlag.deleteMany({ where: { key: KEY } });
 check("unset flag reads false", (await readFlags())[KEY] === false);
 check("unset flag via single read", (await isFeatureEnabled(KEY)) === false);
-check("declared default agrees", flagDefault(KEY) === false);
-
-// A flag declaring defaultEnabled ships on, and its stored row exists only to
-// turn it off again — the opposite direction to every other flag here.
-await prisma.featureFlag.deleteMany({ where: { key: DEFAULT_ON_KEY } });
-check("default-on flag reads true unset", flagDefault(DEFAULT_ON_KEY) === true);
-check(
-	"default-on flag reads true in state",
-	(await readFlags())[DEFAULT_ON_KEY] === true,
-);
-check(
-	"default-on flag reads true via single read",
-	(await isFeatureEnabled(DEFAULT_ON_KEY)) === true,
-);
-await setFlag(DEFAULT_ON_KEY, false, "flags-check");
-check(
-	"stored off beats a true default",
-	(await isFeatureEnabled(DEFAULT_ON_KEY)) === false,
-);
 
 console.log("\n--- toggle round-trip ---");
 await setFlag(KEY, true, "flags-check");
@@ -92,19 +69,11 @@ check(
 );
 await prisma.featureFlag.deleteMany({ where: { key: STALE } });
 
-// Restore whatever was there before. Absence is meaningful now that a flag can
-// default on, so a key with no original row is left with no row.
-for (const [key, before] of [
-	[KEY, original],
-	[DEFAULT_ON_KEY, originalDefaultOn],
-] as const) {
-	await prisma.featureFlag.deleteMany({ where: { key } });
-	if (before) {
-		await prisma.featureFlag.create({ data: before });
-		console.log(`\n(restored ${key} = ${before.enabled})`);
-	} else {
-		console.log(`\n(restored ${key} = unset)`);
-	}
+// Restore whatever was there before.
+await prisma.featureFlag.deleteMany({ where: { key: KEY } });
+if (original) {
+	await prisma.featureFlag.create({ data: original });
+	console.log(`\n(restored ${KEY} = ${original.enabled})`);
 }
 
 console.log(

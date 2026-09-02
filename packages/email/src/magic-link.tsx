@@ -51,7 +51,7 @@ export default function MagicLinkEmail({ url, name }: MagicLinkEmailProps) {
 			<Hr style={divider} />
 
 			<Text style={footer}>
-				If you didn't request this link, you can safely ignore this email. Your
+				If you didn't request this link, you can safely ignore this email — your
 				account stays secure.
 			</Text>
 		</EmailShell>
