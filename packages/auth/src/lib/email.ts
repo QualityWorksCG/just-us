@@ -1,7 +1,10 @@
 import AdminInviteEmail, {
 	adminInviteSubject,
 } from "@just-us/email/admin-invite";
-import CaseInviteEmail, { caseInviteSubject } from "@just-us/email/case-invite";
+import CaseInviteEmail, {
+	type CaseInviteOrigin,
+	caseInviteSubject,
+} from "@just-us/email/case-invite";
 import CaseStatusEmail, { caseStatusSubject } from "@just-us/email/case-status";
 import CaseUpdateEmail, { caseUpdateSubject } from "@just-us/email/case-update";
 import CertificateEmail, {
@@ -131,12 +134,16 @@ export function sendCaseInviteEmail(params: {
 	attorneyName: string;
 	hasAccount: boolean;
 	expiresInDays: number;
+	/** How the invitation came about — a directory "request" or the wizard's
+	 *  "bring_your_own". Defaults to bring-your-own. Changes the email's framing. */
+	origin?: CaseInviteOrigin;
 }) {
 	return send({
 		to: params.to,
 		subject: caseInviteSubject({
 			hasAccount: params.hasAccount,
 			caseTitle: params.caseTitle,
+			origin: params.origin,
 		}),
 		react: CaseInviteEmail({
 			inviteUrl: params.inviteUrl,
@@ -145,6 +152,7 @@ export function sendCaseInviteEmail(params: {
 			attorneyName: params.attorneyName,
 			hasAccount: params.hasAccount,
 			expiresInDays: params.expiresInDays,
+			origin: params.origin,
 		}),
 	});
 }

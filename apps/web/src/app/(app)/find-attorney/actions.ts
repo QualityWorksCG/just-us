@@ -110,6 +110,9 @@ export async function requestRepresentationAction(
 			// They're an on-platform attorney (we resolved a real account above), so
 			// the email is the "sign in and answer" one, not the account-creation one.
 			hasAccount: true,
+			// The plaintiff picked them from the directory — the email reads as a
+			// request, not "you were named as the attorney".
+			origin: "request",
 			expiresInDays: CASE_INVITATION_TTL_DAYS,
 		});
 	} catch {
