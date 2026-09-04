@@ -1,4 +1,5 @@
 import type { CaseStatus } from "../prisma/generated/enums";
+import { pendingCaseInvitationWhere } from "./case-invitations";
 import prisma from "./index";
 
 export type CaseAttorney = {
@@ -17,6 +18,9 @@ export type CaseFields = {
 	category?: string;
 	/** US state the case is in. */
 	location?: string;
+	/** State-court or federal action — gates which attorneys can see and take it.
+	 *  Absent on an update leaves whatever is stored (like `thankYouNote`). */
+	jurisdiction?: "state" | "federal";
 	summary?: string;
 	story?: string;
 	/** Agreed attorney fee — the funding goal — in whole cents. */
@@ -70,6 +74,10 @@ function toData(f: CaseFields) {
 		// then re-run through the wizard would go public having silently dropped it.
 		// On create, absent simply leaves the column at its own null.
 		...(f.thankYouNote !== undefined ? { thankYouNote: f.thankYouNote } : {}),
+		// Same absent-leaves-it rule as thankYouNote: the wizard always sends it, but
+		// a partial update from elsewhere must not silently reset a federal case to
+		// the column default. On create, absent falls back to the schema default.
+		...(f.jurisdiction !== undefined ? { jurisdiction: f.jurisdiction } : {}),
 	};
 }
 
@@ -478,12 +486,20 @@ export function caseEvidence(json: unknown, caseId: string): CaseEvidence[] {
  * One evidence document, for the route that serves it — **the authorization
  * check** for reading a plaintiff's filings.
  *
- * Two people may open a case's documents: the plaintiff who filed them, and the
- * attorney actually representing the case. Both are re-derived from the case row
- * rather than trusted from the request. Neither an attorney *browsing* the queue
- * nor one who has merely been *named* on a case they have not confirmed is among
- * them — the queue view says documents are shared once you are representing the
- * matter, and this is where that holds. See `designatedAttorneyWhere`.
+ * Who may open a case's documents, all re-derived from the case row rather than
+ * trusted from the request:
+ *   - the plaintiff who filed them;
+ *   - the attorney actually representing the case (matched or bring-your-own —
+ *     see `designatedAttorneyWhere`);
+ *   - an attorney the plaintiff *named*, while their invitation is still open; and
+ *   - an attorney who has put themselves forward for it (an expression of
+ *     interest).
+ *
+ * The last two let a reviewing attorney read the evidence *before* they commit —
+ * a plaintiff who has asked a specific attorney to take the case, or one whose
+ * open intake an attorney is weighing, expects that attorney to be able to look
+ * at what was filed to make the call. A pure browsing attorney who has not yet
+ * engaged still gets nothing here until they express interest.
  *
  * Returns null for every failure — wrong case, wrong viewer, no such entry, an
  * entry that is not a stored file — so the caller answers all of them with a 404
@@ -496,6 +512,7 @@ export async function caseEvidenceFile(input: {
 	/** The viewer's account email, for the bring-your-own attorney link. */
 	viewerEmail: string;
 }): Promise<{ name: string; url: string } | null> {
+	const email = input.viewerEmail.toLowerCase();
 	const kase = await prisma.case.findFirst({
 		where: {
 			id: input.caseId,
@@ -504,6 +521,12 @@ export async function caseEvidenceFile(input: {
 				{ ownerId: input.viewerId },
 				{ match: { attorneyId: input.viewerId } },
 				designatedAttorneyWhere(input.viewerEmail),
+				// Named on the case with a still-open invitation — the attorney the
+				// plaintiff asked, reviewing before they accept or decline.
+				{ invitations: { some: { email, ...pendingCaseInvitationWhere() } } },
+				// Put themselves forward for it — reviewing before, or after, the
+				// plaintiff decides on their expression of interest.
+				{ requests: { some: { attorneyId: input.viewerId } } },
 			],
 		},
 		select: { evidence: true },
@@ -662,6 +685,7 @@ export type BrowseFilters = {
 	q?: string;
 	state?: string;
 	category?: string;
+	jurisdiction?: "state" | "federal";
 	sort?: "trending" | "funded" | "newest";
 };
 
@@ -676,6 +700,7 @@ function browseWhere(opts?: BrowseFilters) {
 		moderationStatus: "ok" as const,
 		...(opts?.state ? { location: opts.state } : {}),
 		...(opts?.category ? { category: opts.category } : {}),
+		...(opts?.jurisdiction ? { jurisdiction: opts.jurisdiction } : {}),
 		...(q
 			? {
 					OR: [

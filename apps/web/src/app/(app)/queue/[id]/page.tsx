@@ -1,4 +1,5 @@
 import { getAdmission } from "@just-us/db/admissions";
+import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import { getQueueCase } from "@just-us/db/representation";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
@@ -29,11 +30,15 @@ export default async function QueueCasePage({
 	const item = await getQueueCase(id, session.user.id);
 	if (!item) notFound();
 
-	// The gate is per state, not per attorney: whether this attorney can put
-	// themselves forward turns on their admission in *this case's* state, so the
-	// page can tell them exactly what's outstanding (not claimed / claimed but
-	// unverified / verified) rather than a one-size-fits-all "get verified".
-	const admission = await getAdmission(session.user.id, item.state);
+	// The gate turns on the case's jurisdiction. For a state case it is the
+	// attorney's admission in *this case's* state (not claimed / claimed but
+	// unverified / verified), so the page can say exactly what's outstanding. For a
+	// federal case it is their federal-court standing instead.
+	const federal = item.jurisdiction === "federal";
+	const [admission, profile] = await Promise.all([
+		federal ? Promise.resolve(null) : getAdmission(session.user.id, item.state),
+		federal ? getAttorneyProfile(session.user.id) : Promise.resolve(null),
+	]);
 
 	return (
 		// Full-bleed, like the other app screens: the shell's content column already
@@ -49,6 +54,7 @@ export default async function QueueCasePage({
 			<QueueCaseDetailView
 				item={item}
 				admissionStatus={admission?.verificationStatus ?? null}
+				federalStatus={profile?.federalVerificationStatus ?? null}
 			/>
 		</div>
 	);

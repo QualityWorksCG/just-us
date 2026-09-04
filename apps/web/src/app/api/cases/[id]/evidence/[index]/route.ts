@@ -14,9 +14,10 @@ import { getSession } from "@/lib/auth-server";
  * unrevokable, un-authenticated link to a client's filings into a page's HTML.
  *
  * Who may read is decided by `caseEvidenceFile` against the case row: the
- * plaintiff who filed it, and the attorney representing that case. An attorney
- * browsing the representation queue is not included, which is what makes the
- * queue's "documents are shared once you're representing the case" true.
+ * plaintiff who filed it, the attorney representing that case, and the attorneys
+ * reviewing it toward that decision — one the plaintiff named (while their
+ * invitation is open) or one who has expressed interest. A plain browsing attorney
+ * who has not engaged is still refused until they put themselves forward.
  *
  * Every refusal is a 404, so this says nothing about whether a case or a document
  * exists to someone who isn't entitled to it.
@@ -40,7 +41,14 @@ export async function GET(
 	});
 	if (!file) return notFound();
 
-	const upstream = await fetch(file.url);
+	let upstream: Response;
+	try {
+		upstream = await fetch(file.url);
+	} catch {
+		// Blob store unreachable, malformed stored URL, network blip — not the
+		// viewer's fault and not a reason to leak a 500. Treated like a missing file.
+		return notFound();
+	}
 	if (!upstream.ok || !upstream.body) return notFound();
 
 	// Streamed rather than buffered: evidence runs to 25MB, and holding one in
@@ -50,16 +58,33 @@ export async function GET(
 			"content-type":
 				upstream.headers.get("content-type") ?? "application/octet-stream",
 			// Opens in the browser rather than downloading, which is what "view" means
-			// for the PDFs and photographs this is nearly always serving. The stored
-			// name is quoted and stripped of quotes/newlines so a filename cannot break
-			// out of the header.
-			"content-disposition": `inline; filename="${file.name.replace(/[\r\n"]/g, "")}"`,
+			// for the PDFs and photographs this is nearly always serving.
+			"content-disposition": contentDisposition(file.name),
 			// Private and unstored: a shared cache must never keep one client's
 			// filings, and this response was authorized for exactly one viewer.
 			"cache-control": "private, no-store",
 			"x-content-type-options": "nosniff",
 		},
 	});
+}
+
+/**
+ * A `content-disposition` value that survives any filename (RFC 6266).
+ *
+ * HTTP header values are Latin-1, so a name with any character beyond it — a
+ * macOS screenshot's narrow no-break space (U+202F) before "PM", an accent, CJK —
+ * throws when set as a header, which was surfacing as a 500 the moment an attorney
+ * opened one. Two params cover every client: a plain-ASCII `filename` fallback
+ * (anything non-ASCII or structural replaced with `_`), and the real UTF-8 name in
+ * `filename*`, which modern browsers prefer.
+ */
+function contentDisposition(name: string): string {
+	const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+	const utf8 = encodeURIComponent(name).replace(
+		/['()*]/g,
+		(c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+	);
+	return `inline; filename="${ascii}"; filename*=UTF-8''${utf8}`;
 }
 
 function notFound() {

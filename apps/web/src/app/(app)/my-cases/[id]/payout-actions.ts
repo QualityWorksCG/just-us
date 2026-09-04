@@ -328,35 +328,68 @@ function caseUrl(caseId: string, params: Record<string, string>) {
 }
 
 /**
- * The page Stripe is shown as this account's "business website".
+ * The page Stripe is shown as this account's "business website", or `null` when we
+ * have no *public* one to offer.
  *
  * Best available, in order: the firm's own site, this case's public page, the
- * attorney's directory profile, then the platform. Nothing is invented and nothing that
- * would 404 is offered — see `attorneyBusinessUrlSources`, where the ordering is
- * justified.
+ * attorney's directory profile, then the platform. Nothing is invented and nothing
+ * that would 404 is offered — see `attorneyBusinessUrlSources`, where the ordering
+ * is justified.
+ *
+ * Stripe rejects any URL it cannot resolve — a `localhost` dev origin included —
+ * with "Invalid URL", which fails account creation. So a JustUs-hosted fallback is
+ * only offered when `BETTER_AUTH_URL` is a real public origin (production), and
+ * `null` is returned otherwise; the firm's own website is always public and passes
+ * through in either environment. A `null` just means Stripe asks the holder during
+ * onboarding — the step a good value would have spared them.
  */
 async function businessUrlFor(input: {
 	userId: string;
 	caseId: string;
-}): Promise<string> {
+}): Promise<string | null> {
 	const sources = await attorneyBusinessUrlSources(input);
 	// Profile URLs are attorney-entered free text, so "smithlaw.com" is as likely as
 	// a full URL. Stripe rejects the bare host, and an unusable value here means the
 	// hosted flow asks them for a business website instead — the exact step this
 	// exists to spare them.
 	if (sources.firmWebsiteUrl) {
-		return /^https?:\/\//i.test(sources.firmWebsiteUrl)
+		const withScheme = /^https?:\/\//i.test(sources.firmWebsiteUrl)
 			? sources.firmWebsiteUrl
 			: `https://${sources.firmWebsiteUrl}`;
+		return isPublicUrl(withScheme) ? withScheme : null;
 	}
 	const path = sources.caseId
 		? `/cases/${sources.caseId}`
 		: sources.profileId
 			? `/attorneys/${sources.profileId}`
 			: null;
-	return path
+	const hosted = path
 		? new URL(path, env.BETTER_AUTH_URL).toString()
 		: env.BETTER_AUTH_URL;
+	return isPublicUrl(hosted) ? hosted : null;
+}
+
+/**
+ * Whether a URL is one Stripe can actually reach — a real, non-loopback host over
+ * http/https. A `localhost`/127.0.0.1/`.local` origin (dev) is not, and passing it
+ * as a business URL fails account creation with "Invalid URL".
+ */
+function isPublicUrl(value: string): boolean {
+	let url: URL;
+	try {
+		url = new URL(value);
+	} catch {
+		return false;
+	}
+	if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+	const host = url.hostname.toLowerCase();
+	return (
+		host !== "localhost" &&
+		host !== "127.0.0.1" &&
+		host !== "::1" &&
+		host !== "0.0.0.0" &&
+		!host.endsWith(".local")
+	);
 }
 
 /**
@@ -407,13 +440,15 @@ export async function startPayoutOnboarding(
 				displayName: session.user.firmName?.trim() || session.user.name,
 				caseId: kase.id,
 				caseTitle: kase.title,
-				// Stripe requires a business URL and rejects placeholder sites — it wants
-				// a page showing the holder's actual activity. A law firm's own site is
-				// exactly that, and better than anything we could host on their behalf.
-				businessUrl: await businessUrlFor({
-					userId: session.user.id,
-					caseId,
-				}),
+				// Stripe wants a page showing the holder's actual activity, and rejects
+				// any URL it can't resolve. A law firm's own site is exactly that; when
+				// there's no public URL to offer (e.g. a localhost dev origin), it's left
+				// unset so Stripe asks for it during onboarding rather than failing.
+				businessUrl:
+					(await businessUrlFor({
+						userId: session.user.id,
+						caseId,
+					})) ?? undefined,
 			});
 			// Persist immediately, before the redirect. If we minted the account and
 			// only recorded it on return, an attorney who closed the tab mid-onboarding

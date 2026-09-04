@@ -131,8 +131,13 @@ export async function createPayoutAccount(input: {
 	 * business URL (it raises `defaults.profile.business_url` as a requirement), so
 	 * supplying it is the difference between the holder confirming a sensible value
 	 * and being asked to invent a "business website" they don't have.
+	 *
+	 * Optional, and omitted rather than faked when the caller has no *public* URL to
+	 * offer — Stripe rejects a non-resolvable one (a `localhost` dev origin included)
+	 * with "Invalid URL", so passing it would fail account creation outright. Left
+	 * unset, Stripe simply asks the holder for it during onboarding.
 	 */
-	businessUrl: string;
+	businessUrl?: string;
 }): Promise<ConnectAccountStatus> {
 	const account = await stripe().v2.core.accounts.create({
 		contact_email: input.email,
@@ -159,7 +164,9 @@ export async function createPayoutAccount(input: {
 				losses_collector: "application",
 			},
 			profile: {
-				business_url: input.businessUrl,
+				// Only when the caller has a real public URL — see `businessUrl`. A
+				// missing one becomes an onboarding question, not a rejected account.
+				...(input.businessUrl ? { business_url: input.businessUrl } : {}),
 				// The firm alone, without the case. This is the trading name of the legal
 				// entity Stripe is verifying; qualifying it with a matter would describe
 				// something that is not a business.

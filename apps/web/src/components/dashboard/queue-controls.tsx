@@ -38,6 +38,12 @@ const SORTS = [
 	{ value: "oldest", label: "Longest waiting" },
 ] as const;
 
+const COURTS = [
+	{ value: "all", label: "All courts" },
+	{ value: "state", label: "State" },
+	{ value: "federal", label: "Federal" },
+] as const;
+
 export function QueueControls({
 	categories,
 	states,
@@ -54,6 +60,9 @@ export function QueueControls({
 	const category = params.get("category") ?? "";
 	const state = params.get("state") ?? "";
 	const sort = params.get("sort") ?? "newest";
+	const courtParam = params.get("court");
+	const court =
+		courtParam === "state" || courtParam === "federal" ? courtParam : "all";
 	const ids = { category: useId(), state: useId() };
 
 	function apply(next: Record<string, string | null>) {
@@ -66,7 +75,7 @@ export function QueueControls({
 		router.push((qs ? `${pathname}?${qs}` : pathname) as Route);
 	}
 
-	const hasFilters = !!(category || state);
+	const hasFilters = !!(category || state || court !== "all");
 
 	return (
 		<div className="flex flex-col gap-5">
@@ -90,6 +99,33 @@ export function QueueControls({
 						onChange={(value) => apply({ state: value })}
 					/>
 				</Field>
+			</div>
+
+			<div className="flex flex-wrap items-center gap-2">
+				<span className="mr-1 font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
+					Court
+				</span>
+				{COURTS.map((option) => {
+					const active = court === option.value;
+					return (
+						<button
+							key={option.value}
+							type="button"
+							aria-pressed={active}
+							onClick={() =>
+								apply({ court: option.value === "all" ? null : option.value })
+							}
+							className={cn(
+								"rounded-[var(--radius-pill)] border px-4 py-1.5 font-semibold text-[13px] transition-colors",
+								active
+									? "border-ink bg-ink text-paper"
+									: "border-border bg-surface text-ink-soft hover:border-brass-deep hover:text-ink",
+							)}
+						>
+							{option.label}
+						</button>
+					);
+				})}
 			</div>
 
 			<div className="flex flex-wrap items-center gap-2">
@@ -121,7 +157,7 @@ export function QueueControls({
 				{hasFilters && (
 					<button
 						type="button"
-						onClick={() => apply({ category: null, state: null })}
+						onClick={() => apply({ category: null, state: null, court: null })}
 						className="ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5 font-semibold text-[13px] text-ink-soft transition-colors hover:bg-brass-wash hover:text-brass-deep"
 					>
 						<X className="size-3.5" aria-hidden="true" />

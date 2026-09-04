@@ -71,23 +71,34 @@ export default async function DashboardAttorneysPage({
 		: null;
 
 	// Where "back to your case" returns to, and what the banner says — it depends on
-	// where the case actually is. A still-in-progress draft goes back to the wizard
-	// to keep filling it in. A case already out to attorneys must NOT be walked back
-	// into the creation flow (the plaintiff has published it); it returns to the case
-	// itself, where any attorney requests show up.
+	// where the case actually is. The plaintiff reached this screen mid-flow from the
+	// wizard, so while the case is still being built — draft, out to attorneys, or
+	// committed-but-not-yet-published (any status short of live/closed) — "back"
+	// returns to the wizard, which resumes at whatever step is unfinished (add the
+	// attorney, agree the fee, publish). Only a case that is genuinely done — live or
+	// closed — goes to the case itself; the wizard has nothing left to resume there.
+	//
+	// This is the fix for landing on a published-looking "awaiting firm" page: a
+	// case that has an attorney but no agreed fee is NOT finished, so it must not be
+	// sent to the case view that reads as if it were.
 	const caseTitle = draft?.title?.trim() || "Your case";
+	const inProgress =
+		draft && draft.status !== "live" && draft.status !== "closed";
 	const back = !draft
 		? null
-		: draft.status === "draft"
+		: inProgress
 			? {
 					href: `/cases/new?draft=${draft.id}` as Route,
-					title: `${caseTitle} is saved`,
-					sub: "Find someone who fits, then head back and add them to your case.",
+					title:
+						draft.status === "draft"
+							? `${caseTitle} is saved`
+							: `${caseTitle} is in progress`,
+					sub: "Find someone who fits, then head back to your case to finish it.",
 				}
 			: {
-					href: `/my-cases/${draft.id}/requests` as Route,
-					title: `${caseTitle} is out to attorneys`,
-					sub: "You can still reach out to anyone here yourself. Any requests show up on your case.",
+					href: `/my-cases/${draft.id}` as Route,
+					title: `${caseTitle} is live`,
+					sub: "You can still reach out to anyone here yourself — your case is already public.",
 				};
 
 	const [attorneys, practiceAreas, states, conversations] = await Promise.all([
@@ -96,6 +107,10 @@ export default async function DashboardAttorneysPage({
 			state: filters.allStates ? undefined : (filters.state ?? defaultState),
 			keyword: filters.keyword,
 			sort: toDirectorySort(filters.sort),
+			// An explicit Court filter wins; otherwise the case's own jurisdiction —
+			// a federal case lists only federal-verified attorneys (state ignored),
+			// a state case keeps the state-admission match.
+			jurisdiction: filters.jurisdiction ?? draft?.jurisdiction,
 		}),
 		listedPracticeAreas(),
 		listedStates(),

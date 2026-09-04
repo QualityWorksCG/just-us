@@ -18,6 +18,7 @@ import { z } from "zod";
 
 import { getSession } from "@/lib/auth-server";
 import { type CaseInviteRef, caseInviteHref } from "@/lib/case-invite-ref";
+import { notifyInvitationAccepted } from "@/lib/notify";
 
 /**
  * The three things the invited attorney can do with their link: create the
@@ -56,6 +57,8 @@ const CONFIRM_ERRORS: Record<ConfirmCaseInvitationErrorCode, string> = {
 		"Only an attorney account can confirm representation. Finish attorney onboarding first.",
 	not_verified:
 		"Your bar standing has to be verified before you can take on a case.",
+	not_federal_verified:
+		"This is a federal case. You need a verified federal-court standing to confirm. Add federal practice on your directory profile and verify it first.",
 	not_admitted:
 		"You aren't admitted in this case's state, so you can't confirm representation on it. Add the state on your directory profile and verify your bar standing there.",
 	case_unavailable:
@@ -236,6 +239,16 @@ export async function confirmCaseInviteAction(
 	}
 
 	if (!result.ok) return { ok: false, error: CONFIRM_ERRORS[result.code] };
+
+	// Tell the plaintiff their attorney said yes, and point them at the next step —
+	// agree the fee (request-to-represent) or publish (bring-your-own). Best-effort:
+	// a failed notification must not fail the confirmation. Before the redirect,
+	// which throws.
+	await notifyInvitationAccepted(
+		result.caseId,
+		result.invitationId,
+		result.feeAgreed,
+	).catch(() => undefined);
 
 	// The attorney's own view of the case they now represent — the same screen
 	// Stripe returns them to once they start the payout account.

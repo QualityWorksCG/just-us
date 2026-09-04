@@ -35,6 +35,7 @@ export default async function AttorneysPage({
 			practiceArea: filters.area,
 			state: filters.state,
 			keyword: filters.keyword,
+			jurisdiction: filters.jurisdiction,
 			sort: toDirectorySort(filters.sort),
 		}),
 		listedPracticeAreas(),

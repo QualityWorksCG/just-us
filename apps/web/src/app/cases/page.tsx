@@ -2,7 +2,7 @@
 import { browseLiveCases } from "@just-us/db/cases";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { HandCoins, Scale, SearchX } from "lucide-react";
+import { HandCoins, Landmark, Scale, SearchX } from "lucide-react";
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 
@@ -29,19 +29,23 @@ export default async function BrowseCasesPage({
 		q?: string;
 		state?: string;
 		category?: string;
+		court?: string;
 		sort?: string;
 	}>;
 }) {
 	const sp = await searchParams;
 	const sort =
 		sp.sort === "funded" || sp.sort === "newest" ? sp.sort : "trending";
+	const jurisdiction =
+		sp.court === "state" || sp.court === "federal" ? sp.court : undefined;
 	const cases = await browseLiveCases({
 		q: sp.q,
 		state: sp.state,
 		category: sp.category,
+		jurisdiction,
 		sort,
 	});
-	const filtered = !!(sp.q || sp.state || sp.category);
+	const filtered = !!(sp.q || sp.state || sp.category || jurisdiction);
 
 	return (
 		<main className="h-full overflow-y-auto bg-paper">
@@ -135,6 +139,19 @@ export default async function BrowseCasesPage({
 												</span>
 												<span className="rounded-[var(--radius-chip)] border border-border px-2 py-0.5 text-[11.5px] text-ink-soft">
 													{c.location || "—"}
+												</span>
+												<span
+													className={cn(
+														"inline-flex items-center gap-1 rounded-[var(--radius-chip)] px-2 py-0.5 font-semibold text-[11.5px]",
+														c.jurisdiction === "federal"
+															? "bg-ink text-paper"
+															: "bg-brass-wash text-brass-deep",
+													)}
+												>
+													<Landmark className="size-3" aria-hidden="true" />
+													{c.jurisdiction === "federal"
+														? "Federal court"
+														: "State court"}
 												</span>
 											</div>
 											<h2 className="font-bold text-[16px] text-ink leading-snug">

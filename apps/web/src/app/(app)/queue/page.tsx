@@ -60,6 +60,7 @@ export default async function IntakeRequestsPage({
 		listSeekingQueue(session.user.id, {
 			category: filters.category,
 			state: filters.state,
+			jurisdiction: filters.jurisdiction,
 			sort: toQueueSort(filters.sort),
 		}),
 		queueCategories(session.user.id),

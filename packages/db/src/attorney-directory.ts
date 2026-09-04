@@ -25,6 +25,10 @@ export type DirectoryFilters = {
 	state?: string;
 	/** Free text over name, firm, and practice areas. */
 	keyword?: string;
+	/** The case's court system, when browsing for a specific case. `federal` lists
+	 *  only federal-verified attorneys (and ignores `state`); `state`/undefined
+	 *  keeps the state-admission match. */
+	jurisdiction?: "state" | "federal";
 	sort?: DirectorySort;
 };
 
@@ -32,18 +36,34 @@ export type DirectoryFilters = {
  *  fields a visitor needs to choose. */
 function listableWhere(filters: DirectoryFilters) {
 	const keyword = filters.keyword?.trim();
+	const federal = filters.jurisdiction === "federal";
+	const state = filters.jurisdiction === "state";
+
+	// A listed attorney must be verified in the dimension being browsed: a federal
+	// filter lists the federal-verified, a state filter the state-verified, and no
+	// filter lists anyone verified in *either* — so a federal-only attorney (no
+	// verified state, so no state badge) still appears, which the old
+	// state-badge-only requirement wrongly excluded.
+	const verified = federal
+		? { federalVerificationStatus: "verified" as const }
+		: state
+			? { verificationStatus: "verified" as const }
+			: {
+					OR: [
+						{ verificationStatus: "verified" as const },
+						{ federalVerificationStatus: "verified" as const },
+					],
+				};
+
 	return {
-		verificationStatus: "verified" as const,
 		legalName: { not: null },
 		...(filters.practiceArea
 			? { practiceAreas: { has: filters.practiceArea } }
 			: {}),
-		// The filter is labelled "Licensed in", so it matches an admission rather than
-		// the office address — and `some`, because a licence is per state and an
-		// attorney holding several must be findable under each. Only their verified
-		// admissions count: the directory's whole promise is that a listed attorney
-		// can actually take the work, and a state they have merely claimed cannot.
-		...(filters.state
+		// The "Licensed in" filter matches a verified admission (per state, so an
+		// attorney holding several is found under each). Dropped for a federal
+		// browse — federal practice is not state-scoped.
+		...(filters.state && !federal
 			? {
 					user: {
 						is: {
@@ -57,16 +77,30 @@ function listableWhere(filters: DirectoryFilters) {
 					},
 				}
 			: {}),
-		...(keyword
-			? {
-					OR: [
-						{ legalName: { contains: keyword, mode: "insensitive" as const } },
-						{ firmName: { contains: keyword, mode: "insensitive" as const } },
-						{ practiceAreas: { has: keyword } },
-						{ bio: { contains: keyword, mode: "insensitive" as const } },
-					],
-				}
-			: {}),
+		// AND-combined so the verification `OR` and the keyword `OR` never collide on
+		// one `OR` key.
+		AND: [
+			verified,
+			...(keyword
+				? [
+						{
+							OR: [
+								{
+									legalName: {
+										contains: keyword,
+										mode: "insensitive" as const,
+									},
+								},
+								{
+									firmName: { contains: keyword, mode: "insensitive" as const },
+								},
+								{ practiceAreas: { has: keyword } },
+								{ bio: { contains: keyword, mode: "insensitive" as const } },
+							],
+						},
+					]
+				: []),
+		],
 	};
 }
 
@@ -83,6 +117,7 @@ const listSelect = {
 	acceptingNewCases: true,
 	virtualConsultation: true,
 	feeApproach: true,
+	federalVerificationStatus: true,
 	bio: true,
 	user: {
 		select: {
@@ -128,6 +163,9 @@ export type DirectoryAttorney = {
 	/** Every state this attorney is verified in, alphabetically. Includes the
 	 *  primary; empty only for a legacy row with no admissions. */
 	states: string[];
+	/** Whether they hold a verified federal-court standing — shown as a tag and
+	 *  used by the federal filter. State practice is `states` above. */
+	federalVerified: boolean;
 	headshotUrl: string | null;
 	practiceAreas: string[];
 	bio: string | null;
@@ -173,6 +211,7 @@ export async function listDirectoryAttorneys(
 		// is a third of the truth.
 		state: row.user.jurisdiction ?? row.officeState,
 		states: row.user.admissions.map((a) => a.state),
+		federalVerified: row.federalVerificationStatus === "verified",
 		headshotUrl: row.headshotUrl,
 		practiceAreas: row.practiceAreas,
 		bio: row.bio,
@@ -215,7 +254,16 @@ export type DirectoryProfile = NonNullable<
  */
 export async function getDirectoryAttorney(id: string) {
 	const profile = await prisma.attorneyProfile.findFirst({
-		where: { id, verificationStatus: "verified", legalName: { not: null } },
+		// Verified in either dimension — a federal-only attorney has no state badge
+		// but is still a listed, viewable profile.
+		where: {
+			id,
+			legalName: { not: null },
+			OR: [
+				{ verificationStatus: "verified" },
+				{ federalVerificationStatus: "verified" },
+			],
+		},
 		include: {
 			user: { select: { id: true, jurisdiction: true, barNumber: true } },
 			reviews: {

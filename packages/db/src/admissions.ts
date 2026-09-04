@@ -158,6 +158,36 @@ export async function isAdmittedIn(
 }
 
 /**
+ * Does this attorney declare federal-court practice? The federal analogue of
+ * `admittedStates` — a *visibility* signal (claimed, not necessarily checked), so
+ * a federal case can appear in their queue while the federal check is pending, the
+ * same way a claimed-but-unverified state case does.
+ */
+export async function practicesFederal(userId: string): Promise<boolean> {
+	const profile = await prisma.attorneyProfile.findUnique({
+		where: { userId },
+		select: { practicesFederal: true },
+	});
+	return profile?.practicesFederal ?? false;
+}
+
+/**
+ * Is this attorney cleared to *act* on a federal case? The federal analogue of
+ * `isAdmittedIn` — a verified federal standing, checked transactionally at the
+ * moment of expressing interest or confirming, for the same freshness reason.
+ */
+export async function isFederalVerified(
+	db: Db,
+	userId: string,
+): Promise<boolean> {
+	const profile = await db.attorneyProfile.findUnique({
+		where: { userId },
+		select: { federalVerificationStatus: true },
+	});
+	return profile?.federalVerificationStatus === "verified";
+}
+
+/**
  * Where the attorney behind an email address is admitted, if there is one.
  *
  * For the plaintiff's invite step, which needs to know before it sends whether

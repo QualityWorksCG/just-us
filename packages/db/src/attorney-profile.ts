@@ -36,6 +36,10 @@ export type AttorneyProfileDraft = {
 	languages?: string[];
 	acceptingNewCases?: boolean;
 	virtualConsultation?: boolean;
+	/** The attorney's own declaration that they practise in federal court. Their
+	 *  federal *standing* is verified separately (see `recordFederalVerification`);
+	 *  declaring it only makes federal cases visible and offers the check. */
+	practicesFederal?: boolean;
 	feeApproach?: FeeApproach | null;
 	feeRangeMinCents?: number | null;
 	feeRangeMaxCents?: number | null;
@@ -113,6 +117,27 @@ export async function saveAttorneyProfile(
 			bioStatus: fields.bio ? "pending" : "approved",
 		},
 		update: { ...data, ...moderation },
+	});
+}
+
+/**
+ * Record the outcome of a federal-court standing check on the profile.
+ *
+ * The federal analogue of `recordAdmissionCheck`, kept deliberately separate: it
+ * writes only `federalVerificationStatus` (and stamps `federalVerifiedAt` on a
+ * pass), and never touches the per-state admissions or the aggregate state badge.
+ * Only a `verified` value lets the attorney see and take federal cases.
+ */
+export async function recordFederalVerification(
+	userId: string,
+	status: "unverified" | "pending" | "verified" | "needs_review" | "rejected",
+) {
+	return prisma.attorneyProfile.update({
+		where: { userId },
+		data: {
+			federalVerificationStatus: status,
+			...(status === "verified" ? { federalVerifiedAt: new Date() } : {}),
+		},
 	});
 }
 
@@ -367,6 +392,60 @@ export async function adminSetAdmissionVerification(
 			targetType: "user",
 			targetId: userId,
 			reason: note ? `${state}: ${note}` : state,
+		});
+	});
+
+	return { ok: true, status };
+}
+
+/**
+ * An administrator's ruling on an attorney's **federal-court** standing — the
+ * manual counterpart to the AI federal check, for when it lands in review.
+ *
+ * Federal practice is a single overall standing (not per state), so this sets
+ * `federalVerificationStatus` directly and never touches the per-state admissions
+ * or the state badge. Turning it on implies the attorney practises federally, so
+ * `practicesFederal` is set too. Only `verified` lets them take federal cases.
+ */
+export async function adminSetFederalVerification(
+	userId: string,
+	adminId: string,
+	status: "verified" | "unverified",
+	note?: string,
+): Promise<AdminVerificationResult> {
+	const user = await prisma.user.findUnique({
+		where: { id: userId },
+		select: { role: true },
+	});
+	if (user?.role !== "attorney") {
+		return { ok: false, reason: "not_attorney" };
+	}
+
+	const verified = status === "verified";
+	await prisma.$transaction(async (tx) => {
+		await tx.attorneyProfile.upsert({
+			where: { userId },
+			create: {
+				userId,
+				bioStatus: "approved",
+				practicesFederal: true,
+				federalVerificationStatus: status,
+				...(verified ? { federalVerifiedAt: new Date() } : {}),
+			},
+			update: {
+				federalVerificationStatus: status,
+				...(verified ? { federalVerifiedAt: new Date() } : {}),
+			},
+		});
+
+		// Reuses the attorney-verify audit actions (the reason marks it federal), so
+		// the audit action set doesn't need a federal-specific member.
+		await writeAudit(tx, {
+			actorId: adminId,
+			action: verified ? "attorney.verified" : "attorney.verification_cleared",
+			targetType: "user",
+			targetId: userId,
+			reason: note ? `Federal court: ${note}` : "Federal court",
 		});
 	});
 

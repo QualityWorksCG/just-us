@@ -2,6 +2,7 @@
 
 import {
 	adminSetAdmissionVerification,
+	adminSetFederalVerification,
 	adminSetVerification,
 } from "@just-us/db/attorney-profile";
 import { blockUser, unblockUser } from "@just-us/db/users";
@@ -131,6 +132,54 @@ export async function setAttorneyVerificationAction(
 		return {
 			ok: false,
 			error: "Couldn't update verification. Please try again.",
+		};
+	}
+
+	revalidatePath(`/users/${parsed.data.userId}` as Route);
+	revalidatePath("/users");
+	return { ok: true };
+}
+
+const verifyFederalSchema = z
+	.object({
+		userId: z.string().min(1, "Choose an attorney."),
+		verified: z.boolean(),
+		note: z.string().trim().max(300).optional(),
+	})
+	.strict();
+
+export type SetFederalVerificationInput = z.infer<typeof verifyFederalSchema>;
+
+/**
+ * Verify (or clear) an attorney's federal-court standing. When the AI federal
+ * check can't clear it and lands in review, an admin rules on it here — one
+ * overall standing, not per state.
+ */
+export async function setFederalVerificationAction(
+	input: SetFederalVerificationInput,
+): Promise<BlockUserActionResult> {
+	const guard = await guardAdministrator();
+	if (!guard.ok) return guard;
+
+	const parsed = verifyFederalSchema.safeParse(input);
+	if (!parsed.success) {
+		return { ok: false, error: "Couldn't update federal standing." };
+	}
+
+	try {
+		const res = await adminSetFederalVerification(
+			parsed.data.userId,
+			guard.userId,
+			parsed.data.verified ? "verified" : "unverified",
+			parsed.data.note,
+		);
+		if (!res.ok) {
+			return { ok: false, error: "That account isn't an attorney." };
+		}
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't update federal standing. Please try again.",
 		};
 	}
 
