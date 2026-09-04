@@ -13,6 +13,7 @@ import {
 import {
 	getAttorneyProfile,
 	lastVerificationForState,
+	recordFederalVerification,
 	recordVerification,
 } from "@just-us/db/attorney-profile";
 import { env } from "@just-us/env/server";
@@ -26,6 +27,7 @@ import {
 	type VerificationStatus,
 } from "@/lib/attorney-verification";
 import { requireRole } from "@/lib/auth-server";
+import { notifyAdminsFederalReview } from "@/lib/notify";
 
 /**
  * Bar-standing verification via a web search.
@@ -140,6 +142,17 @@ Do one or two web searches, then answer from what you find. State bar directorie
 - isLicensedAttorney: true if sources show them admitted to practise there, null if you find nothing credible.
 - inGoodStanding: false only if a source says suspended, disbarred, inactive, or lapsed; otherwise true, or null if unaddressed.
 - Report the bar number and status wording verbatim, and cite the pages you used.`;
+
+// Federal admission is to a specific US federal court (a District Court, a Court
+// of Appeals, or the Supreme Court), not a state — so the check asks a different
+// question, though it reads the same `RESULT_SCHEMA` back.
+const FEDERAL_SYSTEM_PROMPT = `Say whether this person is an attorney admitted to practise before a United States federal court (a US District Court, a US Court of Appeals, or the US Supreme Court), and whether that admission is active.
+
+Do one or two web searches, then answer from what you find. Federal court attorney-admission rolls, PACER/CM-ECF attorney records, and established legal directories all count as evidence. Do not keep searching once you have a clear answer.
+
+- isLicensedAttorney: true if sources show them admitted to a federal court bar, null if you find nothing credible.
+- inGoodStanding: false only if a source says suspended, disbarred, inactive, or lapsed; otherwise true, or null if unaddressed.
+- Report the admitting court and any bar/registration number verbatim, and cite the pages you used.`;
 
 type ModelResult = {
 	isLicensedAttorney: boolean | null;
@@ -293,7 +306,7 @@ export type VerifyResult =
  * attorney can only ever check themselves.
  */
 export async function verifyAttorneyAction(
-	input: { state?: string; userId?: string } = {},
+	input: { state?: string; userId?: string; federal?: boolean } = {},
 ): Promise<VerifyResult> {
 	const { session, role } = await requireRole("attorney", "administrator");
 	const targetId =
@@ -318,6 +331,78 @@ export async function verifyAttorneyAction(
 			ok: false,
 			error: "Add your legal name before running a check.",
 		};
+	}
+
+	// ── Federal-court standing ──────────────────────────────────────────────────
+	// No per-state admission to hang on: the check runs on the name (and firm /
+	// website to disambiguate) and records straight onto the profile's federal
+	// status via `recordFederalVerification`, leaving state admissions untouched.
+	if (input.federal) {
+		const question = [
+			"Is this person admitted to practise before a United States federal court, and in good standing?",
+			`Name: ${profile.legalName}`,
+			profile.firmName ? `Firm: ${profile.firmName}` : null,
+			profile.websiteUrl ? `Website: ${profile.websiteUrl}` : null,
+		]
+			.filter(Boolean)
+			.join("\n");
+
+		let fed: ModelResult;
+		try {
+			const res = await fetch("https://api.openai.com/v1/responses", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+				},
+				body: JSON.stringify({
+					model: MODEL,
+					instructions: FEDERAL_SYSTEM_PROMPT,
+					input: question,
+					tools: [{ type: "web_search" }],
+					reasoning: { effort: REASONING_EFFORT },
+					text: {
+						format: {
+							type: "json_schema",
+							name: "bar_verification",
+							strict: true,
+							schema: RESULT_SCHEMA,
+						},
+					},
+				}),
+			});
+			if (!res.ok) {
+				return {
+					ok: false,
+					error: "The verification service is unavailable. Please try again.",
+				};
+			}
+			const { text } = readResponse(await res.json());
+			if (!text) {
+				return {
+					ok: false,
+					error: "The check returned nothing. Please retry.",
+				};
+			}
+			fed = JSON.parse(text) as ModelResult;
+		} catch {
+			return {
+				ok: false,
+				error: "Couldn't complete the check. Please try again.",
+			};
+		}
+
+		const status = decideStatus({
+			isLicensedAttorney: fed.isLicensedAttorney,
+			inGoodStanding: fed.inGoodStanding,
+		});
+		await recordFederalVerification(targetId, status);
+		// The check couldn't clear it either way — hand it to the admins who can
+		// rule by hand. Swallowed so a notify hiccup can't undo the recorded result.
+		if (status === "needs_review") {
+			await notifyAdminsFederalReview(targetId).catch(() => {});
+		}
+		return { ok: true, status };
 	}
 
 	// Which state's records to search. Only ever one the attorney has actually

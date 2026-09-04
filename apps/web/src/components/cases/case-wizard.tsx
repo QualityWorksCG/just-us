@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
-import { Fragment, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -60,7 +60,11 @@ import {
 	saveCaseDraftAction,
 	withdrawInviteAction,
 } from "@/app/cases/actions";
-import { refineStoryAction, suggestTitlesAction } from "@/app/cases/ai-actions";
+import {
+	refineStoryAction,
+	suggestCategoryAction,
+	suggestTitlesAction,
+} from "@/app/cases/ai-actions";
 import { Brandmark } from "@/components/brandmark";
 import { CASE_CATEGORIES } from "@/lib/case-categories";
 import { CASE_TITLE_MAX } from "@/lib/case-title";
@@ -81,6 +85,8 @@ export type WizardInitial = {
 	title: string;
 	category: string;
 	location: string;
+	/** State-court or federal action. Decides which attorneys can take the case. */
+	jurisdiction: "state" | "federal";
 	story: string;
 	goalCents: number;
 	payoutType: string | null;
@@ -261,9 +267,23 @@ export function CaseWizard({
 	const [thankYouNote, setThankYouNote] = useState(initial?.thankYouNote ?? "");
 
 	// Step 2 — the basics
-	const [category, setCategory] = useState(initial?.category || "Employment");
+	//
+	// Category is no longer defaulted to "Employment" for everyone — it's inferred
+	// from the plaintiff's story by AI when they first reach this step, so it fits
+	// the case rather than mis-filing every non-employment one. A resumed draft
+	// keeps its saved category; a manual pick (categoryTouched) is never overwritten.
+	const [category, setCategory] = useState(initial?.category ?? "");
+	const [categoryTouched, setCategoryTouched] = useState(!!initial?.category);
+	const [classifyingCategory, setClassifyingCategory] = useState(false);
+	// Guards the auto-classify so it runs at most once per wizard mount, even as the
+	// plaintiff moves between steps.
+	const categoryAutoTried = useRef(!!initial?.category);
 	// State (US jurisdiction) prefilled from the draft or from onboarding.
 	const [state, setState] = useState(seedState);
+	// State-court vs federal. Gates which attorneys can see/take the case.
+	const [jurisdiction, setJurisdiction] = useState<"state" | "federal">(
+		initial?.jurisdiction ?? "state",
+	);
 	const [title, setTitle] = useState(initial?.title ?? "");
 	const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
 	const [suggestingTitles, setSuggestingTitles] = useState(false);
@@ -374,6 +394,7 @@ export function CaseWizard({
 				return toast.error("Tell us what happened to continue.");
 		}
 		if (step === 2) {
+			if (!category) return toast.error("Pick a category for your case.");
 			if (!title.trim()) return toast.error("Add a title for your case.");
 			if (!state) return toast.error("Select the state your case is in.");
 		}
@@ -396,6 +417,27 @@ export function CaseWizard({
 		setStep((s) => Math.max(1, s - 1));
 		window.scrollTo({ top: 0 });
 	}
+
+	// Infer the category from the story the first time the plaintiff reaches the
+	// basics step, so the field arrives pre-filled to fit their case instead of a
+	// blanket "Employment". Only when they haven't picked one themselves and there's
+	// enough story to classify; a failure just leaves the field empty for them to
+	// choose. Runs once (guarded by the ref), and never fights a manual choice.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: intentionally keyed on reaching step 2
+	useEffect(() => {
+		if (step !== 2) return;
+		if (categoryAutoTried.current) return;
+		if (story.trim().length < 20) return;
+		categoryAutoTried.current = true;
+		setClassifyingCategory(true);
+		suggestCategoryAction(story)
+			.then((res) => {
+				// Don't clobber a category the plaintiff set while we were thinking.
+				if (res.ok && !categoryTouched) setCategory(res.category);
+			})
+			.catch(() => undefined)
+			.finally(() => setClassifyingCategory(false));
+	}, [step]);
 
 	// Drop a confirmed (matched) attorney back into the normal selection so the
 	// plaintiff can pick a different one. The existing details stay pre-filled in
@@ -452,6 +494,7 @@ export function CaseWizard({
 			title: title.trim(),
 			category,
 			location: state,
+			jurisdiction,
 			summary: summary || story.trim().slice(0, 140),
 			story: story.trim(),
 			evidence,
@@ -524,6 +567,7 @@ export function CaseWizard({
 			title: title.trim(),
 			category,
 			location: state,
+			jurisdiction,
 			summary: summary || story.trim().slice(0, 140),
 			story: story.trim(),
 			goalCents: Math.round(goal * 100),
@@ -586,6 +630,7 @@ export function CaseWizard({
 			title: title.trim(),
 			category,
 			location: state,
+			jurisdiction,
 			summary: summary || story.trim().slice(0, 140),
 			story: story.trim(),
 			goalCents: Math.round(goal * 100),
@@ -696,6 +741,7 @@ export function CaseWizard({
 			title: title.trim() || undefined,
 			category,
 			location: state || undefined,
+			jurisdiction,
 			summary: summary || undefined,
 			story: story.trim() || undefined,
 			goalCents: goal ? Math.round(goal * 100) : undefined,
@@ -1603,15 +1649,31 @@ export function CaseWizard({
 
 								<div className="mt-8 flex flex-col gap-6">
 									<div className="grid gap-5 sm:grid-cols-2">
-										<Field label="Category">
+										<Field
+											label="Category"
+											hint={
+												classifyingCategory
+													? "Analyzing your story to suggest a category…"
+													: !categoryTouched && category
+														? "Suggested from your story — change it if it's not right."
+														: undefined
+											}
+										>
 											<Select
 												value={category}
-												onValueChange={(v: string | null) =>
-													setCategory(v ?? "Employment")
-												}
+												onValueChange={(v: string | null) => {
+													setCategoryTouched(true);
+													setCategory(v ?? "");
+												}}
 											>
 												<SelectTrigger className="h-11 bg-surface text-[14px]">
-													<SelectValue placeholder="Select a category" />
+													<SelectValue
+														placeholder={
+															classifyingCategory
+																? "Choosing a category…"
+																: "Select a category"
+														}
+													/>
 												</SelectTrigger>
 												<SelectContent>
 													{CATEGORIES.map((c) => (
@@ -1648,6 +1710,35 @@ export function CaseWizard({
 											</Select>
 										</Field>
 									</div>
+
+									<Field
+										label="Court system"
+										hint="Not sure? State courts handle most disputes (employment, injury, contracts, family). Federal courts handle U.S. law, constitutional claims, cases across state lines, or ones against the federal government. Your attorney can confirm — this decides which attorneys can take your case."
+									>
+										<div className="grid grid-cols-2 gap-2">
+											{(
+												[
+													["state", "State court"],
+													["federal", "Federal court"],
+												] as const
+											).map(([value, label]) => (
+												<button
+													key={value}
+													type="button"
+													onClick={() => setJurisdiction(value)}
+													aria-pressed={jurisdiction === value}
+													className={cn(
+														"h-11 rounded-[var(--radius-control)] border px-4 font-semibold text-[14px] transition-colors",
+														jurisdiction === value
+															? "border-brass bg-brass-wash text-ink"
+															: "border-line-strong bg-surface text-ink-soft hover:border-brass-deep",
+													)}
+												>
+													{label}
+												</button>
+											))}
+										</div>
+									</Field>
 
 									<div className="flex flex-col gap-1.5">
 										<div className="flex items-center justify-between gap-2">

@@ -3,6 +3,7 @@
 
 import { US_STATES } from "@just-us/auth/jurisdiction";
 import { Button } from "@just-us/ui/components/button";
+import { Checkbox } from "@just-us/ui/components/checkbox";
 import { Input } from "@just-us/ui/components/input";
 import {
 	Select,
@@ -23,6 +24,7 @@ import {
 	CircleAlert,
 	Clock3,
 	Globe,
+	Landmark,
 	Languages as LanguagesIcon,
 	Mail,
 	MapPin,
@@ -55,6 +57,7 @@ import {
 	VerificationBadge,
 	type VerificationView,
 } from "@/components/dashboard/attorney-verification";
+import { FederalVerification } from "@/components/dashboard/federal-verification";
 import {
 	BACKGROUND_MAX,
 	BIO_MAX,
@@ -92,6 +95,7 @@ export type AttorneyProfileData = {
 	languages: string[];
 	acceptingNewCases: boolean;
 	virtualConsultation: boolean;
+	practicesFederal: boolean;
 	feeApproach: FeeApproach | null;
 	feeRangeMinCents: number | null;
 	feeRangeMaxCents: number | null;
@@ -149,7 +153,7 @@ const TABS = [
 	{ key: "about", label: "About you", fields: ["bio", "background"] },
 	// Read-only: the attorney triggers a check but enters nothing, so there is
 	// no field here that can be invalid or missing.
-	{ key: "verification", label: "Verification", fields: [] },
+	{ key: "verification", label: "Courts & verification", fields: [] },
 ] as const;
 
 type Tab = (typeof TABS)[number]["key"];
@@ -218,6 +222,7 @@ function buildInitial(
 		languages: profile?.languages ?? [],
 		acceptingNewCases: profile?.acceptingNewCases ?? true,
 		virtualConsultation: profile?.virtualConsultation ?? false,
+		practicesFederal: profile?.practicesFederal ?? false,
 		feeApproach: (profile?.feeApproach ?? "") as FeeApproach | "",
 		feeMin: centsToDollars(profile?.feeRangeMinCents ?? null),
 		feeMax: centsToDollars(profile?.feeRangeMaxCents ?? null),
@@ -292,6 +297,7 @@ function toPayload(v: FormValues): SaveAttorneyProfileInput {
 		languages: v.languages,
 		acceptingNewCases: v.acceptingNewCases,
 		virtualConsultation: v.virtualConsultation,
+		practicesFederal: v.practicesFederal,
 		feeApproach: v.feeApproach,
 		feeRangeMinCents: dollarsToCents(v.feeMin),
 		feeRangeMaxCents: dollarsToCents(v.feeMax),
@@ -464,11 +470,20 @@ export function AttorneyProfileForm({
 	profile,
 	account,
 	verification,
+	federalVerificationStatus,
 	admissions,
 }: {
 	profile: AttorneyProfileData | null;
 	account: AttorneyAccount;
 	verification: VerificationView;
+	/** Read-only federal-court standing (the check result), shown under the
+	 *  "I practise in federal court" toggle. */
+	federalVerificationStatus:
+		| "unverified"
+		| "pending"
+		| "verified"
+		| "needs_review"
+		| "rejected";
 	/** The states this attorney claims, each with its own bar standing. Rendered
 	 *  above the badge because it is the more consequential of the two: it decides
 	 *  which cases reach them and which they may take. */
@@ -488,6 +503,7 @@ export function AttorneyProfileForm({
 		background: useId(),
 		accepting: useId(),
 		virtual: useId(),
+		federal: useId(),
 	};
 
 	const initial = useMemo(
@@ -516,6 +532,9 @@ export function AttorneyProfileForm({
 	);
 	const [virtualConsultation, setVirtualConsultation] = useState(
 		initial.virtualConsultation,
+	);
+	const [practicesFederal, setPracticesFederal] = useState(
+		initial.practicesFederal,
 	);
 	const [feeApproach, setFeeApproach] = useState<FeeApproach | "">(
 		initial.feeApproach,
@@ -550,6 +569,7 @@ export function AttorneyProfileForm({
 		languages,
 		acceptingNewCases,
 		virtualConsultation,
+		practicesFederal,
 		feeApproach,
 		feeMin: showFeeRange ? feeMin : "",
 		feeMax: showFeeRange ? feeMax : "",
@@ -1500,14 +1520,59 @@ export function AttorneyProfileForm({
 			{tab === "verification" && (
 				<Section
 					icon={ShieldCheck}
-					title="Bar verification"
-					sub="We check your licence against public bar records, one state at a time. Verified listings carry a badge plaintiffs can see."
+					title="Where you practise"
+					sub="Plaintiffs are matched to attorneys by court system, so tell us where you practise — state courts, federal court, or both. Each is verified against public records, and only verified practice takes the matching cases."
 				>
-					<div className="flex flex-col gap-5">
-						<AttorneyAdmissions
-							admissions={admissions}
-							canRunChecks={!!profile?.legalName?.trim()}
-						/>
+					<div className="flex flex-col gap-6">
+						{/* State courts — one row per state, each verified on its own. */}
+						<div className="flex flex-col gap-3">
+							<div>
+								<h3 className="font-bold text-[14.5px] text-ink">
+									State courts
+								</h3>
+								<p className="mt-0.5 text-[13px] text-muted-foreground leading-relaxed">
+									Add every state you're admitted in and verify each. A state
+									case reaches you only in a state you're verified in.
+								</p>
+							</div>
+							<AttorneyAdmissions
+								admissions={admissions}
+								canRunChecks={!!profile?.legalName?.trim()}
+							/>
+						</div>
+
+						{/* Federal court — a single overall standing, not per state. */}
+						<div className="flex flex-col gap-3 border-border border-t pt-6">
+							<label
+								htmlFor={ids.federal}
+								className="flex cursor-pointer items-start gap-3"
+							>
+								<Checkbox
+									id={ids.federal}
+									checked={practicesFederal}
+									onCheckedChange={(v) => setPracticesFederal(v === true)}
+									className="mt-0.5"
+								/>
+								<span className="min-w-0">
+									<span className="flex items-center gap-1.5 font-bold text-[14.5px] text-ink">
+										<Landmark
+											className="size-4 text-brass-deep"
+											aria-hidden="true"
+										/>
+										I practise in federal court
+									</span>
+									<span className="mt-0.5 block text-[13px] text-muted-foreground leading-relaxed">
+										One overall standing, not per state. Tick this if you're
+										admitted to a US federal court — federal cases reach you
+										once it's verified.
+									</span>
+								</span>
+							</label>
+							{practicesFederal && (
+								<FederalVerification status={federalVerificationStatus} />
+							)}
+						</div>
+
 						<AttorneyVerification data={verification} />
 					</div>
 				</Section>

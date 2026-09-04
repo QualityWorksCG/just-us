@@ -34,6 +34,12 @@ const SORTS = [
 	{ value: "availability", label: "Availability" },
 ] as const;
 
+const COURTS = [
+	{ value: "all", label: "All courts" },
+	{ value: "state", label: "State" },
+	{ value: "federal", label: "Federal" },
+] as const;
+
 const ALL_PRACTICE_AREAS = "All practice areas";
 const ALL_LICENSED_STATES = "All licensed states";
 
@@ -61,6 +67,9 @@ export function DirectoryControls({
 			: (stateParam ?? defaultState ?? ALL_LICENSED_STATES);
 	const q = params.get("q") ?? "";
 	const sort = params.get("sort") ?? "name";
+	const courtParam = params.get("court");
+	const court =
+		courtParam === "state" || courtParam === "federal" ? courtParam : "all";
 
 	const [keyword, setKeyword] = useState(q);
 	const ids = { area: useId(), state: useId(), keyword: useId() };
@@ -83,6 +92,7 @@ export function DirectoryControls({
 	const hasFilters = !!(
 		(areaParam && areaParam !== "all") ||
 		(stateParam && stateParam !== "all") ||
+		(courtParam && courtParam !== "all") ||
 		q
 	);
 
@@ -91,7 +101,7 @@ export function DirectoryControls({
 	 *  the URL no longer has and immediately re-applies it. */
 	function clearFilters() {
 		setKeyword("");
-		apply({ area: null, state: null, q: null });
+		apply({ area: null, state: null, court: null, q: null });
 	}
 
 	// Debounced so typing doesn't push a history entry per keystroke.
@@ -151,6 +161,33 @@ export function DirectoryControls({
 						/>
 					</form>
 				</Field>
+			</div>
+
+			<div className="flex flex-wrap items-center gap-2">
+				<span className="mr-1 font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
+					Court
+				</span>
+				{COURTS.map((option) => {
+					const active = court === option.value;
+					return (
+						<button
+							key={option.value}
+							type="button"
+							aria-pressed={active}
+							onClick={() =>
+								apply({ court: option.value === "all" ? null : option.value })
+							}
+							className={cn(
+								"rounded-[var(--radius-pill)] border px-4 py-1.5 font-semibold text-[13px] transition-colors",
+								active
+									? "border-ink bg-ink text-paper"
+									: "border-border bg-surface text-ink-soft hover:border-brass-deep hover:text-ink",
+							)}
+						>
+							{option.label}
+						</button>
+					);
+				})}
 			</div>
 
 			<div className="flex flex-wrap items-center gap-2">

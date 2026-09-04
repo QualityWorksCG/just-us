@@ -1,8 +1,8 @@
 "use server";
 
 import { env } from "@just-us/env/server";
-
 import { requireRole } from "@/lib/auth-server";
+import { CASE_CATEGORIES } from "@/lib/case-categories";
 
 type ChatMessage = { role: "system" | "user"; content: string };
 
@@ -101,6 +101,62 @@ export async function refineStoryAction(
 		return { ok: false, error: "AI returned nothing. Try again." };
 	} catch {
 		return { ok: false, error: "Couldn't reach the AI. Please try again." };
+	}
+}
+
+export type SuggestCategoryResult =
+	| { ok: true; category: (typeof CASE_CATEGORIES)[number] }
+	| { ok: false; error: string };
+
+/**
+ * Read the plaintiff's story and pick the single best-fitting case category.
+ *
+ * The wizard used to default the category to "Employment" for everyone, which was
+ * wrong for every non-employment case and quietly mis-filed them. Here the model
+ * chooses from the canonical list only — with "Other" as its catch-all — and any
+ * reply that somehow lands off the list yields no suggestion (the field is left
+ * for the plaintiff to pick) rather than an invented category the filters can't
+ * reach.
+ */
+export async function suggestCategoryAction(
+	story: string,
+): Promise<SuggestCategoryResult> {
+	await requireRole("plaintiff");
+	if (story.trim().length < 20)
+		return { ok: false, error: "Write a bit more of your story first." };
+
+	const allowed = CASE_CATEGORIES.join(", ");
+	try {
+		const raw = await chat(
+			[
+				{
+					role: "system",
+					content: [
+						"You classify a litigation crowdfunding case into exactly one category, based only on the plaintiff's account.",
+						`Choose the single best fit from this fixed list: ${allowed}.`,
+						'Use "Other" only when none of the specific categories clearly fit.',
+						"Do not invent categories or return anything outside the list.",
+						'Return strict JSON: {"category":"<one of the list>"}.',
+					].join("\n"),
+				},
+				{ role: "user", content: story.trim() },
+			],
+			{ jsonObject: true, temperature: 0 },
+		);
+		const parsed = JSON.parse(raw) as { category?: unknown };
+		const picked =
+			typeof parsed.category === "string" ? parsed.category.trim() : "";
+		const match = CASE_CATEGORIES.find(
+			(c) => c.toLowerCase() === picked.toLowerCase(),
+		);
+		if (!match)
+			return { ok: false, error: "Couldn't classify the case. Try again." };
+		return { ok: true, category: match };
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't classify the case. Please try again.",
+		};
 	}
 }
 

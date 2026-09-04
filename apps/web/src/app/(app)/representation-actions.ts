@@ -110,6 +110,8 @@ const FAILURE_MESSAGES = {
 	// because the honest fix is a real one.
 	not_admitted:
 		"You can only put yourself forward for cases in a state you're admitted in. Add that state on your directory profile and verify your bar standing there.",
+	not_federal_verified:
+		"This is a federal case. You need a verified federal-court standing to put yourself forward. Add federal practice on your directory profile and verify it, then try again.",
 	unavailable:
 		"This case is no longer seeking representation. It's been matched, funded, or withdrawn.",
 	already_expressed: "You've already expressed interest in this case.",

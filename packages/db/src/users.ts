@@ -149,7 +149,12 @@ export async function getUserWithCases(id: string) {
 			// Bar-standing badge for an attorney account, so the admin detail screen
 			// can show it and verify from there (JUS-13). Null for every other role.
 			attorneyProfile: {
-				select: { verificationStatus: true, verifiedAt: true },
+				select: {
+					verificationStatus: true,
+					verifiedAt: true,
+					practicesFederal: true,
+					federalVerificationStatus: true,
+				},
 			},
 			cases: {
 				where: { deletedAt: null },

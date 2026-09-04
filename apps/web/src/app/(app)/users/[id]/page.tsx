@@ -2,7 +2,13 @@ import { isBlocked, isLocked } from "@just-us/auth/user-status";
 import { listAdmissions } from "@just-us/db/admissions";
 import { getUserWithCases } from "@just-us/db/users";
 import { cn } from "@just-us/ui/lib/utils";
-import { ArrowRight, BadgeCheck, FolderOpen, HandCoins } from "lucide-react";
+import {
+	ArrowRight,
+	BadgeCheck,
+	FolderOpen,
+	HandCoins,
+	Landmark,
+} from "lucide-react";
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,6 +16,7 @@ import type { ReactNode } from "react";
 import { AdmissionVerifyControl } from "@/components/dashboard/admission-verify-control";
 import { BackLink } from "@/components/dashboard/back-link";
 import { BlockUserDialog } from "@/components/dashboard/block-user-dialog";
+import { FederalVerifyControl } from "@/components/dashboard/federal-verify-control";
 import { UnblockUserButton } from "@/components/dashboard/unblock-user-button";
 import { verificationBadge } from "@/components/dashboard/verification-badge";
 import { VerifyAttorneyControl } from "@/components/dashboard/verify-attorney-control";
@@ -328,6 +335,52 @@ export default async function UserDetailPage({
 										/>
 									</div>
 								)}
+
+								{/* Federal court — one overall standing, not per state. Shown
+								    for every attorney so an admin can rule on a federal check
+								    that landed in review, or vouch directly. */}
+								{(() => {
+									const fedBadge = verificationBadge(
+										u.attorneyProfile?.federalVerificationStatus ??
+											"unverified",
+									);
+									return (
+										<div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-paper-alt/40 px-4 py-3">
+											<div className="min-w-0">
+												<p className="flex items-center gap-2 font-semibold text-[14px] text-ink">
+													<Landmark
+														className="size-4 text-brass-deep"
+														aria-hidden="true"
+													/>
+													Federal court
+												</p>
+												<p className="mt-0.5 text-[12px] text-muted-foreground">
+													{u.attorneyProfile?.practicesFederal
+														? "Declared federal practice"
+														: "Not declared — verify to vouch anyway"}
+												</p>
+											</div>
+											<div className="flex shrink-0 items-center gap-3">
+												<span className={cn(PILL, fedBadge.cls)}>
+													<span
+														className={cn(
+															"size-1.5 rounded-full",
+															fedBadge.dot,
+														)}
+													/>
+													{fedBadge.text}
+												</span>
+												<FederalVerifyControl
+													userId={u.id}
+													verified={
+														u.attorneyProfile?.federalVerificationStatus ===
+														"verified"
+													}
+												/>
+											</div>
+										</div>
+									);
+								})()}
 							</div>
 						</div>
 					);

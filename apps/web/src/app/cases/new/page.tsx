@@ -46,6 +46,7 @@ export default async function NewCasePage({
 				title: source.title,
 				category: source.category,
 				location: source.location,
+				jurisdiction: source.jurisdiction,
 				story: source.story,
 				goalCents: source.goalCents,
 				payoutType: source.payoutType,

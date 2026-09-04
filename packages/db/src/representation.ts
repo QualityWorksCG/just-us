@@ -3,7 +3,12 @@ import type {
 	MatchOrigin,
 	RequestStatus,
 } from "../prisma/generated/enums";
-import { admittedStates, isAdmittedIn } from "./admissions";
+import {
+	admittedStates,
+	isAdmittedIn,
+	isFederalVerified,
+	practicesFederal,
+} from "./admissions";
 import { pendingCaseInvitationWhere } from "./case-invitations";
 import {
 	type CaseEvidence,
@@ -40,6 +45,9 @@ export type QueueFilters = {
 	category?: string;
 	/** A US state, matched against the case's own location. */
 	state?: string;
+	/** Narrow to one court system. Undefined shows both (subject to what the
+	 *  attorney can take). */
+	jurisdiction?: "state" | "federal";
 	sort?: QueueSort;
 };
 
@@ -59,6 +67,7 @@ const cardSelect = {
 	title: true,
 	category: true,
 	location: true,
+	jurisdiction: true,
 	summary: true,
 	publishedAt: true,
 	createdAt: true,
@@ -110,7 +119,26 @@ const detailSelect = {
  * returns here on its own with no write to the case at all. See
  * `pendingCaseInvitationWhere`.
  */
-function queueWhere(filters: QueueFilters = {}, states?: string[]) {
+function queueWhere(
+	filters: QueueFilters = {},
+	states?: string[],
+	federal = false,
+) {
+	// Scope by jurisdiction: a state case is in scope when it falls in one of the
+	// attorney's admitted states; a federal case is in scope when the attorney
+	// declares federal practice. An attorney with neither sees nothing.
+	const stateScope = {
+		jurisdiction: "state" as const,
+		...locationWhere(filters.state, states),
+	};
+	// Which jurisdictions are in scope: state cases (in admitted states) unless the
+	// attorney asked for federal only, plus federal cases when they practise
+	// federally unless they asked for state only. An empty list matches nothing.
+	const branches: Record<string, unknown>[] = [];
+	if (filters.jurisdiction !== "federal") branches.push(stateScope);
+	if (federal && filters.jurisdiction !== "state") {
+		branches.push({ jurisdiction: "federal" as const });
+	}
 	return {
 		status: "seeking" as const,
 		deletedAt: null,
@@ -120,7 +148,7 @@ function queueWhere(filters: QueueFilters = {}, states?: string[]) {
 		match: { is: null },
 		invitations: { none: pendingCaseInvitationWhere(new Date()) },
 		...(filters.category ? { category: filters.category } : {}),
-		...locationWhere(filters.state, states),
+		OR: branches,
 	};
 }
 
@@ -157,6 +185,9 @@ export type QueueCase = {
 	category: string;
 	/** The state the case is in — `Case.location`. */
 	state: string;
+	/** State-court or federal action — decides which standing lets an attorney
+	 *  take it. */
+	jurisdiction: "state" | "federal";
 	summary: string;
 	/** The plaintiff's name. Their name only — never a way to contact them. */
 	plaintiffName: string;
@@ -179,9 +210,12 @@ export async function listSeekingQueue(
 	// Read here rather than taken as an argument, so no caller can render the queue
 	// without the constraint. An attorney who has claimed no state sees nothing —
 	// see `locationWhere`.
-	const states = await admittedStates(attorneyId);
+	const [states, federal] = await Promise.all([
+		admittedStates(attorneyId),
+		practicesFederal(attorneyId),
+	]);
 	const rows = await prisma.case.findMany({
-		where: queueWhere(filters, states),
+		where: queueWhere(filters, states, federal),
 		select: {
 			...cardSelect,
 			requests: {
@@ -208,17 +242,16 @@ export type QueueCaseDetail = QueueCase & {
 	/** The plaintiff's full account of what happened. */
 	story: string;
 	/**
-	 * What the plaintiff filed — **names and sizes only, deliberately**.
+	 * What the plaintiff filed, with a way to open each stored document.
 	 *
-	 * An attorney browsing the queue is deciding whether to put themselves
-	 * forward, not yet acting on the matter, and the screen tells them the
-	 * documents are shared once they are representing it. So neither the storage
-	 * URL nor the app's own evidence route reaches this view: the promise is kept
-	 * by there being nothing here to open, rather than by a component choosing not
-	 * to render a link. The representing attorney gets the files — see
-	 * `getAttorneyCase`.
+	 * An attorney reviewing an intake — one they were named on, or one they are
+	 * weighing in the open queue — needs to read the evidence to decide whether to
+	 * take it, so each file carries its authorized `href` (the app's own evidence
+	 * route, never the raw storage URL). Access is enforced at that route, not by
+	 * withholding the link: see `caseEvidenceFile`, which admits the named,
+	 * interested, and representing attorney.
 	 */
-	evidence: { name: string; size: number }[];
+	evidence: CaseEvidence[];
 	coverImageUrl: string | null;
 	images: string[];
 	/** Set when this attorney has a pending invitation to represent the case (the
@@ -243,8 +276,9 @@ export async function getQueueCase(
 	caseId: string,
 	attorneyId: string,
 ): Promise<QueueCaseDetail | null> {
-	const [states, me] = await Promise.all([
+	const [states, federal, me] = await Promise.all([
 		admittedStates(attorneyId),
+		practicesFederal(attorneyId),
 		prisma.user.findUnique({
 			where: { id: attorneyId },
 			select: { email: true },
@@ -265,7 +299,7 @@ export async function getQueueCase(
 			deletedAt: null,
 			moderationStatus: "ok",
 			OR: [
-				queueWhere({}, states),
+				queueWhere({}, states, federal),
 				{ requests: { some: { attorneyId } } },
 				// A case they were named on is held out of the open queue, so it only
 				// reaches them through their own invitation — which is exactly this.
@@ -291,12 +325,10 @@ export async function getQueueCase(
 		...rest,
 		state: location,
 		plaintiffName: owner.name,
-		// Normalised, then stripped back to name and size: whatever the stored row
-		// carries, a browsing attorney is handed no way to reach a document.
-		evidence: caseEvidence(evidence, row.id).map((file) => ({
-			name: file.name,
-			size: file.size ?? 0,
-		})),
+		// The reviewing attorney gets the same normalised evidence the representing
+		// one does — each stored file with its authorized href. The route behind that
+		// href (`caseEvidenceFile`) is what decides whether they may open it.
+		evidence: caseEvidence(evidence, row.id),
 		myInterest: requests[0] ?? null,
 		invitationId: invitations[0]?.id ?? null,
 	};
@@ -306,10 +338,13 @@ export async function getQueueCase(
  *  choice that returns nothing. Derived from the queue rather than a hardcoded
  *  list, which is also what keeps it in step with whatever the wizard offers. */
 export async function queueCategories(attorneyId: string): Promise<string[]> {
-	const states = await admittedStates(attorneyId);
+	const [states, federal] = await Promise.all([
+		admittedStates(attorneyId),
+		practicesFederal(attorneyId),
+	]);
 	const rows = await prisma.case.groupBy({
 		by: ["category"],
-		where: queueWhere({}, states),
+		where: queueWhere({}, states, federal),
 	});
 	return rows
 		.map((row) => row.category)
@@ -320,10 +355,13 @@ export async function queueCategories(attorneyId: string): Promise<string[]> {
 /** States that actually have a queued case *and* that this attorney is admitted
  *  in — the dropdown must not offer a state whose cases the queue withholds. */
 export async function queueStates(attorneyId: string): Promise<string[]> {
-	const states = await admittedStates(attorneyId);
+	const [states, federal] = await Promise.all([
+		admittedStates(attorneyId),
+		practicesFederal(attorneyId),
+	]);
 	const rows = await prisma.case.groupBy({
 		by: ["location"],
-		where: queueWhere({}, states),
+		where: queueWhere({}, states, federal),
 	});
 	return rows
 		.map((row) => row.location)
@@ -340,6 +378,7 @@ export async function queueStates(attorneyId: string): Promise<string[]> {
 export type ExpressInterestFailure =
 	| "not_verified"
 	| "not_admitted"
+	| "not_federal_verified"
 	| "unavailable"
 	| "already_expressed";
 
@@ -372,28 +411,37 @@ export async function expressInterest(
 	caseId: string,
 	attorneyId: string,
 ): Promise<ExpressInterestResult> {
-	const profile = await prisma.attorneyProfile.findUnique({
-		where: { userId: attorneyId },
-		select: { verificationStatus: true },
-	});
-	if (profile?.verificationStatus !== "verified") {
-		return { ok: false, reason: "not_verified" };
-	}
-
 	// Re-checked against the queue predicate rather than trusting the id the
 	// client sent: the case may have been matched, funded, or withdrawn since the
 	// page rendered, and a stale button must not be able to reach it. Unscoped by
-	// state here so that a case in the wrong jurisdiction is refused as
-	// `not_admitted` — the truthful reason — rather than as `unavailable`, which
-	// would read as "somebody else got it".
+	// the attorney's own eligibility here (federal:true, no states) so that a case
+	// in the wrong jurisdiction is refused with a truthful reason below rather than
+	// as `unavailable`, which would read as "somebody else got it".
 	const target = await prisma.case.findFirst({
-		where: { ...queueWhere(), id: caseId },
-		select: { id: true, location: true },
+		where: { ...queueWhere({}, undefined, true), id: caseId },
+		select: { id: true, location: true, jurisdiction: true },
 	});
 	if (!target) return { ok: false, reason: "unavailable" };
 
-	const admitted = await isAdmittedIn(prisma, attorneyId, target.location);
-	if (!admitted) return { ok: false, reason: "not_admitted" };
+	// Eligibility is per jurisdiction: a federal case needs a verified federal
+	// standing; a state case needs the verified state badge and a verified
+	// admission in the case's own state.
+	if (target.jurisdiction === "federal") {
+		if (!(await isFederalVerified(prisma, attorneyId))) {
+			return { ok: false, reason: "not_federal_verified" };
+		}
+	} else {
+		const profile = await prisma.attorneyProfile.findUnique({
+			where: { userId: attorneyId },
+			select: { verificationStatus: true },
+		});
+		if (profile?.verificationStatus !== "verified") {
+			return { ok: false, reason: "not_verified" };
+		}
+		if (!(await isAdmittedIn(prisma, attorneyId, target.location))) {
+			return { ok: false, reason: "not_admitted" };
+		}
+	}
 
 	const existing = await prisma.attorneyRequest.findUnique({
 		where: { caseId_attorneyId: { caseId, attorneyId } },

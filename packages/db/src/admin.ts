@@ -240,3 +240,16 @@ export async function listDonationActivity(opts?: {
 			r.donorName?.trim() || (r.donorId ? "Account donor" : "Guest donor"),
 	}));
 }
+
+/**
+ * The user ids of every administrator — for fanning a "needs your review"
+ * notification out to the people who can act on it (e.g. a federal-standing check
+ * that landed in review). Ids only; the notification layer resolves names.
+ */
+export async function listAdministratorIds(): Promise<string[]> {
+	const rows = await prisma.user.findMany({
+		where: { role: "administrator" },
+		select: { id: true },
+	});
+	return rows.map((row) => row.id);
+}

@@ -1,6 +1,14 @@
 import type { DirectoryProfile } from "@just-us/db/attorney-directory";
 import { cn } from "@just-us/ui/lib/utils";
-import { FileText, Globe, Lock, Mail, Phone, ShieldCheck } from "lucide-react";
+import {
+	FileText,
+	Globe,
+	Landmark,
+	Lock,
+	Mail,
+	Phone,
+	ShieldCheck,
+} from "lucide-react";
 import type { Route } from "next";
 
 import {
@@ -201,6 +209,12 @@ export function AttorneyProfileView({
 										</span>
 									)}
 									<AvailabilityBadge accepting={attorney.acceptingNewCases} />
+									{attorney.federalVerificationStatus === "verified" && (
+										<span className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-brass-wash px-2.5 py-1 font-semibold text-[12px] text-brass-deep">
+											<Landmark className="size-3.5" aria-hidden="true" />
+											Federal court
+										</span>
+									)}
 								</div>
 								{attorney.practiceAreas.length > 0 && (
 									<div className="mt-3 flex flex-wrap gap-1.5">

@@ -7,6 +7,7 @@ import {
 	sendExpressionOfInterestEmail,
 	sendModerationNoticeEmail,
 } from "@just-us/auth/lib/email";
+import { listAdministratorIds } from "@just-us/db/admin";
 import { getCaseUpdateForNotify } from "@just-us/db/case-updates";
 import {
 	type CertificateRow,
@@ -188,6 +189,46 @@ export async function notifyInvitationDeclined(
 	]);
 }
 
+/**
+ * The plaintiff's chosen attorney accepted the invitation → tell the plaintiff.
+ *
+ * The counterpart to `notifyInvitationDeclined`. What happens next depends on
+ * whether a fee was already agreed:
+ *   - a request-to-represent case (no fee yet) stayed `seeking` — the plaintiff has
+ *     to agree the fee before it can go live, so they're pointed at that step;
+ *   - a bring-your-own case (fee agreed in the wizard) has gone to `pending_payout`
+ *     and only needs publishing, so they're pointed at the case itself.
+ *
+ * In-app only: a nudge to act, not a document to keep. Deduped on the invitation.
+ */
+export async function notifyInvitationAccepted(
+	caseId: string,
+	invitationId: string,
+	feeAgreed: boolean,
+) {
+	const ctx = await getCaseNotifyContext(caseId);
+	if (!ctx) return;
+
+	const who = ctx.attorneyName?.trim() || "The attorney you named";
+	const title = ctx.title || "your case";
+	await createNotifications([
+		{
+			recipientId: ctx.ownerId,
+			type: "case_status",
+			caseId,
+			actorName: ctx.attorneyName ?? null,
+			title: feeAgreed
+				? "Your attorney accepted — publish to go live"
+				: "Your attorney accepted — agree the fee next",
+			body: feeAgreed
+				? `${who} accepted “${title}”. Publish it to start raising.`
+				: `${who} accepted “${title}”. Agree the fee together and publish to take it live.`,
+			href: feeAgreed ? `/my-cases/${caseId}` : `/my-cases/${caseId}/requests`,
+			dedupeKey: `invite_accepted:${invitationId}`,
+		},
+	]);
+}
+
 const STATUS_COPY: Record<
 	string,
 	{
@@ -217,6 +258,36 @@ const STATUS_COPY: Record<
 		audience: (t) => `“${t}” has been resolved. Thank you for supporting it.`,
 	},
 };
+
+/**
+ * A federal-court check that couldn't be cleared automatically → every
+ * administrator, so a person rules on it.
+ *
+ * The federal analogue of a state bar scan landing in `needs_review`: the AI
+ * check found no clear answer, so it can't verify or reject on its own. This
+ * fans a review notification out to the admins who can set the standing by hand
+ * (see `adminSetFederalVerification`). In-app only — a nudge to the review queue,
+ * not a document. Deduped per attorney→admin so a repeated check doesn't spam.
+ */
+export async function notifyAdminsFederalReview(userId: string) {
+	const [named, adminIds] = await Promise.all([
+		usersForNotification([userId]),
+		listAdministratorIds(),
+	]);
+	if (adminIds.length === 0) return;
+	const name = named[0]?.name?.trim() || "An attorney";
+	const href = `/users/${userId}`;
+	await createNotifications(
+		adminIds.map((adminId) => ({
+			recipientId: adminId,
+			type: "moderation" as const,
+			title: "Federal review needed",
+			body: `${name}'s federal-court standing couldn't be verified automatically and needs a manual review.`,
+			href,
+			dedupeKey: `federal_review:${userId}:${adminId}`,
+		})),
+	);
+}
 
 /**
  * A case status change → the plaintiff always; on `live`/`closed`, also every

@@ -170,6 +170,16 @@ model AttorneyProfile {
   /// Newest check first — the full evidence trail behind the badge.
   verifications      AttorneyVerification[]
 
+  /// Federal-court practice, tracked separately from the per-state admissions
+  /// above because federal admission is not a US state. `practicesFederal` is the
+  /// attorney's own declaration (set at onboarding / on their profile);
+  /// `federalVerificationStatus` is the checked standing, and only a `verified`
+  /// value lets them see and take federal cases. State practice stays entirely in
+  /// `AttorneyAdmission`, so this never touches state matching or the state badge.
+  practicesFederal          Boolean            @default(false)
+  federalVerificationStatus VerificationStatus @default(unverified)
+  federalVerifiedAt         DateTime?
+
   /// Client reviews and self-reported outcomes shown on the public profile.
   reviews     AttorneyReview[]
   caseRecords AttorneyCaseRecord[]

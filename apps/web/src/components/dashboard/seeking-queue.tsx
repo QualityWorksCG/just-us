@@ -37,11 +37,15 @@ export function readQueueParams(
 	};
 	const category = one("category");
 	const state = one("state");
+	const court = one("court");
+	const jurisdiction: "state" | "federal" | undefined =
+		court === "state" || court === "federal" ? court : undefined;
 	return {
 		category,
 		state,
+		jurisdiction,
 		sort: one("sort"),
-		filtered: !!(category || state),
+		filtered: !!(category || state || jurisdiction),
 	};
 }
 

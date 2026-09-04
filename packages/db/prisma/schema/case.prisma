@@ -26,16 +26,30 @@ enum CaseStatus {
   closed
 }
 
+// Whether the matter is a state-court action or a federal one. This gates which
+// attorneys may see and take the case: a state case reaches only attorneys
+// admitted in its state; a federal case reaches only federal-verified attorneys.
+// Defaults to `state`, which is the common case and what every case predating
+// this field is treated as.
+enum CaseJurisdiction {
+  state
+  federal
+}
+
 model Case {
   id      String @id @default(cuid())
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   ownerId String
 
   // Step 1 — the basics
-  title    String
-  category String
-  location String
-  summary  String
+  title        String
+  category     String
+  location     String
+  // `location` is still the US state the matter falls under (used for venue and,
+  // on a state case, for admission matching). `jurisdiction` says which court
+  // system it belongs to.
+  jurisdiction CaseJurisdiction @default(state)
+  summary      String
 
   // Step 2 — the story + evidence metadata ([{ name, size }]). Actual files are
   // not stored yet (no object storage wired up); only their metadata is kept.
