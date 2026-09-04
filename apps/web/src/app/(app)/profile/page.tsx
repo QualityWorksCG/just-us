@@ -66,6 +66,7 @@ export default async function AttorneyProfilePage({
 				languages: saved.languages,
 				acceptingNewCases: saved.acceptingNewCases,
 				virtualConsultation: saved.virtualConsultation,
+				practicesFederal: saved.practicesFederal,
 				feeApproach: saved.feeApproach,
 				feeRangeMinCents: saved.feeRangeMinCents,
 				feeRangeMaxCents: saved.feeRangeMaxCents,
@@ -126,6 +127,9 @@ export default async function AttorneyProfilePage({
 						jurisdiction: user.jurisdiction ?? null,
 					}}
 					verification={verification}
+					federalVerificationStatus={
+						saved?.federalVerificationStatus ?? "unverified"
+					}
 					admissions={admissions}
 				/>
 			</div>

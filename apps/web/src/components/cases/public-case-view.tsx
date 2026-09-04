@@ -4,6 +4,7 @@ import { cn } from "@just-us/ui/lib/utils";
 import {
 	Eye,
 	Heart,
+	Landmark,
 	Lock,
 	Scale,
 	ShieldCheck,
@@ -169,6 +170,17 @@ export function PublicCaseView({
 				</span>
 				<span className="rounded-[var(--radius-chip)] border border-border px-2.5 py-0.5 text-[12px] text-ink-soft">
 					{c.location || "—"}
+				</span>
+				<span
+					className={cn(
+						"inline-flex items-center gap-1 rounded-[var(--radius-chip)] px-2.5 py-0.5 font-semibold text-[12px]",
+						c.jurisdiction === "federal"
+							? "bg-ink text-paper"
+							: "bg-brass-wash text-brass-deep",
+					)}
+				>
+					<Landmark className="size-3" aria-hidden="true" />
+					{c.jurisdiction === "federal" ? "Federal court" : "State court"}
 				</span>
 			</div>
 			<Heading className="font-extrabold text-[clamp(1.9rem,4vw,2.75rem)] text-ink leading-[1.05] tracking-[-0.03em]">

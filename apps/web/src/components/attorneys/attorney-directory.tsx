@@ -133,16 +133,21 @@ export function readDirectoryParams(
 	const area = one("area");
 	const state = one("state");
 	const keyword = one("q");
+	const court = one("court");
 	const allStates = state === "all";
+	const jurisdiction: "state" | "federal" | undefined =
+		court === "state" || court === "federal" ? court : undefined;
 	return {
 		area: area === "all" ? undefined : area,
 		state: allStates ? undefined : state,
 		allStates,
 		keyword,
+		jurisdiction,
 		sort: one("sort"),
 		filtered: !!(
 			(area && area !== "all") ||
 			(state && state !== "all") ||
+			jurisdiction ||
 			keyword
 		),
 	};

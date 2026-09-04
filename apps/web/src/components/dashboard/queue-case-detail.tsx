@@ -5,6 +5,7 @@ import { cn } from "@just-us/ui/lib/utils";
 import {
 	CalendarClock,
 	FileText,
+	Link2,
 	MapPin,
 	Paperclip,
 	Scale,
@@ -55,6 +56,50 @@ function fileSize(bytes: number) {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * One filing, opened where there is something to open.
+ *
+ * A stored document goes through the app's authorized evidence route (`file.href`),
+ * never its storage URL; a pasted link opens directly; an entry from before
+ * documents were stored has no href and renders plainly. Access is enforced at the
+ * route — see `caseEvidenceFile` — so rendering the link here is safe. Mirrors the
+ * representing attorney's evidence row so both read identically.
+ */
+function EvidenceRow({
+	file,
+	canOpen,
+}: {
+	file: QueueCaseDetail["evidence"][number];
+	/** Whether this viewer is allowed to open the file — a link is only rendered
+	 *  when the serving route would honour it. */
+	canOpen: boolean;
+}) {
+	const Icon = file.kind === "link" ? Link2 : Paperclip;
+
+	return (
+		<li className="flex items-center gap-2.5 rounded-[var(--radius-card)] border border-border bg-paper-alt px-3 py-2">
+			<Icon className="size-3.5 shrink-0 text-brass-deep" aria-hidden="true" />
+			{canOpen && file.href ? (
+				<a
+					href={file.href}
+					target="_blank"
+					rel="noopener noreferrer"
+					className="min-w-0 flex-1 truncate font-semibold text-[13px] text-brass-deep hover:underline"
+				>
+					{file.name}
+				</a>
+			) : (
+				<span className="min-w-0 flex-1 truncate font-semibold text-[13px] text-ink">
+					{file.name}
+				</span>
+			)}
+			<span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
+				{file.kind === "link" ? "Link" : fileSize(file.size ?? 0)}
+			</span>
+		</li>
+	);
+}
+
 function waitingFor(publishedAt: Date | null, createdAt: Date) {
 	const since = publishedAt ?? createdAt;
 	const days = Math.floor((Date.now() - since.getTime()) / 86_400_000);
@@ -73,15 +118,42 @@ type ExpressInterestGate =
  * Whether this attorney can put themselves forward for this case — and, when they
  * can't, why and what to do about it.
  *
- * The gate is the case's own state: representation needs a *verified* bar
- * admission there, so each not-yet standing gets its own sentence and next step
- * rather than a single generic "get verified" that leaves the attorney guessing
- * whether to add a state, wait on a check, or fix a rejected one.
+ * The gate turns on the case's jurisdiction. A state case needs a *verified* bar
+ * admission in that state; a federal case needs a *verified* federal-court
+ * standing. Each not-yet status gets its own sentence and next step rather than a
+ * single generic "get verified" that leaves the attorney guessing.
  */
 function expressInterestGate(
+	jurisdiction: "state" | "federal",
 	state: string,
 	admissionStatus: string | null,
+	federalStatus: string | null,
 ): ExpressInterestGate {
+	if (jurisdiction === "federal") {
+		if (federalStatus === "verified") return { canExpress: true };
+		if (federalStatus === "pending" || federalStatus === "needs_review") {
+			return {
+				canExpress: false,
+				title: "Your federal standing is still being verified",
+				body: "This is a federal case. Your federal-court check is in progress — you'll be able to express interest the moment it clears.",
+				cta: "View your profile",
+			};
+		}
+		if (federalStatus === "rejected") {
+			return {
+				canExpress: false,
+				title: "Your federal standing couldn't be verified",
+				body: "This is a federal case, and the federal-court check didn't pass. Review your federal practice on your profile and we'll re-check it.",
+				cta: "Review your profile",
+			};
+		}
+		return {
+			canExpress: false,
+			title: "Verify your federal standing to express interest",
+			body: "This is a federal case. Turn on federal practice and verify your federal-court standing on your profile to put yourself forward.",
+			cta: "Get verified",
+		};
+	}
 	if (admissionStatus === "verified") return { canExpress: true };
 	const where = state || "this state";
 	if (admissionStatus === null) {
@@ -120,18 +192,33 @@ function expressInterestGate(
 export function QueueCaseDetailView({
 	item,
 	admissionStatus,
+	federalStatus,
 }: {
 	item: QueueCaseDetail;
 	/** This attorney's admission standing in *this case's* state: `verified`
 	 *  unlocks expressing interest; anything else — or `null`, meaning the state
-	 *  isn't claimed at all — drives the explanation of what's outstanding. */
+	 *  isn't claimed at all — drives the explanation of what's outstanding. Used
+	 *  for state cases. */
 	admissionStatus: string | null;
+	/** This attorney's federal-court standing, used for federal cases. */
+	federalStatus: string | null;
 }) {
-	const gate = expressInterestGate(item.state, admissionStatus);
+	const gate = expressInterestGate(
+		item.jurisdiction,
+		item.state,
+		admissionStatus,
+		federalStatus,
+	);
 	const paragraphs = item.story
 		.split(/\n{2,}|\n/)
 		.map((p) => p.trim())
 		.filter(Boolean);
+
+	// May this attorney open the filed documents? Yes if the plaintiff named them
+	// (a pending invitation) or they've put themselves forward (an expression of
+	// interest) — the exact pair the evidence route authorizes. Kept in lockstep so
+	// the panel never renders a link the route would 404.
+	const canReviewEvidence = !!(item.invitationId || item.myInterest);
 
 	// The one thing an attorney can do from here, as a card at the top of the
 	// right rail. Which card depends on where they stand with this intake: named
@@ -323,30 +410,22 @@ export function QueueCaseDetailView({
 						<>
 							<ul className="flex flex-col gap-2">
 								{item.evidence.map((file) => (
-									<li
+									<EvidenceRow
 										key={`${file.name}-${file.size}`}
-										className="flex items-center gap-2.5 rounded-[var(--radius-card)] border border-border bg-paper-alt px-3 py-2"
-									>
-										<Paperclip
-											className="size-3.5 shrink-0 text-brass-deep"
-											aria-hidden="true"
-										/>
-										<span className="min-w-0 flex-1 truncate font-semibold text-[13px] text-ink">
-											{file.name}
-										</span>
-										<span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
-											{fileSize(file.size)}
-										</span>
-									</li>
+										file={file}
+										// Only the attorney the plaintiff named, or one who has put
+										// themselves forward, may open the files — the same gate the
+										// serving route enforces (`caseEvidenceFile`). For a plain
+										// browsing attorney the row stays a plain, unopenable listing,
+										// so no link here ever 404s.
+										canOpen={canReviewEvidence}
+									/>
 								))}
 							</ul>
-							{/* Honest about what this list is: the wizard records evidence
-							    metadata, and file storage isn't wired up yet. Rendering
-							    these as downloads would promise something that doesn't
-							    work. */}
 							<p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
-								Filed by the plaintiff. Documents themselves are shared once
-								you're representing the intake.
+								{canReviewEvidence
+									? "Filed by the plaintiff. Open a document to review it before you decide — it opens in a new tab."
+									: "Filed by the plaintiff. Express interest to open and review the documents."}
 							</p>
 						</>
 					) : (

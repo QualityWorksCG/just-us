@@ -2,7 +2,7 @@
 import type { DirectoryAttorney } from "@just-us/db/attorney-directory";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { Eye } from "lucide-react";
+import { Eye, Landmark } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { ContactAttorneyButton } from "@/components/attorneys/contact-attorney-button";
@@ -179,6 +179,12 @@ export function AttorneyCard({
 							</span>
 						)}
 						<AvailabilityBadge accepting={attorney.acceptingNewCases} />
+						{attorney.federalVerified && (
+							<span className="inline-flex items-center gap-1 rounded-[var(--radius-pill)] bg-brass-wash px-2.5 py-1 font-semibold text-[12px] text-brass-deep">
+								<Landmark className="size-3.5" aria-hidden="true" />
+								Federal court
+							</span>
+						)}
 					</div>
 
 					{attorney.practiceAreas.length > 0 && (

@@ -1,5 +1,6 @@
 import { isBlocked } from "@just-us/auth/user-status";
 import { getAdmission } from "@just-us/db/admissions";
+import { getAttorneyProfile } from "@just-us/db/attorney-profile";
 import {
 	caseInvitationStatus,
 	type findCaseInvitation,
@@ -10,6 +11,7 @@ import {
 	BadgeCheck,
 	CircleCheck,
 	Handshake,
+	Landmark,
 	LogIn,
 	MailCheck,
 	MapPin,
@@ -385,84 +387,124 @@ export async function CaseInviteResolved({
 		);
 	}
 
-	// Bar standing in *this case's* state, not the account's overall badge. An
-	// attorney verified in New York is still not able to act on a California
-	// matter, and telling them they are verified and then refusing the confirm
-	// would be the worst of both.
-	const admission = await getAdmission(user.id, c.location);
+	// Standing appropriate to the case's jurisdiction — never the account's overall
+	// badge. A federal case needs a verified federal-court standing; a state case
+	// needs a verified admission in that case's own state (an attorney verified in
+	// New York still cannot act on a California matter).
+	if (c.jurisdiction === "federal") {
+		const attorneyProfile = await getAttorneyProfile(user.id);
+		if (attorneyProfile?.federalVerificationStatus !== "verified") {
+			const fed = attorneyProfile?.federalVerificationStatus ?? "unverified";
+			return (
+				<CaseInviteShell
+					asModal={asModal}
+					icon={Landmark}
+					width="wide"
+					title="Verify your federal standing to continue"
+					description={
+						fed === "pending" || fed === "needs_review"
+							? `${c.owner.name}'s case is a federal matter, and your federal-court check is still being reviewed. Once it clears, come back to this link and you'll be able to confirm.`
+							: `${c.owner.name}'s case is a federal matter. Taking one on needs a verified federal-court standing — turn on federal practice and verify it on your profile.`
+					}
+				>
+					<div className="flex flex-col gap-4">
+						{summary}
+						<Link
+							href={withNext("/profile", returnHere) as Route}
+							className={primaryLinkClass}
+						>
+							{fed === "pending" || fed === "needs_review"
+								? "Check my verification"
+								: "Verify my federal standing"}
+						</Link>
+						<p className="text-[12px] text-muted-foreground leading-relaxed">
+							This invitation is held open for you in the meantime. You can come
+							back to it from your dashboard at any time.
+						</p>
+						<DeclineInviteButton
+							invite={ref}
+							label="I don't represent this case"
+						/>
+					</div>
+				</CaseInviteShell>
+			);
+		}
+	} else {
+		const admission = await getAdmission(user.id, c.location);
 
-	// Never claimed the state at all: a different problem from an unverified claim,
-	// and a different first step. Said before the bar check is mentioned, because
-	// "verify your licence" is meaningless advice for a state they hold none in.
-	if (!admission) {
-		return (
-			<CaseInviteShell
-				asModal={asModal}
-				icon={MapPin}
-				width="wide"
-				title={`You aren't admitted in ${c.location}`}
-				description={`${c.owner.name}'s case falls under ${c.location} law, and your JustUs profile doesn't list ${c.location} among the states you practise in. A case can only be taken on by an attorney admitted where it is.`}
-			>
-				<div className="flex flex-col gap-4">
-					{summary}
-					<Link
-						href={withNext("/profile", returnHere) as Route}
-						className={primaryLinkClass}
-					>
-						Add {c.location} to my states
-					</Link>
-					<p className="text-[12px] text-muted-foreground leading-relaxed">
-						If you are admitted there, add the state and run its bar check.
-						We'll bring you back here. If you aren't, decline so {c.owner.name}
-						's case goes in front of attorneys who are, rather than waiting out
-						the week.
-					</p>
-					<DeclineInviteButton
-						invite={ref}
-						label="I don't represent this case"
-					/>
-				</div>
-			</CaseInviteShell>
-		);
-	}
+		// Never claimed the state at all: a different problem from an unverified
+		// claim, and a different first step. Said before the bar check is mentioned,
+		// because "verify your licence" is meaningless for a state they hold none in.
+		if (!admission) {
+			return (
+				<CaseInviteShell
+					asModal={asModal}
+					icon={MapPin}
+					width="wide"
+					title={`You aren't admitted in ${c.location}`}
+					description={`${c.owner.name}'s case falls under ${c.location} law, and your JustUs profile doesn't list ${c.location} among the states you practise in. A case can only be taken on by an attorney admitted where it is.`}
+				>
+					<div className="flex flex-col gap-4">
+						{summary}
+						<Link
+							href={withNext("/profile", returnHere) as Route}
+							className={primaryLinkClass}
+						>
+							Add {c.location} to my states
+						</Link>
+						<p className="text-[12px] text-muted-foreground leading-relaxed">
+							If you are admitted there, add the state and run its bar check.
+							We'll bring you back here. If you aren't, decline so{" "}
+							{c.owner.name}
+							's case goes in front of attorneys who are, rather than waiting
+							out the week.
+						</p>
+						<DeclineInviteButton
+							invite={ref}
+							label="I don't represent this case"
+						/>
+					</div>
+				</CaseInviteShell>
+			);
+		}
 
-	const verification = admission.verificationStatus;
-
-	if (verification !== "verified") {
-		return (
-			<CaseInviteShell
-				asModal={asModal}
-				icon={BadgeCheck}
-				width="wide"
-				title={`Verify your ${c.location} bar standing to continue`}
-				description={
-					verification === "pending" || verification === "needs_review"
-						? `Your ${c.location} bar check is still being reviewed. Once it clears, come back to this link and you'll be able to confirm.`
-						: `Every attorney on JustUs is checked against the bar of the state a case falls under, including one they were invited to. This case is in ${c.location}.`
-				}
-			>
-				<div className="flex flex-col gap-4">
-					{summary}
-					<Link
-						href={withNext("/profile", returnHere) as Route}
-						className={primaryLinkClass}
-					>
-						{verification === "pending" || verification === "needs_review"
-							? "Check my verification"
-							: `Verify my ${c.location} licence`}
-					</Link>
-					<p className="text-[12px] text-muted-foreground leading-relaxed">
-						This invitation is held open for you in the meantime. The case stays
-						off the attorney queue until you answer or it expires. You can come
-						back to it from your dashboard at any time.
-					</p>
-					<DeclineInviteButton
-						invite={ref}
-						label="I don't represent this case"
-					/>
-				</div>
-			</CaseInviteShell>
-		);
+		if (admission.verificationStatus !== "verified") {
+			const verification = admission.verificationStatus;
+			return (
+				<CaseInviteShell
+					asModal={asModal}
+					icon={BadgeCheck}
+					width="wide"
+					title={`Verify your ${c.location} bar standing to continue`}
+					description={
+						verification === "pending" || verification === "needs_review"
+							? `Your ${c.location} bar check is still being reviewed. Once it clears, come back to this link and you'll be able to confirm.`
+							: `Every attorney on JustUs is checked against the bar of the state a case falls under, including one they were invited to. This case is in ${c.location}.`
+					}
+				>
+					<div className="flex flex-col gap-4">
+						{summary}
+						<Link
+							href={withNext("/profile", returnHere) as Route}
+							className={primaryLinkClass}
+						>
+							{verification === "pending" || verification === "needs_review"
+								? "Check my verification"
+								: `Verify my ${c.location} licence`}
+						</Link>
+						<p className="text-[12px] text-muted-foreground leading-relaxed">
+							This invitation is held open for you in the meantime. The case
+							stays off the attorney queue until you answer or it expires. You
+							can come back to it from your dashboard at any time.
+						</p>
+						<DeclineInviteButton
+							invite={ref}
+							label="I don't represent this case"
+						/>
+					</div>
+				</CaseInviteShell>
+			);
+		}
 	}
 
 	// ── Everything checks out ───────────────────────────────────────────────────

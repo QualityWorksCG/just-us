@@ -32,6 +32,12 @@ const SORTS = [
 	{ value: "newest", label: "Newest" },
 ];
 
+const COURTS = [
+	{ value: "all", label: "All courts" },
+	{ value: "state", label: "State" },
+	{ value: "federal", label: "Federal" },
+] as const;
+
 export function BrowseControls() {
 	const router = useRouter();
 	const pathname = usePathname();
@@ -41,9 +47,12 @@ export function BrowseControls() {
 	const state = params.get("state") ?? "";
 	const category = params.get("category") ?? "";
 	const sort = params.get("sort") ?? "trending";
+	const courtParam = params.get("court");
+	const court =
+		courtParam === "state" || courtParam === "federal" ? courtParam : "all";
 
 	const [search, setSearch] = useState(q);
-	const hasFilters = !!(q || state || category);
+	const hasFilters = !!(q || state || category || court !== "all");
 
 	// Keep the input in sync if the URL changes elsewhere (e.g. back button).
 	useEffect(() => {
@@ -67,7 +76,7 @@ export function BrowseControls() {
 	 *  the URL no longer has and immediately re-applies it. */
 	function clearFilters() {
 		setSearch("");
-		apply({ q: null, state: null, category: null });
+		apply({ q: null, state: null, category: null, court: null });
 	}
 
 	// Debounce the free-text search so we don't push on every keystroke.
@@ -110,6 +119,26 @@ export function BrowseControls() {
 						options={SORTS}
 					/>
 				</div>
+			</div>
+
+			{/* Court — state vs. federal jurisdiction. A segmented control, not a
+			    two-way toggle, so "All courts" stays the default view rather than
+			    forcing donors into one bucket. */}
+			<div className="flex flex-wrap items-center gap-2">
+				<span className="mr-1 font-mono font-semibold text-[11px] text-muted-foreground uppercase tracking-[0.1em]">
+					Court
+				</span>
+				{COURTS.map((option) => (
+					<Pill
+						key={option.value}
+						active={court === option.value}
+						onClick={() =>
+							apply({ court: option.value === "all" ? null : option.value })
+						}
+					>
+						{option.label}
+					</Pill>
+				))}
 			</div>
 
 			{/* Category pills */}

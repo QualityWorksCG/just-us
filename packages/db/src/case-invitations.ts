@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { isAdmittedIn } from "./admissions";
+import type { MatchOrigin } from "../prisma/generated/enums";
+import { isAdmittedIn, isFederalVerified } from "./admissions";
 import { writeAudit } from "./audit";
 import prisma from "./index";
 
@@ -302,6 +303,7 @@ export async function findCaseInvitation(ref: CaseInvitationRef) {
 					summary: true,
 					category: true,
 					location: true,
+					jurisdiction: true,
 					goalCents: true,
 					status: true,
 					deletedAt: true,
@@ -647,10 +649,21 @@ export type ConfirmCaseInvitationErrorCode =
 	| "not_attorney"
 	| "not_verified"
 	| "not_admitted"
+	| "not_federal_verified"
 	| "case_unavailable";
 
 export type ConfirmCaseInvitationResult =
-	| { ok: true; caseId: string; matchId: string }
+	| {
+			ok: true;
+			caseId: string;
+			matchId: string;
+			/** The invitation that was accepted — for deduping the plaintiff's notice. */
+			invitationId: string;
+			/** Whether the fee was already agreed. False means the case stayed
+			 *  `seeking` and the plaintiff still has to agree the fee — which changes
+			 *  what they're told and where they're pointed. */
+			feeAgreed: boolean;
+	  }
 	| { ok: false; code: ConfirmCaseInvitationErrorCode };
 
 /**
@@ -668,10 +681,17 @@ export type ConfirmCaseInvitationResult =
  *     path cannot be the way around it;
  *   - the case is still `seeking`, undeleted, and unmatched.
  *
- * On success the case moves to `pending_payout` — finished, committed, private,
- * and waiting on this attorney to open its Stripe account. `publishedAt` is
- * re-stamped for the same reason `publishCase` re-stamps it: it marks the last
- * change of visibility, not the first.
+ * On success a `Match` is always written, and where the case goes next depends on
+ * whether a fee was already agreed:
+ *   - **bring-your-own** (fee set in the wizard before the invite): the case is
+ *     finished, so it moves to `pending_payout` — committed, private, waiting on
+ *     this attorney to open its Stripe account. `publishedAt` is re-stamped for the
+ *     same reason `publishCase` re-stamps it: it marks the last change of
+ *     visibility, not the first.
+ *   - **request-to-represent** (published to the named attorney from the directory
+ *     with no fee yet): accepting settles only *who*. The case stays `seeking` with
+ *     the match written, and the plaintiff is sent to agree the fee and publish —
+ *     the same limbo the expressed-interest path leaves (see `acceptRequest`).
  */
 export async function confirmCaseInvitation(input: {
 	ref: CaseInvitationRef;
@@ -730,17 +750,39 @@ export async function confirmCaseInvitation(input: {
 					status: "seeking",
 					match: { is: null },
 				},
-				select: { id: true, location: true },
+				select: {
+					id: true,
+					location: true,
+					jurisdiction: true,
+					goalCents: true,
+				},
 			});
 			if (!target) return { ok: false, code: "case_unavailable" };
 
+			// Which flow reached this confirmation decides what "accepted" means, and
+			// the agreed fee is the tell. A bring-your-own case has already been
+			// through the wizard's fee step (goal set) before the invite went out, so
+			// accepting *finishes* it — it commits to `pending_payout` and waits on the
+			// attorney's payout account. A request-to-represent case was published to
+			// the named attorney straight from the directory with no fee agreed yet
+			// (goal 0); accepting only settles *who*, and the plaintiff still owes the
+			// fee. That case stays `seeking` with a match written — exactly the limbo
+			// the expressed-interest path leaves (see `acceptRequest`) — so the requests
+			// screen shows "you've connected, now agree the fee & publish" instead of a
+			// premature, $0 "awaiting your firm" page.
+			const feeAgreed = target.goalCents > 0;
+			const origin: MatchOrigin = feeAgreed ? "bring_your_own" : "directory";
+
 			// Being named by a plaintiff is not a licence. The invitation says who
-			// they want; whether this attorney may act on a matter in this state is a
-			// fact about their admissions, and it is checked here in the same
-			// transaction as every other condition — the plaintiff typed a
-			// jurisdiction into the wizard, and what they typed is a claim about
-			// somebody else.
-			if (!(await isAdmittedIn(tx, attorney.id, target.location))) {
+			// they want; whether this attorney may act on this matter is a fact about
+			// their standing, checked here in the same transaction as every other
+			// condition. Per jurisdiction: a federal case needs a verified federal
+			// standing; a state case needs a verified admission in the case's state.
+			if (target.jurisdiction === "federal") {
+				if (!(await isFederalVerified(tx, attorney.id))) {
+					return { ok: false, code: "not_federal_verified" };
+				}
+			} else if (!(await isAdmittedIn(tx, attorney.id, target.location))) {
 				return { ok: false, code: "not_admitted" };
 			}
 
@@ -760,14 +802,20 @@ export async function confirmCaseInvitation(input: {
 				data: {
 					caseId: inv.caseId,
 					attorneyId: attorney.id,
-					origin: "bring_your_own",
+					origin,
 				},
 				select: { id: true },
 			});
-			await tx.case.update({
-				where: { id: inv.caseId },
-				data: { status: "pending_payout", publishedAt: now },
-			});
+			// Only a fee-agreed (bring-your-own) case advances to pending_payout here.
+			// A request-to-represent case keeps its seeking status so the plaintiff is
+			// routed to agree the fee first; the match alone is what takes it off the
+			// queue and out of the "no attorney chosen" limbo.
+			if (feeAgreed) {
+				await tx.case.update({
+					where: { id: inv.caseId },
+					data: { status: "pending_payout", publishedAt: now },
+				});
+			}
 			await writeAudit(tx, {
 				actorId: attorney.id,
 				action: "case_invite.confirmed",
@@ -777,11 +825,18 @@ export async function confirmCaseInvitation(input: {
 					caseId: inv.caseId,
 					email: inv.email,
 					matchId: match.id,
-					origin: "bring_your_own",
+					origin,
+					feeAgreed,
 				},
 			});
 
-			return { ok: true, caseId: inv.caseId, matchId: match.id };
+			return {
+				ok: true,
+				caseId: inv.caseId,
+				matchId: match.id,
+				invitationId: inv.id,
+				feeAgreed,
+			};
 		},
 	);
 }
