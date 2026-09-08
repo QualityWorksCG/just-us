@@ -119,14 +119,16 @@ export async function AdminOverview() {
 
 	const queues = [
 		{
-			label: "Open reports",
+			// Count-aware so a single item doesn't read as "1 Open reports".
+			label: (n: number) => (n === 1 ? "Open report" : "Open reports"),
 			value: stats.openReports,
 			hint: "Conversations awaiting moderation",
 			href: "/moderation" as Route,
 			icon: ShieldAlert,
 		},
 		{
-			label: "Attorneys to verify",
+			label: (n: number) =>
+				n === 1 ? "Attorney to verify" : "Attorneys to verify",
 			value: stats.attorneysPending,
 			hint: "Have a claimed jurisdiction not yet verified",
 			href: "/users?role=attorney" as Route,
@@ -187,7 +189,7 @@ export async function AdminOverview() {
 			<div className="grid gap-4 sm:grid-cols-2">
 				{queues.map((q) => (
 					<Link
-						key={q.label}
+						key={q.href}
 						href={q.href}
 						className="group flex items-center gap-4 rounded-[var(--radius-card)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)] transition-colors hover:border-brass-deep"
 					>
@@ -207,7 +209,7 @@ export async function AdminOverview() {
 									{q.value}
 								</span>
 								<span className="font-semibold text-[13.5px] text-ink">
-									{q.label}
+									{q.label(q.value)}
 								</span>
 							</span>
 							<span className="mt-1 block text-[12px] text-muted-foreground">
