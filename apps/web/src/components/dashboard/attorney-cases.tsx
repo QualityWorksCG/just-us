@@ -134,8 +134,11 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 
 	const hasFilters =
 		!!q || selStates.length > 0 || status !== "all" || court !== "all";
-	// The filter bar earns its space only once there's more than one intake to sift.
-	const showFilters = cases.length > 1;
+	// The filter bar is always shown (for one intake or many), so the search and the
+	// court/status/state controls live in a stable, predictable place rather than
+	// appearing only past a threshold. The empty state (no intakes) returns earlier,
+	// so there is never a filter bar over nothing.
+	const showFilters = true;
 
 	function toggleState(s: string) {
 		setSelStates((prev) =>
