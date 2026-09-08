@@ -30,7 +30,7 @@ CaseUpdateEmail.PreviewProps = {
 	caseTitle: "Seeking justice for workplace retaliation",
 	actorName: "Daniel Osei",
 	recipientName: "Aisha",
-	snippet: "We've secured a court date — next Wednesday.",
+	snippet: "We've secured a court date, next Wednesday.",
 	tagLabel: "Court date",
 } satisfies CaseUpdateEmailProps;
 

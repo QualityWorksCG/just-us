@@ -182,7 +182,7 @@ export default async function UserDetailPage({
 						<p className="text-[13.5px] text-ink capitalize">{u.role}</p>
 					</Fact>
 					<Fact label="Jurisdiction">
-						<p className="text-[13.5px] text-ink">{u.jurisdiction || "—"}</p>
+						<p className="text-[13.5px] text-ink">{u.jurisdiction || "-"}</p>
 					</Fact>
 					<Fact label="Email">
 						<p className="text-[13.5px] text-ink">
@@ -222,7 +222,7 @@ export default async function UserDetailPage({
 					<div className="mt-5 rounded-[var(--radius-card-sm)] border border-warn/50 bg-warn/10 px-4 py-3">
 						<p className={cn(HEAD, "mb-1 text-warn-deep")}>Locked</p>
 						<p className="text-[13.5px] text-ink leading-relaxed">
-							Locked until {u.lockedUntil ? stamp(u.lockedUntil) : "—"} after
+							Locked until {u.lockedUntil ? stamp(u.lockedUntil) : "-"} after
 							failed sign-in attempts.
 						</p>
 					</div>
@@ -332,6 +332,8 @@ export default async function UserDetailPage({
 										<VerifyAttorneyControl
 											userId={u.id}
 											verified={isVerified}
+											disabled={!isVerified}
+											disabledReason="This attorney hasn't claimed any states to verify."
 										/>
 									</div>
 								)}
@@ -357,7 +359,7 @@ export default async function UserDetailPage({
 												<p className="mt-0.5 text-[12px] text-muted-foreground">
 													{u.attorneyProfile?.practicesFederal
 														? "Declared federal practice"
-														: "Not declared — verify to vouch anyway"}
+														: "Not declared - verify to vouch anyway"}
 												</p>
 											</div>
 											<div className="flex shrink-0 items-center gap-3">

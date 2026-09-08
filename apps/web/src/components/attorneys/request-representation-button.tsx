@@ -83,7 +83,7 @@ export function RequestRepresentationButton({
 				setRequested(false);
 				setConfirmingWithdraw(false);
 				toast.success("Request withdrawn", {
-					description: `${firstName}'s link no longer works. Your case is a private draft — request another attorney whenever you're ready.`,
+					description: `${firstName}'s link no longer works. Your case is a private draft. Request another attorney whenever you're ready.`,
 				});
 				router.refresh();
 			} else {
@@ -180,7 +180,7 @@ export function RequestRepresentationButton({
 						<p className="mt-3 text-[14px] text-ink-soft leading-relaxed">
 							We'll send {firstName} your case and ask them to take it on. Your
 							case goes out to attorneys, held just for {firstName} until they
-							answer — never the open queue. They accept or decline, and you can
+							answer, never the open queue. They accept or decline, and you can
 							still message them for context.
 						</p>
 						<div className="mt-6 flex justify-end gap-2">

@@ -76,7 +76,7 @@ function Fact({
 			<div className="min-w-0">
 				<dt className="text-[11.5px] text-muted-foreground">{label}</dt>
 				<dd className="truncate font-semibold text-[13.5px] text-ink">
-					{value || "—"}
+					{value || "-"}
 				</dd>
 			</div>
 		</div>

@@ -11,12 +11,14 @@ import {
 	upsertCaseInvitationForPublish,
 } from "@just-us/db/case-invitations";
 import {
+	addEvidenceToOwnedCase,
 	closeCase,
 	deleteDraft,
 	getOwnedCase,
 	incrementShareCount,
 	publishCase,
 	publishForAttorneys,
+	removeEvidenceFromOwnedCase,
 	revertSeekingToDraft,
 	saveDraft,
 	setCaseInvitedAttorney,
@@ -35,7 +37,11 @@ import { z } from "zod";
 
 import { requireRole } from "@/lib/auth-server";
 import { CASE_TITLE_MAX, CASE_TITLE_TOO_LONG } from "@/lib/case-title";
-import { notifyCaseClosed, notifyStatusChange } from "@/lib/notify";
+import {
+	notifyCaseClosed,
+	notifyCaseEvidenceAdded,
+	notifyStatusChange,
+} from "@/lib/notify";
 import { THANK_YOU_MAX, THANK_YOU_TOO_LONG } from "@/lib/thank-you-note";
 
 /** How far the representing firm's Stripe setup for this case has got. */
@@ -352,6 +358,99 @@ export async function closeCaseAction(id: string): Promise<DeleteCaseResult> {
 	} catch {
 		return { ok: false, error: "Couldn't close this case. Please try again." };
 	}
+}
+
+const addEvidenceSchema = z.object({
+	caseId: z.string().min(1),
+	items: z
+		.array(
+			z.object({
+				name: z.string().min(1).max(255),
+				url: z.string().url(),
+				size: z.number().int().nonnegative().optional(),
+				kind: z.enum(["file", "link"]),
+			}),
+		)
+		.min(1)
+		.max(10),
+});
+
+const ADD_EVIDENCE_ERRORS: Record<string, string> = {
+	not_found: "We couldn't find that case.",
+	wrong_status: "Evidence can only be added while your case is active.",
+	empty: "Add a file or a link first.",
+};
+
+/**
+ * A plaintiff files more evidence on a case that is already up — the "add after
+ * the fact" path. Owner-scoped in the data layer; on success the attorney of
+ * record (if any) is notified there is something new to read.
+ */
+export async function addCaseEvidenceAction(
+	input: z.input<typeof addEvidenceSchema>,
+): Promise<{ ok: true; addedCount: number } | { ok: false; error: string }> {
+	const { session } = await requireRole("plaintiff");
+	const parsed = addEvidenceSchema.safeParse(input);
+	if (!parsed.success)
+		return { ok: false, error: "That evidence isn't valid." };
+
+	const res = await addEvidenceToOwnedCase({
+		caseId: parsed.data.caseId,
+		ownerId: session.user.id,
+		items: parsed.data.items,
+	});
+	if (!res.ok) {
+		return {
+			ok: false,
+			error: ADD_EVIDENCE_ERRORS[res.reason] ?? "Couldn't add that evidence.",
+		};
+	}
+
+	// Best-effort: a notify hiccup must not undo evidence that was saved.
+	if (res.attorneyId) {
+		await notifyCaseEvidenceAdded(
+			parsed.data.caseId,
+			res.attorneyId,
+			res.addedCount,
+		).catch(() => {});
+	}
+	revalidatePath(`/my-cases/${parsed.data.caseId}`);
+	return { ok: true, addedCount: res.addedCount };
+}
+
+const removeEvidenceSchema = z.object({
+	caseId: z.string().min(1),
+	index: z.number().int().nonnegative(),
+});
+
+/**
+ * A plaintiff removes a piece of evidence they filed. Owner-scoped in the data
+ * layer and limited to an active case. Silent to the attorney — a removal is not a
+ * notifiable event the way a new filing is.
+ */
+export async function removeCaseEvidenceAction(
+	input: z.input<typeof removeEvidenceSchema>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+	const { session } = await requireRole("plaintiff");
+	const parsed = removeEvidenceSchema.safeParse(input);
+	if (!parsed.success) return { ok: false, error: "That request isn't valid." };
+
+	const res = await removeEvidenceFromOwnedCase({
+		caseId: parsed.data.caseId,
+		ownerId: session.user.id,
+		index: parsed.data.index,
+	});
+	if (!res.ok) {
+		return {
+			ok: false,
+			error:
+				res.reason === "wrong_status"
+					? "Evidence can only be changed while your case is active."
+					: "We couldn't find that case.",
+		};
+	}
+	revalidatePath(`/my-cases/${parsed.data.caseId}`);
+	return { ok: true };
 }
 
 /** Delete an owned case of any status from the Manage page (soft delete). */

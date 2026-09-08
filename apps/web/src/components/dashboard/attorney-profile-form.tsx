@@ -1521,7 +1521,7 @@ export function AttorneyProfileForm({
 				<Section
 					icon={ShieldCheck}
 					title="Where you practise"
-					sub="Plaintiffs are matched to attorneys by court system, so tell us where you practise — state courts, federal court, or both. Each is verified against public records, and only verified practice takes the matching cases."
+					sub="Plaintiffs are matched to attorneys by court system, so tell us where you practise: state courts, federal court, or both. Each is verified against public records, and only verified practice takes the matching cases."
 				>
 					<div className="flex flex-col gap-6">
 						{/* State courts — one row per state, each verified on its own. */}
@@ -1563,8 +1563,8 @@ export function AttorneyProfileForm({
 									</span>
 									<span className="mt-0.5 block text-[13px] text-muted-foreground leading-relaxed">
 										One overall standing, not per state. Tick this if you're
-										admitted to a US federal court — federal cases reach you
-										once it's verified.
+										admitted to a US federal court. Federal cases reach you once
+										it's verified.
 									</span>
 								</span>
 							</label>

@@ -404,7 +404,7 @@ export async function CaseInviteResolved({
 					description={
 						fed === "pending" || fed === "needs_review"
 							? `${c.owner.name}'s case is a federal matter, and your federal-court check is still being reviewed. Once it clears, come back to this link and you'll be able to confirm.`
-							: `${c.owner.name}'s case is a federal matter. Taking one on needs a verified federal-court standing — turn on federal practice and verify it on your profile.`
+							: `${c.owner.name}'s case is a federal matter. Taking one on needs a verified federal-court standing. Turn on federal practice and verify it on your profile.`
 					}
 				>
 					<div className="flex flex-col gap-4">

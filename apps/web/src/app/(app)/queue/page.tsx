@@ -83,6 +83,7 @@ export default async function IntakeRequestsPage({
 		title: inv.caseTitle,
 		category: inv.category,
 		state: inv.location,
+		jurisdiction: inv.jurisdiction,
 		plaintiffName: inv.plaintiffName,
 	}));
 
@@ -92,6 +93,7 @@ export default async function IntakeRequestsPage({
 		title: i.case.title,
 		category: i.case.category,
 		state: i.case.state,
+		jurisdiction: i.case.jurisdiction,
 	});
 	// The attorney's own expressions of interest, split by what became of each:
 	// still awaiting the plaintiff (Interest sent), Accepted, or Declined.
@@ -112,6 +114,7 @@ export default async function IntakeRequestsPage({
 			title: d.caseTitle,
 			category: d.category,
 			state: d.location,
+			jurisdiction: d.jurisdiction,
 		})),
 	];
 
@@ -154,6 +157,7 @@ export default async function IntakeRequestsPage({
 						.map((row) => row.state)}
 					filtered={filters.filtered}
 					canExpressInterest={profile?.verificationStatus === "verified"}
+					federalVerified={profile?.federalVerificationStatus === "verified"}
 				/>
 			) : (
 				<YourRequests

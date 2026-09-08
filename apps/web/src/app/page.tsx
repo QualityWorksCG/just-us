@@ -300,7 +300,7 @@ export default async function Home() {
 		id: c.id,
 		title: c.title || "Untitled case",
 		category: c.category || "Case",
-		jurisdiction: c.location || "—",
+		jurisdiction: c.location || "-",
 		cover: c.coverImageUrl,
 		blurb:
 			c.summary || `${c.story.slice(0, 160)}${c.story.length > 160 ? "…" : ""}`,

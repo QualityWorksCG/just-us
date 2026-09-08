@@ -56,7 +56,7 @@ function initials(name: string) {
 			.split(/\s+/)
 			.slice(0, 2)
 			.map((p) => p[0]?.toUpperCase() ?? "")
-			.join("") || "—"
+			.join("") || "-"
 	);
 }
 
@@ -151,7 +151,7 @@ export function PublicCaseView({
 	const attorneyMeta =
 		[c.attorneyFirm, c.attorneyArea, c.attorneyLocation]
 			.filter(Boolean)
-			.join(" · ") || "—";
+			.join(" · ") || "-";
 	const paragraphs = c.story
 		.split(/\n{2,}|\n/)
 		.map((p) => p.trim())
@@ -169,7 +169,7 @@ export function PublicCaseView({
 					{c.category || "Case"}
 				</span>
 				<span className="rounded-[var(--radius-chip)] border border-border px-2.5 py-0.5 text-[12px] text-ink-soft">
-					{c.location || "—"}
+					{c.location || "-"}
 				</span>
 				<span
 					className={cn(
@@ -375,7 +375,7 @@ export function PublicCaseView({
 													: "bg-green-soft text-green-deep",
 											)}
 										>
-											{b.anonymous ? "—" : initials(b.displayName)}
+											{b.anonymous ? "-" : initials(b.displayName)}
 										</span>
 										<span className="min-w-0 flex-1 truncate font-semibold text-[13px] text-ink">
 											{b.displayName}

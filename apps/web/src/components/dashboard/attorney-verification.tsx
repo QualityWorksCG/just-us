@@ -229,10 +229,10 @@ export function AttorneyVerification({ data }: { data: VerificationView }) {
 							<p className="font-semibold text-[12.5px] text-ink">
 								What we searched for
 							</p>
-							<Detail label="Name" value={check.checkedName ?? "—"} muted />
+							<Detail label="Name" value={check.checkedName ?? "-"} muted />
 							<Detail
 								label="Jurisdiction"
-								value={check.checkedJurisdiction ?? "—"}
+								value={check.checkedJurisdiction ?? "-"}
 								muted
 							/>
 						</div>

@@ -428,6 +428,7 @@ export type PendingInvitationForAttorney = {
 	caseTitle: string;
 	category: string;
 	location: string;
+	jurisdiction: "state" | "federal";
 	goalCents: number;
 	plaintiffName: string;
 };
@@ -477,6 +478,7 @@ export async function pendingInvitationsForEmail(
 					title: true,
 					category: true,
 					location: true,
+					jurisdiction: true,
 					goalCents: true,
 					owner: { select: { name: true } },
 				},
@@ -491,6 +493,7 @@ export async function pendingInvitationsForEmail(
 		caseTitle: row.case.title,
 		category: row.case.category,
 		location: row.case.location,
+		jurisdiction: row.case.jurisdiction,
 		goalCents: row.case.goalCents,
 		plaintiffName: row.case.owner.name,
 	}));
@@ -502,6 +505,7 @@ export type DeclinedInvitationForAttorney = {
 	caseTitle: string;
 	category: string;
 	location: string;
+	jurisdiction: "state" | "federal";
 	plaintiffName: string;
 	declinedAt: Date;
 };
@@ -538,6 +542,7 @@ export async function declinedInvitationsForEmail(
 					title: true,
 					category: true,
 					location: true,
+					jurisdiction: true,
 					owner: { select: { name: true } },
 				},
 			},
@@ -550,6 +555,7 @@ export async function declinedInvitationsForEmail(
 		caseTitle: row.case.title,
 		category: row.case.category,
 		location: row.case.location,
+		jurisdiction: row.case.jurisdiction,
 		plaintiffName: row.case.owner.name,
 		// Non-null: the `declinedAt: { not: null }` predicate above guarantees it.
 		declinedAt: row.declinedAt as Date,

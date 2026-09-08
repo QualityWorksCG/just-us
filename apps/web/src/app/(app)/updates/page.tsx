@@ -35,7 +35,7 @@ function initials(name: string) {
 			.split(/\s+/)
 			.slice(0, 2)
 			.map((p) => p[0]?.toUpperCase() ?? "")
-			.join("") || "—"
+			.join("") || "-"
 	);
 }
 
@@ -240,7 +240,7 @@ function CaseUpdateCard({
 						{group.title}
 					</p>
 					<p className="truncate text-[12.5px] text-muted-foreground">
-						{meta || "—"}
+						{meta || "-"}
 					</p>
 				</div>
 				{group.unread > 0 ? (

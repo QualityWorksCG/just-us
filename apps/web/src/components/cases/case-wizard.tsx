@@ -1020,7 +1020,7 @@ export function CaseWizard({
 								{displayTitle}
 							</p>
 							<p className="mt-0.5 text-[12.5px] text-muted-foreground">
-								{category} · {state || "—"} · goal {money(goal)}
+								{category} · {state || "-"} · goal {money(goal)}
 							</p>
 						</div>
 						<span className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-pill)] bg-brass-wash px-3 py-1 font-mono font-semibold text-[11px] text-brass-deep uppercase tracking-[0.06em]">
@@ -1156,7 +1156,7 @@ export function CaseWizard({
 								{displayTitle}
 							</p>
 							<p className="mt-0.5 text-[12.5px] text-muted-foreground">
-								{category} · {state || "—"} · 0 requests yet · published just
+								{category} · {state || "-"} · 0 requests yet · published just
 								now
 							</p>
 						</div>
@@ -1655,7 +1655,7 @@ export function CaseWizard({
 												classifyingCategory
 													? "Analyzing your story to suggest a category…"
 													: !categoryTouched && category
-														? "Suggested from your story — change it if it's not right."
+														? "Suggested from your story. Change it if it's not right."
 														: undefined
 											}
 										>
@@ -1688,7 +1688,7 @@ export function CaseWizard({
 												</SelectContent>
 											</Select>
 										</Field>
-										<Field label="State" hint="Prefilled from your onboarding">
+										<Field label="State">
 											<Select
 												value={state}
 												onValueChange={(v: string | null) => setState(v ?? "")}
@@ -1713,7 +1713,7 @@ export function CaseWizard({
 
 									<Field
 										label="Court system"
-										hint="Not sure? State courts handle most disputes (employment, injury, contracts, family). Federal courts handle U.S. law, constitutional claims, cases across state lines, or ones against the federal government. Your attorney can confirm — this decides which attorneys can take your case."
+										hint="Not sure? State courts handle most disputes (employment, injury, contracts, family). Federal courts handle U.S. law, constitutional claims, cases across state lines, or ones against the federal government. Your attorney can confirm; this decides which attorneys can take your case."
 									>
 										<div className="grid grid-cols-2 gap-2">
 											{(
