@@ -42,7 +42,7 @@ const STEPS: { icon: LucideIcon; title: string; body: string }[] = [
 const ASSURANCES = [
 	"Free to start",
 	"You connect with your own attorney",
-	"Funds land in your account",
+	"Funds go straight to your attorney's firm",
 ];
 
 export default async function StartNewCasePage() {

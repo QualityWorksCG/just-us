@@ -1,5 +1,6 @@
 "use server";
 
+import { markAttorneyEvidenceSeen } from "@just-us/db/cases";
 import { expressInterest, withdrawInterest } from "@just-us/db/representation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -97,7 +98,7 @@ export async function withdrawInterestAction(
 
 const WITHDRAW_FAILURE_MESSAGES = {
 	not_found:
-		"There's no expression of interest to withdraw — it may already be gone.",
+		"There's no expression of interest to withdraw. It may already be gone.",
 	already_matched:
 		"This plaintiff has already taken your interest forward, so it can't be withdrawn here.",
 } as const;
@@ -116,3 +117,21 @@ const FAILURE_MESSAGES = {
 		"This case is no longer seeking representation. It's been matched, funded, or withdrawn.",
 	already_expressed: "You've already expressed interest in this case.",
 } as const;
+
+/**
+ * The attorney marks this case's new evidence as reviewed, clearing the "new
+ * evidence" highlight on the case and the intakes list.
+ *
+ * Scoped to the matched attorney inside `markAttorneyEvidenceSeen`, so a stranger's
+ * id stamps nothing. This is deliberately explicit rather than fired on page load:
+ * the cue must persist across visits until the attorney says they've looked.
+ */
+export async function markEvidenceReviewedAction(
+	caseId: string,
+): Promise<{ ok: boolean }> {
+	const { session } = await requireRole("attorney");
+	await markAttorneyEvidenceSeen(caseId, session.user.id).catch(() => null);
+	revalidatePath(`/my-cases/${caseId}`);
+	revalidatePath("/my-cases");
+	return { ok: true };
+}

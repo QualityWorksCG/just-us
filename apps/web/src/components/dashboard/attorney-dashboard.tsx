@@ -229,7 +229,7 @@ export function AttorneyDashboard({
 												{c.title || "Untitled intake"}
 											</p>
 											<p className="truncate text-[12px] text-muted-foreground">
-												{badge.text} · {c.state || "—"}
+												{badge.text} · {c.state || "-"}
 											</p>
 										</Link>
 										<span className="shrink-0 text-[12.5px] text-ink-soft tabular-nums">

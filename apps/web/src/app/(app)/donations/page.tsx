@@ -261,7 +261,7 @@ function GiftsTable({ rows }: { rows: DonationRows }) {
 												className="text-muted-foreground"
 												title="No receipt was recorded for this gift."
 											>
-												—
+												-
 											</span>
 										)}
 									</td>

@@ -73,7 +73,7 @@ export function FederalVerification({ status }: { status: Status }) {
 						? "Your federal standing is verified."
 						: res.status === "rejected"
 							? "We couldn't confirm your federal standing."
-							: "Federal check saved — it needs a closer look.",
+							: "Federal check saved. It needs a closer look.",
 				);
 				router.refresh();
 			} else {

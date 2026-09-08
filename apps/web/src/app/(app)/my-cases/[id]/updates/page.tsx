@@ -141,14 +141,14 @@ export default async function CaseUpdatesPage({
 							</p>
 							<div className="mt-3 flex items-center gap-3">
 								<span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-green-deep font-bold text-[13px] text-white">
-									{firstName(clientName)[0]?.toUpperCase() ?? "—"}
+									{firstName(clientName)[0]?.toUpperCase() ?? "-"}
 								</span>
 								<div className="min-w-0">
 									<p className="truncate font-bold text-[14.5px] text-ink">
 										{clientName}
 									</p>
 									<p className="text-[12.5px] text-muted-foreground">
-										Plaintiff · {location || "—"}
+										Plaintiff · {location || "-"}
 									</p>
 								</div>
 							</div>

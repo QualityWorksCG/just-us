@@ -10,6 +10,7 @@ import {
 	MapPin,
 	Megaphone,
 	Search,
+	Sparkles,
 	Users,
 	X,
 } from "lucide-react";
@@ -54,6 +55,7 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 	const [query, setQuery] = useState("");
 	const [selStates, setSelStates] = useState<string[]>([]);
 	const [status, setStatus] = useState<StatusKey | "all">("all");
+	const [court, setCourt] = useState<"all" | "state" | "federal">("all");
 
 	// Holding-up first, then live, then the rest; publication order within a group.
 	const ordered = useMemo(
@@ -75,6 +77,12 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		return (["active", "fee", "awaiting", "closed"] as StatusKey[]).filter(
 			(s) => present.has(s),
 		);
+	}, [cases]);
+	// The Court filter only earns its place when the attorney actually holds both
+	// state and federal intakes — a single-court practice has nothing to sift.
+	const hasBothCourts = useMemo(() => {
+		const kinds = new Set(cases.map((c) => c.jurisdiction));
+		return kinds.has("state") && kinds.has("federal");
 	}, [cases]);
 
 	if (cases.length === 0) {
@@ -111,6 +119,7 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 
 	const q = query.trim().toLowerCase();
 	const filtered = ordered.filter((c) => {
+		if (court !== "all" && c.jurisdiction !== court) return false;
 		if (selStates.length && !selStates.includes(c.state)) return false;
 		if (status !== "all" && statusKey(c) !== status) return false;
 		if (
@@ -123,7 +132,8 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		return true;
 	});
 
-	const hasFilters = !!q || selStates.length > 0 || status !== "all";
+	const hasFilters =
+		!!q || selStates.length > 0 || status !== "all" || court !== "all";
 	// The filter bar earns its space only once there's more than one intake to sift.
 	const showFilters = cases.length > 1;
 
@@ -136,6 +146,7 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		setQuery("");
 		setSelStates([]);
 		setStatus("all");
+		setCourt("all");
 	}
 
 	return (
@@ -201,6 +212,33 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 							))}
 						</div>
 					</div>
+
+					{hasBothCourts && (
+						<div className="flex flex-wrap items-center gap-1.5 border-border border-t pt-3">
+							<span className="mr-1 inline-flex items-center gap-1 font-mono font-semibold text-[10.5px] text-muted-foreground uppercase tracking-[0.08em]">
+								<Landmark className="size-3.5" aria-hidden="true" />
+								Court
+							</span>
+							<FilterPill
+								active={court === "all"}
+								onClick={() => setCourt("all")}
+							>
+								All courts
+							</FilterPill>
+							<FilterPill
+								active={court === "state"}
+								onClick={() => setCourt("state")}
+							>
+								State
+							</FilterPill>
+							<FilterPill
+								active={court === "federal"}
+								onClick={() => setCourt("federal")}
+							>
+								Federal
+							</FilterPill>
+						</div>
+					)}
 
 					{states.length > 1 && (
 						<div className="flex flex-wrap items-center gap-1.5 border-border border-t pt-3">
@@ -354,6 +392,25 @@ function CaseRow({ case: c }: { case: AttorneyCase }) {
 						{badge.text}
 					</span>
 					<PayoutChip case={c} />
+					<span
+						className={cn(
+							"inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 font-mono font-semibold text-[10px] uppercase tracking-[0.06em]",
+							c.jurisdiction === "federal"
+								? "bg-ink text-paper"
+								: "bg-brass-wash text-brass-deep",
+						)}
+					>
+						<Landmark className="size-3" aria-hidden="true" />
+						{c.jurisdiction === "federal" ? "Federal court" : "State court"}
+					</span>
+					{c.newEvidenceCount > 0 && (
+						<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-brass px-2.5 py-1 font-mono font-semibold text-[10px] text-white uppercase tracking-[0.06em]">
+							<Sparkles className="size-3" aria-hidden="true" />
+							{c.newEvidenceCount === 1
+								? "New evidence"
+								: `${c.newEvidenceCount} new evidence`}
+						</span>
+					)}
 				</div>
 				<h2 className="mt-2 font-bold text-[17px] text-ink leading-snug">
 					{c.title || "Untitled intake"}

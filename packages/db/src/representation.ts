@@ -562,6 +562,7 @@ export async function listMyInterests(attorneyId: string) {
 			title: row.case.title,
 			category: row.case.category,
 			state: row.case.location,
+			jurisdiction: row.case.jurisdiction,
 			summary: row.case.summary,
 			plaintiffName: row.case.owner.name,
 		},
@@ -614,6 +615,7 @@ const myCaseSelect = {
 	title: true,
 	category: true,
 	location: true,
+	jurisdiction: true,
 	summary: true,
 	status: true,
 	goalCents: true,
@@ -622,6 +624,10 @@ const myCaseSelect = {
 	coverImageUrl: true,
 	publishedAt: true,
 	createdAt: true,
+	// Evidence + when this attorney last looked at it, so the list can flag a case
+	// the plaintiff has filed something new on since (JUS-100 follow-up).
+	evidence: true,
+	attorneyEvidenceSeenAt: true,
 	// Whether the plaintiff has opened donations against the account — their step,
 	// not the attorney's, and worth telling them apart.
 	payoutAccountId: true,
@@ -659,6 +665,8 @@ export type AttorneyCase = {
 	category: string;
 	/** The state the case is in — `Case.location`. */
 	state: string;
+	/** State-court or federal action — decides which attorneys can take it. */
+	jurisdiction: "state" | "federal";
 	summary: string;
 	status: CaseStatus;
 	/** The agreed fee in cents — the funding goal. 0 until a fee is agreed. */
@@ -679,6 +687,12 @@ export type AttorneyCase = {
 	payout: AttorneyCasePayout;
 	/** Progress updates posted on this case so far (JUS-33). */
 	updatesCount: number;
+	/** Evidence the plaintiff filed since this attorney last marked evidence
+	 *  reviewed — the "new evidence" flag on the intakes list. 0 when none. */
+	newEvidenceCount: number;
+	/** When this attorney last marked this case's evidence reviewed. Evidence with
+	 *  a newer `addedAt` is new; null means they never have. */
+	evidenceSeenAt: Date | null;
 };
 
 function toAttorneyCase(
@@ -687,6 +701,7 @@ function toAttorneyCase(
 		title: string;
 		category: string;
 		location: string;
+		jurisdiction: "state" | "federal";
 		summary: string;
 		status: CaseStatus;
 		goalCents: number;
@@ -695,6 +710,8 @@ function toAttorneyCase(
 		coverImageUrl: string | null;
 		publishedAt: Date | null;
 		createdAt: Date;
+		evidence: unknown;
+		attorneyEvidenceSeenAt: Date | null;
 		payoutAccountId: string | null;
 		payoutAccountForCase: {
 			userId: string;
@@ -715,11 +732,18 @@ function toAttorneyCase(
 		row.payoutAccountForCase?.userId === userId
 			? row.payoutAccountForCase
 			: null;
+	const evidenceSeenMs = row.attorneyEvidenceSeenAt
+		? row.attorneyEvidenceSeenAt.getTime()
+		: 0;
+	const newEvidenceCount = caseEvidence(row.evidence, row.id).filter(
+		(e) => e.addedAt && new Date(e.addedAt).getTime() > evidenceSeenMs,
+	).length;
 	return {
 		id: row.id,
 		title: row.title,
 		category: row.category,
 		state: row.location,
+		jurisdiction: row.jurisdiction,
 		summary: row.summary,
 		status: row.status,
 		goalCents: row.goalCents,
@@ -733,6 +757,8 @@ function toAttorneyCase(
 		origin: row.match?.origin ?? null,
 		matchedAt: row.match?.createdAt ?? null,
 		updatesCount: row._count.updates,
+		newEvidenceCount,
+		evidenceSeenAt: row.attorneyEvidenceSeenAt,
 		payout: {
 			bound: !!row.payoutAccountId,
 			hasAccount: !!account,
@@ -795,12 +821,13 @@ export async function getAttorneyCase(input: {
 	});
 	if (!row) return null;
 
-	const { story, evidence, images, ...rest } = row;
 	return {
-		...toAttorneyCase(rest, input.userId),
-		story,
-		evidence: caseEvidence(evidence, row.id),
-		images,
+		// The full row carries the extra `story`/`images`/`evidence` too; toAttorneyCase
+		// reads only the fields it needs (including `evidence`, for the new-count).
+		...toAttorneyCase(row, input.userId),
+		story: row.story,
+		evidence: caseEvidence(row.evidence, row.id),
+		images: row.images,
 	};
 }
 

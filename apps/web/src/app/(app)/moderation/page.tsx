@@ -203,7 +203,7 @@ export default async function ModerationPage({
 							Median time to a ruling:{" "}
 							<span className="font-semibold text-ink">
 								{week.medianHours === null
-									? "—"
+									? "-"
 									: `${week.medianHours.toFixed(1)} hours`}
 							</span>
 						</div>

@@ -430,6 +430,12 @@ export type CaseEvidence = {
 	kind: "file" | "link" | "record";
 	/** Where to send the viewer, or null for a `record`. */
 	href: string | null;
+	/** Position in the stored array — how the serving route addresses a file, and
+	 *  what the owner's "remove" action names an entry by. */
+	index: number;
+	/** ISO timestamp, set only when the plaintiff filed it *after* the case was up.
+	 *  Null for original (wizard) evidence — which is never flagged as new. */
+	addedAt: string | null;
 };
 
 type StoredEvidence = {
@@ -437,6 +443,7 @@ type StoredEvidence = {
 	size?: unknown;
 	url?: unknown;
 	kind?: unknown;
+	addedAt?: unknown;
 };
 
 /** The stored rows, filtered to the ones with a usable name. Index is preserved
@@ -478,8 +485,144 @@ export function caseEvidence(json: unknown, caseId: string): CaseEvidence[] {
 					: kind === "file"
 						? `/api/cases/${caseId}/evidence/${at}`
 						: null,
+			index: at,
+			addedAt: typeof item.addedAt === "string" ? item.addedAt : null,
 		};
 	});
+}
+
+/** A new evidence entry a plaintiff files after their case is already up. */
+export type NewEvidence = {
+	name: string;
+	url: string;
+	size?: number;
+	kind: "file" | "link";
+};
+
+/**
+ * Append evidence to a live case the plaintiff already owns — the "add more after
+ * the fact" path, distinct from the wizard's wholesale write.
+ *
+ * Scoped to the owner and to a case that is genuinely under way (live, seeking, or
+ * awaiting payout): a draft is still edited in the wizard, and a closed case is a
+ * finished record. New rows are appended to whatever is stored so existing indices
+ * — which the serving route addresses files by — never shift. Returns the id of
+ * the attorney representing the case, if any, so the caller can notify them.
+ */
+export async function addEvidenceToOwnedCase(input: {
+	caseId: string;
+	ownerId: string;
+	items: NewEvidence[];
+}): Promise<
+	| { ok: true; addedCount: number; attorneyId: string | null }
+	| { ok: false; reason: "not_found" | "wrong_status" | "empty" }
+> {
+	const clean = input.items.filter(
+		(i) => typeof i.url === "string" && i.url && typeof i.name === "string",
+	);
+	if (clean.length === 0) return { ok: false, reason: "empty" };
+
+	const kase = await prisma.case.findFirst({
+		where: { id: input.caseId, ownerId: input.ownerId, deletedAt: null },
+		select: {
+			evidence: true,
+			status: true,
+			match: { select: { attorneyId: true } },
+		},
+	});
+	if (!kase) return { ok: false, reason: "not_found" };
+	if (
+		!(["live", "seeking", "pending_payout"] as string[]).includes(kase.status)
+	) {
+		return { ok: false, reason: "wrong_status" };
+	}
+
+	const existing = Array.isArray(kase.evidence) ? kase.evidence : [];
+	// `addedAt` marks a filing as post-creation, so the attorney's screen can flag
+	// what arrived after they last looked. Wizard evidence has none, so it never
+	// reads as new.
+	const now = new Date().toISOString();
+	const appended = clean.map((i) => ({
+		name: i.name,
+		url: i.url,
+		kind: i.kind,
+		addedAt: now,
+		...(typeof i.size === "number" ? { size: i.size } : {}),
+	}));
+	await prisma.case.update({
+		where: { id: input.caseId },
+		data: { evidence: [...existing, ...appended] },
+	});
+	return {
+		ok: true,
+		addedCount: appended.length,
+		attorneyId: kase.match?.attorneyId ?? null,
+	};
+}
+
+/**
+ * Mark this case's evidence as seen by the attorney representing it, returning the
+ * timestamp of their *previous* visit so the caller can flag anything filed since.
+ *
+ * Scoped to the matched attorney — only the case's own attorney reads it, so a
+ * stranger's id stamps nothing. Mirrors `markCaseUpdatesSeenByOwner`: the read of
+ * the old value and the write of the new happen together, so opening the screen is
+ * exactly what clears the "new evidence" flag next time.
+ */
+export async function markAttorneyEvidenceSeen(
+	caseId: string,
+	attorneyId: string,
+): Promise<Date | null> {
+	const kase = await prisma.case.findFirst({
+		where: { id: caseId, match: { attorneyId } },
+		select: { attorneyEvidenceSeenAt: true },
+	});
+	if (!kase) return null;
+	const previous = kase.attorneyEvidenceSeenAt;
+	await prisma.case.update({
+		where: { id: caseId },
+		data: { attorneyEvidenceSeenAt: new Date() },
+	});
+	return previous;
+}
+
+/**
+ * Remove one evidence entry from a case the plaintiff owns, by its position in the
+ * stored array (the same index the serving route and `caseEvidence` address it by).
+ *
+ * Owner-scoped and limited to a case still under way, like the add path. The whole
+ * array is rewritten with that one entry dropped; the remaining indices shift, so
+ * the caller re-reads the list afterwards to get fresh positions.
+ */
+export async function removeEvidenceFromOwnedCase(input: {
+	caseId: string;
+	ownerId: string;
+	index: number;
+}): Promise<
+	{ ok: true } | { ok: false; reason: "not_found" | "wrong_status" }
+> {
+	const kase = await prisma.case.findFirst({
+		where: { id: input.caseId, ownerId: input.ownerId, deletedAt: null },
+		select: { evidence: true, status: true },
+	});
+	if (!kase) return { ok: false, reason: "not_found" };
+	if (
+		!(["live", "seeking", "pending_payout"] as string[]).includes(kase.status)
+	) {
+		return { ok: false, reason: "wrong_status" };
+	}
+
+	const existing = Array.isArray(kase.evidence) ? kase.evidence : [];
+	if (input.index < 0 || input.index >= existing.length) {
+		// Nothing at that position — treat as already gone rather than an error.
+		return { ok: true };
+	}
+	const next = existing.filter((_, i) => i !== input.index);
+	await prisma.case.update({
+		where: { id: input.caseId },
+		data: { evidence: next },
+	});
+	return { ok: true };
 }
 
 /**

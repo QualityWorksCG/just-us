@@ -5,6 +5,7 @@ import { cn } from "@just-us/ui/lib/utils";
 import {
 	CalendarClock,
 	FileText,
+	Landmark,
 	Link2,
 	MapPin,
 	Paperclip,
@@ -44,13 +45,13 @@ function initials(name: string) {
 			.split(/\s+/)
 			.slice(0, 2)
 			.map((part) => part[0]?.toUpperCase() ?? "")
-			.join("") || "—"
+			.join("") || "-"
 	);
 }
 
 /** File size as the plaintiff would recognise it, from the stored byte count. */
 function fileSize(bytes: number) {
-	if (bytes <= 0) return "—";
+	if (bytes <= 0) return "-";
 	if (bytes < 1024) return `${bytes} B`;
 	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -135,7 +136,7 @@ function expressInterestGate(
 			return {
 				canExpress: false,
 				title: "Your federal standing is still being verified",
-				body: "This is a federal case. Your federal-court check is in progress — you'll be able to express interest the moment it clears.",
+				body: "This is a federal case. Your federal-court check is in progress. You'll be able to express interest the moment it clears.",
 				cta: "View your profile",
 			};
 		}
@@ -319,7 +320,20 @@ export function QueueCaseDetailView({
 						</span>
 						<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-green-soft px-2.5 py-0.5 font-semibold text-[12px] text-green-deep">
 							<MapPin className="size-3.5" aria-hidden="true" />
-							{item.state || "—"}
+							{item.state || "-"}
+						</span>
+						<span
+							className={cn(
+								"inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] px-2.5 py-0.5 font-semibold text-[12px]",
+								item.jurisdiction === "federal"
+									? "bg-ink text-paper"
+									: "bg-brass-wash text-brass-deep",
+							)}
+						>
+							<Landmark className="size-3.5" aria-hidden="true" />
+							{item.jurisdiction === "federal"
+								? "Federal court"
+								: "State court"}
 						</span>
 						<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] bg-surface-2 px-2.5 py-0.5 font-semibold text-[12px] text-ink-soft">
 							<CalendarClock className="size-3.5" aria-hidden="true" />
@@ -424,7 +438,7 @@ export function QueueCaseDetailView({
 							</ul>
 							<p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
 								{canReviewEvidence
-									? "Filed by the plaintiff. Open a document to review it before you decide — it opens in a new tab."
+									? "Filed by the plaintiff. Open a document to review it before you decide; it opens in a new tab."
 									: "Filed by the plaintiff. Express interest to open and review the documents."}
 							</p>
 						</>
@@ -438,8 +452,8 @@ export function QueueCaseDetailView({
 				<Panel icon={UserRound} title="The plaintiff">
 					<dl className="flex flex-col gap-2.5 text-[13px]">
 						<Row label="Name" value={item.plaintiffName} />
-						<Row label="Jurisdiction" value={item.state || "—"} />
-						<Row label="Matter type" value={item.category || "—"} />
+						<Row label="Jurisdiction" value={item.state || "-"} />
+						<Row label="Matter type" value={item.category || "-"} />
 					</dl>
 					<p className="mt-3 flex items-start gap-2 border-border border-t pt-3 text-[12px] text-muted-foreground leading-relaxed">
 						<ShieldCheck

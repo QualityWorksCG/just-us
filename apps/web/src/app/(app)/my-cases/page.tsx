@@ -314,7 +314,7 @@ export default async function MyCasesPage({
 										{c.title || "Untitled case"}
 									</h2>
 									<p className="mt-1 text-[12.5px] text-muted-foreground">
-										{meta || "—"}
+										{meta || "-"}
 									</p>
 
 									<div className="mt-3 flex-1">

@@ -77,7 +77,7 @@ const caseCardMeta: React.CSSProperties = {
 
 CaseInviteEmail.PreviewProps = {
 	inviteUrl: "https://example.com/case-invite?token=abc123",
-	caseTitle: "Wrongful termination — Hale v. Brightline Logistics",
+	caseTitle: "Wrongful termination: Hale v. Brightline Logistics",
 	plaintiffName: "Maya Roberts",
 	attorneyName: "Jane Rivera",
 	hasAccount: false,

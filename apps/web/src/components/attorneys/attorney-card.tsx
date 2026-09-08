@@ -216,7 +216,7 @@ export function AttorneyCard({
 								“{attorney.topReview.quote}”
 							</span>{" "}
 							<span className="text-muted-foreground">
-								— {attorney.topReview.byline}
+								- {attorney.topReview.byline}
 							</span>
 						</p>
 					)}

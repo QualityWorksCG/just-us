@@ -32,7 +32,7 @@ export function WithdrawRequestButton({
 			const res = await withdrawInviteAction(caseId);
 			if (res.ok) {
 				toast.success("Request withdrawn", {
-					description: `${attorneyFirstName}'s link no longer works. Your case is a private draft — pick another attorney whenever you're ready.`,
+					description: `${attorneyFirstName}'s link no longer works. Your case is a private draft. Pick another attorney whenever you're ready.`,
 				});
 				router.push(`/find-attorney?draft=${caseId}`);
 			} else {

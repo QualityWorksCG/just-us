@@ -2,7 +2,7 @@ import {
 	listCaseUpdates,
 	markCaseUpdatesSeenByOwner,
 } from "@just-us/db/case-updates";
-import { getOwnedCase } from "@just-us/db/cases";
+import { caseEvidence, getOwnedCase } from "@just-us/db/cases";
 import { countCaseFollowers } from "@just-us/db/follows";
 import { listMessageConversations } from "@just-us/db/messages";
 import { bindReadyLiveCase, getCasePayoutOptions } from "@just-us/db/payouts";
@@ -50,10 +50,11 @@ export default async function CasePage({
 	// the progress updates.
 	const { session, role } = await requireRole("plaintiff", "attorney");
 	const { id } = await params;
-	// `?tab=edit` opens straight on the editor — how the case list's edit control
-	// arrives here. Anything else falls back to the overview rather than erroring:
-	// it is a view preference in a URL people share and re-type.
-	const tab = (await searchParams)?.tab === "edit" ? "edit" : "overview";
+	// `?tab=` is a shared view preference: the plaintiff editor opens on `edit`, and
+	// the attorney's "new evidence" notification opens on `intake`. Anything else
+	// falls back rather than erroring — it is a URL people share and re-type.
+	const rawTab = (await searchParams)?.tab;
+	const tab = rawTab === "edit" ? "edit" : "overview";
 
 	// Before reading the case: fold in any donation that was paid at Stripe but is
 	// still pending here because its webhook was late, lost, or never forwarded.
@@ -65,7 +66,7 @@ export default async function CasePage({
 	await bindReadyLiveCase(id);
 
 	if (role === "attorney") {
-		return <AttorneyView caseId={id} session={session} />;
+		return <AttorneyView caseId={id} session={session} tab={rawTab} />;
 	}
 
 	const c = await getOwnedCase(id, session.user.id);
@@ -105,6 +106,7 @@ export default async function CasePage({
 		followerCount,
 		coverImageUrl: c.coverImageUrl,
 		images: c.images ?? [],
+		evidence: caseEvidence(c.evidence, c.id),
 		thankYouNote: c.thankYouNote,
 		attorneyName: c.attorneyName,
 		attorneyFirm: c.attorneyFirm,
@@ -234,9 +236,12 @@ export default async function CasePage({
 async function AttorneyView({
 	caseId,
 	session,
+	tab,
 }: {
 	caseId: string;
 	session: { user: { id: string; email: string; name: string } };
+	/** The `?tab=` preference — `intake` opens the case's intake/evidence tab. */
+	tab?: string;
 }) {
 	const [item, conversations, updates] = await Promise.all([
 		getAttorneyCase({
@@ -248,6 +253,9 @@ async function AttorneyView({
 		listCaseUpdates(caseId, { includeModerated: true }),
 	]);
 	if (!item) notFound();
+	// The new-evidence highlight is NOT cleared just by opening the case — it stays
+	// until the attorney explicitly marks it reviewed (see the Evidence panel), so a
+	// reload doesn't make the cue vanish before they've acted on it.
 
 	// Threads are found by the other participant: an attorney has one conversation
 	// per client, and the client is the only person on the other side of this case.
@@ -266,6 +274,7 @@ async function AttorneyView({
 			<AttorneyCaseDetailView
 				item={item}
 				conversationId={conversationId}
+				initialTab={tab === "intake" ? "case" : undefined}
 				payoutsConfigured={isPaymentsConfigured()}
 				payoutPanel={
 					// CasePayoutSetup reads ?payout= to detect the return from Stripe's

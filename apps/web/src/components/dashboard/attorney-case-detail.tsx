@@ -15,6 +15,7 @@ import {
 	Paperclip,
 	Scale,
 	ShieldCheck,
+	Sparkles,
 	Tag,
 	Users,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import {
 	payoutStage,
 } from "@/components/dashboard/attorney-payout";
 import { CaseTabs } from "@/components/dashboard/case-tabs";
+import { MarkEvidenceReviewedButton } from "@/components/dashboard/mark-evidence-reviewed-button";
 
 /**
  * One case an attorney is acting on.
@@ -59,7 +61,7 @@ function initials(name: string) {
 			.split(/\s+/)
 			.slice(0, 2)
 			.map((part) => part[0]?.toUpperCase() ?? "")
-			.join("") || "—"
+			.join("") || "-"
 	);
 }
 
@@ -80,12 +82,24 @@ function fileSize(bytes: number | null) {
  * An entry from before documents were stored is neither, and is rendered plainly
  * rather than as a link that would 404.
  */
-function EvidenceRow({ file }: { file: CaseEvidence }) {
+function EvidenceRow({
+	file,
+	isNew,
+}: {
+	file: CaseEvidence;
+	/** Filed by the plaintiff since the attorney last opened the case. */
+	isNew?: boolean;
+}) {
 	const Icon = file.kind === "link" ? Link2 : Paperclip;
 	const size = fileSize(file.size);
 
 	return (
-		<li className="flex items-center gap-2.5 rounded-[var(--radius-card)] border border-border bg-paper-alt px-3 py-2">
+		<li
+			className={cn(
+				"flex items-center gap-2.5 rounded-[var(--radius-card)] border px-3 py-2",
+				isNew ? "border-brass bg-brass-wash/60" : "border-border bg-paper-alt",
+			)}
+		>
 			<Icon className="size-3.5 shrink-0 text-brass-deep" aria-hidden="true" />
 			{file.href ? (
 				<a
@@ -99,6 +113,11 @@ function EvidenceRow({ file }: { file: CaseEvidence }) {
 			) : (
 				<span className="min-w-0 flex-1 truncate font-semibold text-[13px] text-ink">
 					{file.name}
+				</span>
+			)}
+			{isNew && (
+				<span className="shrink-0 rounded-[var(--radius-pill)] bg-brass px-1.5 py-0.5 font-bold font-mono text-[9px] text-white uppercase tracking-[0.06em]">
+					New
 				</span>
 			)}
 			<span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
@@ -126,6 +145,7 @@ const PAYOUT_GLANCE: Record<PayoutStage, { value: string; hint: string }> = {
 export function AttorneyCaseDetailView({
 	item,
 	conversationId,
+	initialTab,
 	payoutsConfigured,
 	payoutPanel,
 	updatesPanel,
@@ -133,6 +153,10 @@ export function AttorneyCaseDetailView({
 	item: AttorneyCaseDetail;
 	/** An existing thread with this client, if they have started one. */
 	conversationId: string | null;
+	/** Force a tab open on load (a CaseTabs key, e.g. "case" for the intake), from
+	 *  a `?tab=` link such as the "new evidence" notification. Falls back to the
+	 *  computed default. */
+	initialTab?: string;
 	/** Whether Stripe is configured at all in this environment — without it there
 	 *  is no payout stage to report and nothing outstanding to chase. */
 	payoutsConfigured: boolean;
@@ -155,6 +179,14 @@ export function AttorneyCaseDetailView({
 		item.goalCents > 0
 			? Math.min(100, Math.round((item.raisedCents / item.goalCents) * 100))
 			: 0;
+
+	// Evidence the plaintiff filed since this attorney last marked it reviewed. The
+	// flag persists across visits — it is not cleared by merely opening the case —
+	// so they can act on it; the "Mark reviewed" control below stands it down.
+	const seenMs = item.evidenceSeenAt ? item.evidenceSeenAt.getTime() : 0;
+	const isNewEvidence = (file: (typeof item.evidence)[number]) =>
+		!!file.addedAt && new Date(file.addedAt).getTime() > seenMs;
+	const newEvidenceCount = item.evidence.filter(isNewEvidence).length;
 
 	// "Fee not agreed" only where no fee is agreed. It used to be the catch-all for
 	// everything that wasn't live or closed, which called a finished case awaiting
@@ -210,7 +242,7 @@ export function AttorneyCaseDetailView({
 					</span>
 					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border border-border px-2.5 py-0.5 text-[12px] text-ink-soft">
 						<MapPin className="size-3.5" aria-hidden="true" />
-						{item.state || "—"}
+						{item.state || "-"}
 					</span>
 				</div>
 
@@ -315,7 +347,10 @@ export function AttorneyCaseDetailView({
 				label="Intake sections"
 				// Opens on payouts whenever they are outstanding: that is the work only
 				// the attorney can do, and their client is stuck behind it.
-				initialKey={payoutOutstanding ? "funding" : isLive ? "updates" : "case"}
+				initialKey={
+					initialTab ??
+					(payoutOutstanding ? "funding" : isLive ? "updates" : "case")
+				}
 				tabs={[
 					// Progress updates only exist once the case is live and raising — there
 					// is nothing to post, and no backers to read it, while it is still out
@@ -375,11 +410,29 @@ export function AttorneyCaseDetailView({
 								<Panel icon={Paperclip} title="Evidence">
 									{item.evidence.length > 0 ? (
 										<>
+											{newEvidenceCount > 0 && (
+												<div className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brass bg-brass-wash/60 px-3 py-2">
+													<Sparkles
+														className="size-4 shrink-0 text-brass-deep"
+														aria-hidden="true"
+													/>
+													<p className="min-w-[12ch] flex-1 text-[12.5px] text-ink leading-snug">
+														<span className="font-bold">
+															{newEvidenceCount === 1
+																? "1 new filing"
+																: `${newEvidenceCount} new filings`}
+														</span>{" "}
+														from your client since you last reviewed.
+													</p>
+													<MarkEvidenceReviewedButton caseId={item.id} />
+												</div>
+											)}
 											<ul className="flex flex-col gap-2">
 												{item.evidence.map((file, i) => (
 													<EvidenceRow
 														key={`${file.name}-${file.kind}-${i}`}
 														file={file}
+														isNew={isNewEvidence(file)}
 													/>
 												))}
 											</ul>
