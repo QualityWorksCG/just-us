@@ -63,7 +63,8 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		[cases],
 	);
 	// The states an attorney can filter by are only the ones they actually have
-	// intakes in — a multi-state practice sees each, a single-state one sees none.
+	// intakes in — shown whenever there's at least one, so the field stays present
+	// (and uniform with Court) even for a single intake.
 	const states = useMemo(
 		() =>
 			[...new Set(cases.map((c) => c.state).filter(Boolean))].sort((a, b) =>
@@ -77,12 +78,6 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 		return (["active", "fee", "awaiting", "closed"] as StatusKey[]).filter(
 			(s) => present.has(s),
 		);
-	}, [cases]);
-	// The Court filter only earns its place when the attorney actually holds both
-	// state and federal intakes — a single-court practice has nothing to sift.
-	const hasBothCourts = useMemo(() => {
-		const kinds = new Set(cases.map((c) => c.jurisdiction));
-		return kinds.has("state") && kinds.has("federal");
 	}, [cases]);
 
 	if (cases.length === 0) {
@@ -134,8 +129,11 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 
 	const hasFilters =
 		!!q || selStates.length > 0 || status !== "all" || court !== "all";
-	// The filter bar earns its space only once there's more than one intake to sift.
-	const showFilters = cases.length > 1;
+	// The filter bar is always shown (for one intake or many), so the search and the
+	// court/status/state controls live in a stable, predictable place rather than
+	// appearing only past a threshold. The empty state (no intakes) returns earlier,
+	// so there is never a filter bar over nothing.
+	const showFilters = true;
 
 	function toggleState(s: string) {
 		setSelStates((prev) =>
@@ -213,34 +211,32 @@ export function AttorneyCases({ cases }: { cases: AttorneyCase[] }) {
 						</div>
 					</div>
 
-					{hasBothCourts && (
-						<div className="flex flex-wrap items-center gap-1.5 border-border border-t pt-3">
-							<span className="mr-1 inline-flex items-center gap-1 font-mono font-semibold text-[10.5px] text-muted-foreground uppercase tracking-[0.08em]">
-								<Landmark className="size-3.5" aria-hidden="true" />
-								Court
-							</span>
-							<FilterPill
-								active={court === "all"}
-								onClick={() => setCourt("all")}
-							>
-								All courts
-							</FilterPill>
-							<FilterPill
-								active={court === "state"}
-								onClick={() => setCourt("state")}
-							>
-								State
-							</FilterPill>
-							<FilterPill
-								active={court === "federal"}
-								onClick={() => setCourt("federal")}
-							>
-								Federal
-							</FilterPill>
-						</div>
-					)}
+					<div className="flex flex-wrap items-center gap-1.5 border-border border-t pt-3">
+						<span className="mr-1 inline-flex items-center gap-1 font-mono font-semibold text-[10.5px] text-muted-foreground uppercase tracking-[0.08em]">
+							<Landmark className="size-3.5" aria-hidden="true" />
+							Court
+						</span>
+						<FilterPill
+							active={court === "all"}
+							onClick={() => setCourt("all")}
+						>
+							All courts
+						</FilterPill>
+						<FilterPill
+							active={court === "state"}
+							onClick={() => setCourt("state")}
+						>
+							State
+						</FilterPill>
+						<FilterPill
+							active={court === "federal"}
+							onClick={() => setCourt("federal")}
+						>
+							Federal
+						</FilterPill>
+					</div>
 
-					{states.length > 1 && (
+					{states.length > 0 && (
 						<div className="flex flex-wrap items-center gap-1.5 border-border border-t pt-3">
 							<span className="mr-1 inline-flex items-center gap-1 font-mono font-semibold text-[10.5px] text-muted-foreground uppercase tracking-[0.08em]">
 								<MapPin className="size-3.5" aria-hidden="true" />
