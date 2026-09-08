@@ -4,7 +4,7 @@ import type {
 	RequestStatus,
 	VerificationStatus,
 } from "../prisma/generated/enums";
-import { isAdmittedIn } from "./admissions";
+import { isAdmittedIn, isFederalVerified } from "./admissions";
 import { averageRating } from "./attorney-directory";
 import { pendingInvitationsForCases } from "./case-invitations";
 import prisma from "./index";
@@ -270,7 +270,12 @@ export type AcceptInterestResult =
 	| { ok: true; caseId: string }
 	| {
 			ok: false;
-			reason: "not_found" | "not_verified" | "not_admitted" | "already_matched";
+			reason:
+				| "not_found"
+				| "not_verified"
+				| "not_admitted"
+				| "not_federal_verified"
+				| "already_matched";
 	  };
 
 /**
@@ -298,7 +303,13 @@ export async function acceptInterest(
 			id: true,
 			caseId: true,
 			attorneyId: true,
-			case: { select: { location: true, match: { select: { id: true } } } },
+			case: {
+				select: {
+					location: true,
+					jurisdiction: true,
+					match: { select: { id: true } },
+				},
+			},
 			attorney: {
 				select: {
 					name: true,
@@ -322,18 +333,29 @@ export async function acceptInterest(
 	if (interest.case.match) return { ok: false, reason: "already_matched" };
 
 	const profile = interest.attorney.attorneyProfile;
-	if (profile?.verificationStatus !== "verified") {
-		return { ok: false, reason: "not_verified" };
-	}
 
-	// Admission in the case's own state, re-read now rather than trusted from when
-	// the interest was expressed. An attorney can drop a state, or have one
-	// downgraded by a re-check, between putting themselves forward and a plaintiff
-	// deciding — and this is the write that makes them attorney of record.
-	if (
-		!(await isAdmittedIn(prisma, interest.attorneyId, interest.case.location))
-	) {
-		return { ok: false, reason: "not_admitted" };
+	// Eligibility follows the case's jurisdiction, re-read now rather than trusted
+	// from when the interest was expressed — standing can change between an attorney
+	// putting themselves forward and the plaintiff deciding, and this is the write
+	// that makes them attorney of record.
+	if (interest.case.jurisdiction === "federal") {
+		// A federal case turns on the attorney's federal-court standing alone. A
+		// federal attorney takes a federal case in ANY state — the case's state is
+		// not a qualification here, so no admission is required.
+		if (!(await isFederalVerified(prisma, interest.attorneyId))) {
+			return { ok: false, reason: "not_federal_verified" };
+		}
+	} else {
+		// A state case needs the verified state badge and a verified admission in the
+		// case's own state.
+		if (profile?.verificationStatus !== "verified") {
+			return { ok: false, reason: "not_verified" };
+		}
+		if (
+			!(await isAdmittedIn(prisma, interest.attorneyId, interest.case.location))
+		) {
+			return { ok: false, reason: "not_admitted" };
+		}
 	}
 
 	await prisma.$transaction([
@@ -344,11 +366,14 @@ export async function acceptInterest(
 		prisma.case.update({
 			where: { id: interest.caseId },
 			data: {
-				attorneyName: profile.legalName ?? interest.attorney.name,
-				attorneyFirm: profile.firmName,
-				attorneyArea: profile.practiceAreas[0] ?? null,
+				// A federally-verified attorney always has a profile (the check above
+				// reads it), and the state branch narrows it too, so these fall back
+				// safely either way.
+				attorneyName: profile?.legalName ?? interest.attorney.name,
+				attorneyFirm: profile?.firmName ?? null,
+				attorneyArea: profile?.practiceAreas[0] ?? null,
 				attorneyLocation:
-					interest.attorney.jurisdiction ?? profile.officeState ?? null,
+					interest.attorney.jurisdiction ?? profile?.officeState ?? null,
 			},
 		}),
 		prisma.match.create({

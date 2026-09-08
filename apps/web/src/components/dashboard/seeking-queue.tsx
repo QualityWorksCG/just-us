@@ -219,14 +219,6 @@ export function SeekingQueue({
 					</div>
 				)}
 			</section>
-
-			<p className="rounded-[var(--radius-card)] border border-border bg-paper-alt px-5 py-3.5 text-[12.5px] text-muted-foreground leading-relaxed">
-				Intakes are listed by the sort you choose, never ranked for you, and
-				never assigned. Open an intake to read the plaintiff's full account and
-				the evidence they've filed; their contact details are never shared.
-				Expressing interest tells them you're available. It doesn't open a
-				conversation, and the plaintiff is the one who makes contact.
-			</p>
 		</div>
 	);
 }
