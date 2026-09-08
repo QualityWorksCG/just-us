@@ -22,6 +22,7 @@ export default async function DiscoverPage({
 		q?: string;
 		state?: string;
 		category?: string;
+		court?: string;
 		sort?: string;
 		page?: string;
 	}>;
@@ -30,13 +31,16 @@ export default async function DiscoverPage({
 	const sp = await searchParams;
 	const sort =
 		sp.sort === "funded" || sp.sort === "newest" ? sp.sort : "trending";
+	const jurisdiction =
+		sp.court === "state" || sp.court === "federal" ? sp.court : undefined;
 	const filters = {
 		q: sp.q,
 		state: sp.state,
 		category: sp.category,
+		jurisdiction,
 		sort,
 	} as const;
-	const filtered = !!(sp.q || sp.state || sp.category);
+	const filtered = !!(sp.q || sp.state || sp.category || jurisdiction);
 
 	const total = await countLiveCases(filters);
 	const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -62,6 +66,7 @@ export default async function DiscoverPage({
 		if (sp.q) qs.set("q", sp.q);
 		if (sp.state) qs.set("state", sp.state);
 		if (sp.category) qs.set("category", sp.category);
+		if (jurisdiction) qs.set("court", jurisdiction);
 		if (sort !== "trending") qs.set("sort", sort);
 		if (p > 1) qs.set("page", String(p));
 		const s = qs.toString();
