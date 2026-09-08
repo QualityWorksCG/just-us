@@ -728,12 +728,7 @@ export async function confirmCaseInvitation(input: {
 
 			const attorney = await tx.user.findUnique({
 				where: { id: input.attorneyId },
-				select: {
-					id: true,
-					email: true,
-					role: true,
-					attorneyProfile: { select: { verificationStatus: true } },
-				},
+				select: { id: true, email: true, role: true },
 			});
 			if (!attorney) return { ok: false, code: "invalid" };
 			if (attorney.email.trim().toLowerCase() !== inv.email) {
@@ -742,9 +737,10 @@ export async function confirmCaseInvitation(input: {
 			if (attorney.role !== "attorney") {
 				return { ok: false, code: "not_attorney" };
 			}
-			if (attorney.attorneyProfile?.verificationStatus !== "verified") {
-				return { ok: false, code: "not_verified" };
-			}
+			// Standing is checked per jurisdiction below, once the case (and so its
+			// court) is known — not with a profile-wide state badge here, which would
+			// refuse a federal-only attorney (no state admission) as `not_verified` on
+			// a federal case they are actually cleared to take.
 
 			// Re-read against the full predicate rather than trusting the id on the
 			// invitation: the plaintiff may have deleted, withdrawn, or matched the

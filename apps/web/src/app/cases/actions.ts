@@ -497,6 +497,11 @@ const ACCEPT_INTEREST_ERRORS = {
 	// it. Their case stays in the queue for someone who can take it.
 	not_admitted:
 		"This attorney isn't admitted in your case's state, so they can't take it on. Your case stays open to other attorneys.",
+	// The federal equivalent of not_admitted: a federal case only needs a verified
+	// federal-court standing, not a state admission, so this is the one to report
+	// when that standing isn't (or is no longer) verified.
+	not_federal_verified:
+		"This attorney's federal-court standing isn't verified, so they can't take this federal case yet. Your case stays open to other attorneys.",
 	already_matched: "You've already chosen an attorney for this case.",
 } as const;
 
