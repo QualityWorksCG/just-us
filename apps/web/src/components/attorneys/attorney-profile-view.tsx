@@ -465,8 +465,8 @@ export function AttorneyProfileView({
 									aria-hidden="true"
 								/>
 								<span>
-									Funds settle to the plaintiff each case names, never to
-									JustUs.
+									Donations settle to the attorney's firm on each case, never to
+									the plaintiff or to JustUs.
 								</span>
 							</li>
 						</ul>

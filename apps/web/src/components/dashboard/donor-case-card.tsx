@@ -8,6 +8,7 @@ import {
 	HandCoins,
 	Heart,
 	Home,
+	Landmark,
 	type LucideIcon,
 	Megaphone,
 	Plus,
@@ -189,6 +190,21 @@ export function DonorCaseCard({
 					<span className={cn("size-1.5 rounded-full", status.dot)} />
 					{status.label}
 				</span>
+				{/* Compact cards have no chip row, so the jurisdiction rides here on the
+				    cover; the full card shows it in the chips below instead. */}
+				{compact && (
+					<span
+						className={cn(
+							"inline-flex items-center gap-1 rounded-[var(--radius-pill)] px-2.5 py-1 font-mono font-semibold text-[10px] uppercase leading-none tracking-[0.06em] backdrop-blur-sm",
+							c.jurisdiction === "federal"
+								? "bg-ink/90 text-paper"
+								: "bg-brass-wash/90 text-brass-deep",
+						)}
+					>
+						<Landmark className="size-3" aria-hidden="true" />
+						{c.jurisdiction === "federal" ? "Federal" : "State"}
+					</span>
+				)}
 				{hasNewUpdate && (
 					<span className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] bg-gold-bright px-2.5 py-1 font-mono font-semibold text-[10px] text-gold-bright-ink uppercase leading-none tracking-[0.06em] shadow-[var(--shadow-rest)]">
 						<Megaphone className="size-3" aria-hidden="true" />
@@ -223,6 +239,17 @@ export function DonorCaseCard({
 						</span>
 						<span className="rounded-[var(--radius-chip)] border border-border px-2 py-0.5 text-[11.5px] text-ink-soft">
 							{c.location || "-"}
+						</span>
+						<span
+							className={cn(
+								"inline-flex items-center gap-1 rounded-[var(--radius-chip)] px-2 py-0.5 font-semibold text-[11.5px]",
+								c.jurisdiction === "federal"
+									? "bg-ink text-paper"
+									: "bg-brass-wash text-brass-deep",
+							)}
+						>
+							<Landmark className="size-3" aria-hidden="true" />
+							{c.jurisdiction === "federal" ? "Federal court" : "State court"}
 						</span>
 					</div>
 				)}

@@ -6,6 +6,8 @@ export type DonorCase = {
 	title: string;
 	category: string;
 	location: string;
+	/** State-court or federal action — for the donor-facing jurisdiction badge. */
+	jurisdiction: "state" | "federal";
 	status: string;
 	cover: string | null;
 	owner: string;
@@ -24,6 +26,7 @@ type CaseRow = {
 	title: string;
 	category: string;
 	location: string;
+	jurisdiction: "state" | "federal";
 	status: string;
 	coverImageUrl: string | null;
 	attorneyName: string | null;
@@ -42,6 +45,7 @@ export function toDonorCase(c: CaseRow): DonorCase {
 		title: c.title || "Untitled case",
 		category: c.category,
 		location: c.location,
+		jurisdiction: c.jurisdiction,
 		status: c.status,
 		cover: c.coverImageUrl,
 		owner: c.owner?.name ?? "A plaintiff",
