@@ -2,6 +2,7 @@
 "use client";
 
 import { US_STATES } from "@just-us/auth/jurisdiction";
+import type { CaseEvidence } from "@just-us/db/cases";
 import { Button } from "@just-us/ui/components/button";
 import { Input } from "@just-us/ui/components/input";
 import {
@@ -16,12 +17,14 @@ import { cn } from "@just-us/ui/lib/utils";
 import { upload } from "@vercel/blob/client";
 import {
 	ArrowRight,
+	CircleCheck,
 	Eye,
 	HandCoins,
 	ImageIcon,
 	Link2,
 	type LucideIcon,
 	Megaphone,
+	Paperclip,
 	Plus,
 	Rocket,
 	Save,
@@ -41,8 +44,10 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
+	addCaseEvidenceAction,
 	deleteOwnedCaseAction,
 	recordShareAction,
+	removeCaseEvidenceAction,
 	updateCaseDetailsAction,
 } from "@/app/cases/actions";
 import {
@@ -74,6 +79,9 @@ export type ManageCaseData = {
 	followerCount: number;
 	coverImageUrl: string | null;
 	images: string[];
+	/** The documents and links the plaintiff filed, each with an authorized href
+	 *  to open it (the owner may always read their own — see `caseEvidenceFile`). */
+	evidence: CaseEvidence[];
 	/** The plaintiff's thank-you, sent to every donor. Null when unwritten. */
 	thankYouNote: string | null;
 	attorneyName: string | null;
@@ -81,6 +89,69 @@ export type ManageCaseData = {
 	attorneyArea: string | null;
 	attorneyLocation: string | null;
 };
+
+type NewEvidenceItem = {
+	name: string;
+	url: string;
+	size?: number;
+	kind: "file" | "link";
+};
+
+function fileSize(bytes: number | null) {
+	if (!bytes || bytes <= 0) return "-";
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** One filed document or link, opened through the app's authorized evidence route
+ *  (never the raw storage URL) — mirrors the attorney-side row so both read alike.
+ *  `onRemove` is passed only on the owner's own screen while the case is editable. */
+function EvidenceRow({
+	file,
+	onRemove,
+	removing,
+}: {
+	file: CaseEvidence;
+	onRemove?: () => void;
+	removing?: boolean;
+}) {
+	const Icon = file.kind === "link" ? Link2 : Paperclip;
+	return (
+		<li className="flex items-center gap-2.5 rounded-[var(--radius-card)] border border-border bg-paper-alt px-3 py-2">
+			<Icon className="size-3.5 shrink-0 text-brass-deep" aria-hidden="true" />
+			{file.href ? (
+				<a
+					href={file.href}
+					target="_blank"
+					rel="noopener noreferrer"
+					className="min-w-0 flex-1 truncate font-semibold text-[13px] text-brass-deep hover:underline"
+				>
+					{file.name}
+				</a>
+			) : (
+				<span className="min-w-0 flex-1 truncate font-semibold text-[13px] text-ink">
+					{file.name}
+				</span>
+			)}
+			<span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
+				{file.kind === "link" ? "Link" : fileSize(file.size)}
+			</span>
+			{onRemove && (
+				<button
+					type="button"
+					onClick={onRemove}
+					disabled={removing}
+					aria-label={`Remove ${file.name}`}
+					title="Remove"
+					className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+				>
+					<Trash2 className="size-3.5" aria-hidden="true" />
+				</button>
+			)}
+		</li>
+	);
+}
 
 function money(n: number) {
 	return new Intl.NumberFormat("en-US", {
@@ -237,7 +308,7 @@ export function ManageCase({
 	const attorneyMeta =
 		[data.attorneyArea, data.attorneyLocation, data.attorneyFirm]
 			.filter(Boolean)
-			.join(" · ") || "—";
+			.join(" · ") || "-";
 
 	const dirty =
 		title !== data.title ||
@@ -285,6 +356,107 @@ export function ManageCase({
 		setShares((s) => s + 1);
 		void recordShareAction(data.id);
 		toast.success(message);
+	}
+
+	// Adding evidence after the case is up is a two-step, confirm-first flow: files
+	// upload to the same Blob route as the wizard's and links are validated, but
+	// nothing is attached to the case (or shown to the attorney) until the plaintiff
+	// reviews the staged list and confirms. Only then does the action append them
+	// and notify the attorney; a refresh re-reads the stored list afterwards.
+	const evidenceInput = useRef<HTMLInputElement>(null);
+	const [uploadingEvidence, setUploadingEvidence] = useState(false);
+	const [committingEvidence, setCommittingEvidence] = useState(false);
+	const [evidenceLink, setEvidenceLink] = useState("");
+	const [staged, setStaged] = useState<NewEvidenceItem[]>([]);
+	const canAddEvidence = isLive || isSeeking || isPending;
+
+	async function onPickEvidence(e: React.ChangeEvent<HTMLInputElement>) {
+		const files = Array.from(e.target.files ?? []);
+		e.target.value = "";
+		if (!files.length) return;
+		setUploadingEvidence(true);
+		try {
+			const items = await Promise.all(
+				files.map(async (file): Promise<NewEvidenceItem> => {
+					const blob = await upload(file.name, file, {
+						access: "public",
+						handleUploadUrl: "/api/cases/upload",
+						clientPayload: "evidence",
+					});
+					return {
+						name: file.name,
+						url: blob.url,
+						size: file.size,
+						kind: "file",
+					};
+				}),
+			);
+			// Staged, not attached: the plaintiff confirms below before it lands.
+			setStaged((p) => [...p, ...items]);
+		} catch {
+			toast.error("Couldn't upload that file. Please try again.");
+		} finally {
+			setUploadingEvidence(false);
+		}
+	}
+
+	function addEvidenceLink() {
+		let url = evidenceLink.trim();
+		if (!url) return;
+		if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+		let host: string;
+		try {
+			host = new URL(url).hostname;
+		} catch {
+			toast.error("That doesn't look like a valid link.");
+			return;
+		}
+		setEvidenceLink("");
+		setStaged((p) => [...p, { name: host, url, kind: "link" }]);
+	}
+
+	function removeStaged(idx: number) {
+		setStaged((p) => p.filter((_, i) => i !== idx));
+	}
+
+	async function confirmEvidence() {
+		if (staged.length === 0) return;
+		setCommittingEvidence(true);
+		try {
+			const res = await addCaseEvidenceAction({
+				caseId: data.id,
+				items: staged,
+			});
+			if (res.ok) {
+				setStaged([]);
+				toast.success(
+					res.addedCount === 1
+						? "Evidence added. Your attorney has been notified."
+						: `${res.addedCount} items added. Your attorney has been notified.`,
+				);
+				router.refresh();
+			} else {
+				toast.error(res.error);
+			}
+		} finally {
+			setCommittingEvidence(false);
+		}
+	}
+
+	const [removingIndex, setRemovingIndex] = useState<number | null>(null);
+	async function removeEvidence(index: number) {
+		setRemovingIndex(index);
+		try {
+			const res = await removeCaseEvidenceAction({ caseId: data.id, index });
+			if (res.ok) {
+				toast.success("Evidence removed.");
+				router.refresh();
+			} else {
+				toast.error(res.error);
+			}
+		} finally {
+			setRemovingIndex(null);
+		}
 	}
 
 	function save() {
@@ -459,7 +631,7 @@ export function ManageCase({
 						<Metric
 							icon={Target}
 							label="funding goal"
-							value={goal > 0 ? money(goal) : "—"}
+							value={goal > 0 ? money(goal) : "-"}
 							tone="gold"
 						/>
 					</div>
@@ -510,6 +682,175 @@ export function ManageCase({
 								limit={2}
 								highlightSince={updatesHighlightSince}
 							/>
+						</section>
+					)}
+
+					{/* Evidence the plaintiff filed — theirs to re-open any time, not just
+					    the attorney's, and theirs to add to after the case is up. Only the
+					    owner and attorneys on the case can reach the files (see
+					    `caseEvidenceFile`); the link is safe to render. */}
+					{(data.evidence.length > 0 || canAddEvidence) && (
+						<section className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)]">
+							<div className="mb-4 flex items-center gap-2.5">
+								<span className="flex size-10 items-center justify-center rounded-xl bg-brass-wash text-brass-deep">
+									<Paperclip className="size-5" aria-hidden="true" />
+								</span>
+								<div>
+									<h2 className="font-bold text-[15px] text-ink">
+										Your evidence
+									</h2>
+									<p className="text-[12.5px] text-muted-foreground">
+										The documents and links you filed. Only you and your
+										attorney can open these.
+									</p>
+								</div>
+							</div>
+
+							{data.evidence.length > 0 ? (
+								<ul className="flex flex-col gap-2">
+									{data.evidence.map((file) => (
+										<EvidenceRow
+											key={`${file.index}-${file.name}`}
+											file={file}
+											onRemove={
+												canAddEvidence
+													? () => void removeEvidence(file.index)
+													: undefined
+											}
+											removing={removingIndex === file.index}
+										/>
+									))}
+								</ul>
+							) : (
+								<p className="rounded-[var(--radius-card)] border border-border border-dashed bg-paper-alt px-4 py-3 text-[13px] text-muted-foreground">
+									No evidence filed yet. Add a document or a link below.
+								</p>
+							)}
+
+							{canAddEvidence && (
+								<div className="mt-4 flex flex-col gap-3 border-border border-t pt-4">
+									<p className="font-semibold text-[13px] text-ink">
+										Add more evidence
+									</p>
+									<div className="flex flex-wrap items-center gap-2">
+										<input
+											ref={evidenceInput}
+											type="file"
+											multiple
+											className="hidden"
+											onChange={onPickEvidence}
+										/>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											disabled={uploadingEvidence || committingEvidence}
+											onClick={() => evidenceInput.current?.click()}
+										>
+											<Upload data-icon="inline-start" aria-hidden="true" />
+											{uploadingEvidence ? "Uploading…" : "Choose a document"}
+										</Button>
+									</div>
+									<div className="flex flex-wrap items-center gap-2">
+										<Input
+											value={evidenceLink}
+											onChange={(e) => setEvidenceLink(e.target.value)}
+											placeholder="Or paste a link (e.g. a shared folder)"
+											className="h-9 max-w-[360px] flex-1"
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													addEvidenceLink();
+												}
+											}}
+										/>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											disabled={!evidenceLink.trim()}
+											onClick={addEvidenceLink}
+										>
+											<Link2 data-icon="inline-start" aria-hidden="true" />
+											Add link
+										</Button>
+									</div>
+
+									{/* Confirm step: nothing is attached, and the attorney is not
+									    notified, until the plaintiff reviews the staged list and
+									    confirms. */}
+									{staged.length > 0 && (
+										<div className="flex flex-col gap-2.5 rounded-[var(--radius-card)] border border-brass bg-brass-wash/50 p-3.5">
+											<p className="font-semibold text-[12.5px] text-ink">
+												Ready to add ({staged.length}) — review, then confirm
+											</p>
+											<ul className="flex flex-col gap-1.5">
+												{staged.map((it, i) => {
+													const Icon = it.kind === "link" ? Link2 : Paperclip;
+													return (
+														<li
+															key={`${it.url}-${i}`}
+															className="flex items-center gap-2.5 rounded-[var(--radius-card-sm)] border border-border bg-surface px-3 py-1.5"
+														>
+															<Icon
+																className="size-3.5 shrink-0 text-brass-deep"
+																aria-hidden="true"
+															/>
+															<span className="min-w-0 flex-1 truncate font-semibold text-[12.5px] text-ink">
+																{it.name}
+															</span>
+															<span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+																{it.kind === "link"
+																	? "Link"
+																	: fileSize(it.size ?? null)}
+															</span>
+															<button
+																type="button"
+																onClick={() => removeStaged(i)}
+																disabled={committingEvidence}
+																aria-label={`Remove ${it.name} from the list`}
+																className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+															>
+																<X className="size-3.5" aria-hidden="true" />
+															</button>
+														</li>
+													);
+												})}
+											</ul>
+											<div className="flex flex-wrap items-center gap-2">
+												<Button
+													type="button"
+													size="sm"
+													disabled={committingEvidence}
+													onClick={() => void confirmEvidence()}
+												>
+													<CircleCheck
+														data-icon="inline-start"
+														aria-hidden="true"
+													/>
+													{committingEvidence
+														? "Adding…"
+														: `Confirm & add ${staged.length}`}
+												</Button>
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													disabled={committingEvidence}
+													onClick={() => setStaged([])}
+												>
+													Cancel
+												</Button>
+											</div>
+										</div>
+									)}
+
+									<p className="text-[12px] text-muted-foreground">
+										Nothing is attached until you confirm. Your attorney is
+										notified when you add new evidence.
+									</p>
+								</div>
+							)}
 						</section>
 					)}
 
@@ -821,7 +1162,7 @@ export function ManageCase({
 									Agreed fee
 								</p>
 								<p className="font-extrabold text-[20px] text-ink tabular-nums">
-									{goal > 0 ? money(goal) : "—"}
+									{goal > 0 ? money(goal) : "-"}
 								</p>
 							</div>
 						</div>

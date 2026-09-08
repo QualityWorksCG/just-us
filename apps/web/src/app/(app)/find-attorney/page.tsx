@@ -98,7 +98,7 @@ export default async function DashboardAttorneysPage({
 			: {
 					href: `/my-cases/${draft.id}` as Route,
 					title: `${caseTitle} is live`,
-					sub: "You can still reach out to anyone here yourself — your case is already public.",
+					sub: "You can still reach out to anyone here yourself. Your case is already public.",
 				};
 
 	const [attorneys, practiceAreas, states, conversations] = await Promise.all([

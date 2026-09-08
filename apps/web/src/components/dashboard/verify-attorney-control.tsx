@@ -17,10 +17,17 @@ import { setAttorneyVerificationAction } from "@/app/(app)/users/actions";
 export function VerifyAttorneyControl({
 	userId,
 	verified,
+	disabled = false,
+	disabledReason,
 }: {
 	userId: string;
 	/** Whether the attorney currently holds the verified badge. */
 	verified: boolean;
+	/** Block the "Mark as verified" action — e.g. the attorney has claimed no
+	 *  states, so there is no bar admission to vouch for. Clearing an existing
+	 *  verification stays available. */
+	disabled?: boolean;
+	disabledReason?: string;
 }) {
 	const router = useRouter();
 	const [pending, startTransition] = useTransition();
@@ -62,9 +69,10 @@ export function VerifyAttorneyControl({
 		<button
 			type="button"
 			onClick={() => set(true)}
-			disabled={pending}
+			disabled={pending || disabled}
+			title={disabled ? disabledReason : undefined}
 			className={cn(
-				"inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-brass px-4 py-2 font-bold text-[13px] text-white transition-colors hover:bg-brass-deep disabled:opacity-60",
+				"inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-brass px-4 py-2 font-bold text-[13px] text-white transition-colors hover:bg-brass-deep disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-brass",
 			)}
 		>
 			<BadgeCheck className="size-4" aria-hidden="true" />

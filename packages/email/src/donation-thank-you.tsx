@@ -105,7 +105,7 @@ export default function DonationThankYouEmail({
 				<Section style={noteSection}>
 					<Text style={noteText}>{note}</Text>
 					<Text style={noteAttribution}>
-						— {plaintiffName?.trim() || "The plaintiff"}
+						- {plaintiffName?.trim() || "The plaintiff"}
 					</Text>
 				</Section>
 			) : null}

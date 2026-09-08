@@ -82,7 +82,7 @@ function initials(name: string) {
 			.split(/\s+/)
 			.slice(0, 2)
 			.map((p) => p[0]?.toUpperCase() ?? "")
-			.join("") || "—"
+			.join("") || "-"
 	);
 }
 
@@ -268,7 +268,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 	const attorneyMeta =
 		[c.attorneyArea, c.attorneyLocation, c.attorneyFirm]
 			.filter(Boolean)
-			.join(" · ") || "—";
+			.join(" · ") || "-";
 
 	// Readiness is computed from the case's own completeness — not invented.
 	const checks = [
@@ -362,7 +362,7 @@ function SingleCaseDashboard({ c }: { c: CaseSummary }) {
 				<StatCard
 					icon={Target}
 					label="Funding goal"
-					value={hasGoal ? money(goal) : "—"}
+					value={hasGoal ? money(goal) : "-"}
 					sub={
 						hasGoal ? "agreed with your attorney" : "set when you agree a fee"
 					}
@@ -724,7 +724,7 @@ function CaseRow({ c }: { c: CaseSummary }) {
 	const raised = c.raisedCents / 100;
 	const pct = goal > 0 ? Math.round((raised / goal) * 100) : 0;
 	const readiness = readinessOf(c);
-	const meta = [c.category, c.location].filter(Boolean).join(" · ") || "—";
+	const meta = [c.category, c.location].filter(Boolean).join(" · ") || "-";
 
 	const badge = isLive
 		? {

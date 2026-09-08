@@ -218,13 +218,49 @@ export async function notifyInvitationAccepted(
 			caseId,
 			actorName: ctx.attorneyName ?? null,
 			title: feeAgreed
-				? "Your attorney accepted — publish to go live"
-				: "Your attorney accepted — agree the fee next",
+				? "Your attorney accepted. Publish to go live"
+				: "Your attorney accepted. Agree the fee next",
 			body: feeAgreed
 				? `${who} accepted “${title}”. Publish it to start raising.`
 				: `${who} accepted “${title}”. Agree the fee together and publish to take it live.`,
 			href: feeAgreed ? `/my-cases/${caseId}` : `/my-cases/${caseId}/requests`,
 			dedupeKey: `invite_accepted:${invitationId}`,
+		},
+	]);
+}
+
+/**
+ * The plaintiff filed new evidence on a case that is already up → tell the
+ * attorney representing it.
+ *
+ * Only fires when the case has an attorney of record; a seeking case with no match
+ * has no one to notify. In-app only — a nudge to go read the new filing, which
+ * lives behind the authorized evidence route on the case's own screen. Not deduped
+ * across adds (each new filing is its own event), so the key carries the moment.
+ */
+export async function notifyCaseEvidenceAdded(
+	caseId: string,
+	attorneyId: string,
+	addedCount: number,
+) {
+	const ctx = await getCaseNotifyContext(caseId);
+	if (!ctx) return;
+
+	const who = ctx.owner?.name?.trim() || "Your client";
+	const title = ctx.title || "your case";
+	const n = addedCount === 1 ? "a new document" : `${addedCount} new documents`;
+	await createNotifications([
+		{
+			recipientId: attorneyId,
+			type: "case_update",
+			caseId,
+			actorName: ctx.owner?.name ?? null,
+			title: "New evidence on your case",
+			body: `${who} added ${n} to “${title}”. Open the case to review it.`,
+			// Straight to the intake tab, where the evidence panel and the new-filing
+			// highlight live.
+			href: `/my-cases/${caseId}?tab=intake`,
+			dedupeKey: `evidence_added:${caseId}:${attorneyId}:${Date.now()}`,
 		},
 	]);
 }

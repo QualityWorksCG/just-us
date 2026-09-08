@@ -174,8 +174,8 @@ export function ExpressInterestButton({
 				</div>
 				<p className="mt-3 text-[14px] text-ink-soft leading-relaxed">
 					The plaintiff will see your interest on their dashboard. This sends no
-					message and opens no conversation — they reach out if they want to
-					take it forward. You can withdraw it any time.
+					message and opens no conversation. They reach out if they want to take
+					it forward. You can withdraw it any time.
 				</p>
 				<div className="mt-6 flex justify-end gap-2">
 					<Button

@@ -229,10 +229,10 @@ export default async function AuditLogPage({
 													: "font-mono text-[12px] text-ink-soft",
 											)}
 										>
-											{invitedEmail ?? e.targetId ?? "—"}
+											{invitedEmail ?? e.targetId ?? "-"}
 										</p>
 									) : (
-										<p className="text-[13px] text-muted-foreground">—</p>
+										<p className="text-[13px] text-muted-foreground">-</p>
 									)}
 								</Cell>
 							</div>

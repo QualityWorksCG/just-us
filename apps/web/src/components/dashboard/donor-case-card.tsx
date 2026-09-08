@@ -41,7 +41,7 @@ function initials(name: string) {
 			.split(/\s+/)
 			.slice(0, 2)
 			.map((p) => p[0]?.toUpperCase() ?? "")
-			.join("") || "—"
+			.join("") || "-"
 	);
 }
 
@@ -222,7 +222,7 @@ export function DonorCaseCard({
 							{c.category || "Case"}
 						</span>
 						<span className="rounded-[var(--radius-chip)] border border-border px-2 py-0.5 text-[11.5px] text-ink-soft">
-							{c.location || "—"}
+							{c.location || "-"}
 						</span>
 					</div>
 				)}

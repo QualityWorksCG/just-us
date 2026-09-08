@@ -2,7 +2,7 @@
 
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { ArrowRight, Inbox } from "lucide-react";
+import { ArrowRight, Inbox, Landmark } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useState } from "react";
@@ -26,6 +26,7 @@ export type ExpressionIntake = {
 	title: string;
 	category: string;
 	state: string;
+	jurisdiction: "state" | "federal";
 };
 
 export type InvitationItem = {
@@ -34,6 +35,7 @@ export type InvitationItem = {
 	title: string;
 	category: string;
 	state: string;
+	jurisdiction: "state" | "federal";
 	plaintiffName: string;
 };
 
@@ -150,6 +152,27 @@ export function YourRequests({
 	);
 }
 
+/** State-court or federal chip, matching the badge used on the case cards. */
+function JurisdictionChip({
+	jurisdiction,
+}: {
+	jurisdiction: "state" | "federal";
+}) {
+	return (
+		<span
+			className={cn(
+				"inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-pill)] px-2 py-0.5 font-semibold text-[11px]",
+				jurisdiction === "federal"
+					? "bg-ink text-paper"
+					: "bg-brass-wash text-brass-deep",
+			)}
+		>
+			<Landmark className="size-3" aria-hidden="true" />
+			{jurisdiction === "federal" ? "Federal" : "State"}
+		</span>
+	);
+}
+
 function InvitationRow({ inv }: { inv: InvitationItem }) {
 	return (
 		<li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
@@ -161,13 +184,14 @@ function InvitationRow({ inv }: { inv: InvitationItem }) {
 					<span className="shrink-0 rounded-[var(--radius-pill)] bg-gold-bright/20 px-2 py-0.5 font-semibold text-[11px] text-gold-bright-ink">
 						New
 					</span>
+					<JurisdictionChip jurisdiction={inv.jurisdiction} />
 				</div>
 				<p className="mt-0.5 text-[12.5px] text-muted-foreground">
 					<span className="font-semibold text-ink-soft">
 						{inv.plaintiffName}
 					</span>{" "}
 					invited you ·{" "}
-					{[inv.category, inv.state].filter(Boolean).join(" · ") || "—"}
+					{[inv.category, inv.state].filter(Boolean).join(" · ") || "-"}
 				</p>
 			</div>
 			<Link
@@ -222,9 +246,10 @@ function RequestRow({
 					>
 						{badge.text}
 					</span>
+					<JurisdictionChip jurisdiction={intake.jurisdiction} />
 				</div>
 				<p className="mt-0.5 text-[12.5px] text-muted-foreground">
-					{[intake.category, intake.state].filter(Boolean).join(" · ") || "—"}
+					{[intake.category, intake.state].filter(Boolean).join(" · ") || "-"}
 				</p>
 			</div>
 			<Link

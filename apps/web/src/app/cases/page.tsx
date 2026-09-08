@@ -138,7 +138,7 @@ export default async function BrowseCasesPage({
 													{c.category || "Case"}
 												</span>
 												<span className="rounded-[var(--radius-chip)] border border-border px-2 py-0.5 text-[11.5px] text-ink-soft">
-													{c.location || "—"}
+													{c.location || "-"}
 												</span>
 												<span
 													className={cn(

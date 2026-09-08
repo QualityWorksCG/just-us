@@ -1,7 +1,14 @@
 import type { QueueCase, QueueSort } from "@just-us/db/representation";
 import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
-import { Eye, Inbox, MapPin, ShieldAlert, UserRound } from "lucide-react";
+import {
+	Eye,
+	Inbox,
+	Landmark,
+	MapPin,
+	ShieldAlert,
+	UserRound,
+} from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
 
@@ -69,6 +76,7 @@ export function SeekingQueue({
 	verifiedStates,
 	filtered,
 	canExpressInterest,
+	federalVerified,
 }: {
 	cases: QueueCase[];
 	categories: string[];
@@ -86,25 +94,38 @@ export function SeekingQueue({
 	verifiedStates: string[];
 	/** Whether any filter is active, which changes the empty-state wording. */
 	filtered: boolean;
-	/** False until the attorney's bar standing is verified — they can browse the
-	 *  queue either way, but cannot put themselves forward (JUS-24). */
+	/** True once the attorney's *state* bar standing is verified — they can browse
+	 *  the queue either way, but cannot put themselves forward on a state case
+	 *  without it (JUS-24). */
 	canExpressInterest: boolean;
+	/** True once the attorney's *federal* standing is verified — the equivalent
+	 *  gate for a federal case, which turns on federal practice, not a state. */
+	federalVerified: boolean;
 }) {
-	const nowhereAdmitted = admittedStates.length === 0;
+	// A federal-practising attorney with no state admissions still has federal
+	// cases to see, so "nowhere to look" means neither a state nor federal footing.
+	const nowhereAdmitted = admittedStates.length === 0 && !federalVerified;
 
 	/**
 	 * Why this particular case can't be put forward for, if it can't.
 	 *
-	 * Per case, because the gate is per state: an attorney verified in New York
-	 * browsing a New Jersey case they have claimed but not yet had checked would
-	 * otherwise be shown a live button and refused by the action behind it.
+	 * The gate follows the case's jurisdiction: a federal case turns on the
+	 * attorney's verified federal-court standing; a state case turns on a verified
+	 * admission in that case's state (an attorney verified in New York browsing a
+	 * New Jersey case they have claimed but not yet had checked must not be shown a
+	 * live button the action behind it would refuse).
 	 */
-	function reasonFor(state: string): string | undefined {
-		if (verifiedStates.includes(state)) return undefined;
+	function reasonFor(item: QueueCase): string | undefined {
+		if (item.jurisdiction === "federal") {
+			return federalVerified
+				? undefined
+				: "Verify your federal-court standing on your profile to express interest.";
+		}
+		if (verifiedStates.includes(item.state)) return undefined;
 		if (!canExpressInterest) {
 			return "Verify your bar standing on your profile to express interest.";
 		}
-		return `You're not verified in ${state} yet. Verify your bar standing there to express interest.`;
+		return `You're not verified in ${item.state} yet. Verify your bar standing there to express interest.`;
 	}
 
 	return (
@@ -131,7 +152,7 @@ export function SeekingQueue({
 				</div>
 			) : null}
 
-			{!canExpressInterest && !nowhereAdmitted && (
+			{!canExpressInterest && !federalVerified && !nowhereAdmitted && (
 				<div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-brass/40 bg-brass-wash px-5 py-4">
 					<ShieldAlert
 						className="size-5 shrink-0 text-brass-deep"
@@ -192,7 +213,7 @@ export function SeekingQueue({
 							<QueueCard
 								key={item.id}
 								item={item}
-								disabledReason={reasonFor(item.state)}
+								disabledReason={reasonFor(item)}
 							/>
 						))}
 					</div>
@@ -227,6 +248,19 @@ function QueueCard({
 								{item.category}
 							</span>
 						)}
+						<span
+							className={cn(
+								"inline-flex items-center gap-1 rounded-[var(--radius-chip)] px-2 py-0.5 font-semibold text-[11.5px]",
+								item.jurisdiction === "federal"
+									? "bg-ink text-paper"
+									: "bg-brass-wash text-brass-deep",
+							)}
+						>
+							<Landmark className="size-3" aria-hidden="true" />
+							{item.jurisdiction === "federal"
+								? "Federal court"
+								: "State court"}
+						</span>
 						{item.state && (
 							<span className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground">
 								<MapPin className="size-3.5" aria-hidden="true" />

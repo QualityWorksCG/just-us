@@ -39,7 +39,7 @@ function initials(name: string) {
 			.split(/\s+/)
 			.slice(0, 2)
 			.map((p) => p[0]?.toUpperCase() ?? "")
-			.join("") || "—"
+			.join("") || "-"
 	);
 }
 
@@ -215,7 +215,7 @@ export default async function CaseRequestsPage({
 						{daysLeft > 0
 							? ` within about ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`
 							: " soon"}
-						. While your request is open, your case is held just for them — no
+						. While your request is open, your case is held just for them. No
 						other attorney can see it.
 					</p>
 				</div>
@@ -291,7 +291,7 @@ export default async function CaseRequestsPage({
 					/>
 					If {firstName} declines or doesn't answer in time, your case goes to
 					every bar-verified attorney, who can then read it and put themselves
-					forward — and you choose from whoever does. Your contact details are
+					forward, and you choose from whoever does. Your contact details are
 					never shared, and nothing reaches you until you reach out.
 				</div>
 			</div>

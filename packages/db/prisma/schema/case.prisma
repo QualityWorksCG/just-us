@@ -128,6 +128,10 @@ model Case {
   // the "new update" notification: updates newer than this are unseen. Null means
   // they've never opened the case since an update landed. (JUS-33)
   ownerUpdatesSeenAt DateTime?
+  // When the representing attorney last looked at this case's evidence. Evidence
+  // the plaintiff files after this is "new" to them, which drives the highlight
+  // and count on the attorney's case screen. Null until they first open it.
+  attorneyEvidenceSeenAt DateTime?
   // Soft delete — set when the plaintiff removes a case. Rows are kept so they
   // can appear in the "Deleted" filter and be restored, not hard-deleted.
   deletedAt   DateTime?
