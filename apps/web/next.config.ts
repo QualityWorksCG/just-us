@@ -27,7 +27,14 @@ const nextConfig: NextConfig = {
 	// workspace. Platform packages absent from the build machine match nothing, so
 	// this is correct on Linux CI and on a developer's Mac alike.
 	outputFileTracingIncludes: {
+		// Every route that runs `sharp` needs libvips copied in, and the shared
+		// name-and-photo control saves a photo through this route as well as
+		// /settings — so the directory profile has to carry the same include or its
+		// photo upload dies with ERR_DLOPEN_FAILED once deployed.
 		"/settings": [
+			"../../node_modules/.bun/@img+sharp-libvips-*/node_modules/@img/*/lib/**/*",
+		],
+		"/profile": [
 			"../../node_modules/.bun/@img+sharp-libvips-*/node_modules/@img/*/lib/**/*",
 		],
 	},
