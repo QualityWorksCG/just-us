@@ -182,6 +182,12 @@ export async function getUserWithCases(id: string) {
 			// can show it and verify from there (JUS-13). Null for every other role.
 			attorneyProfile: {
 				select: {
+					// `id` addresses the public directory route (/attorneys/[id]); firm and
+					// bio status give the admin the directory context and the one moderation
+					// signal that lives on the profile.
+					id: true,
+					firmName: true,
+					bioStatus: true,
 					verificationStatus: true,
 					verifiedAt: true,
 					practicesFederal: true,
