@@ -327,7 +327,11 @@ export function OnboardingFlow({
 							</div>
 						</>
 					) : (
-						<form id={STEP2_FORM_ID} onSubmit={handleSubmit}>
+						<form
+							id={STEP2_FORM_ID}
+							onSubmit={handleSubmit}
+							className="mx-auto max-w-[720px]"
+						>
 							<p className="mb-2.5 font-mono font-semibold text-[12px] text-brass-deep uppercase tracking-[0.1em]">
 								{isAttorney ? "Your practice" : "Almost there"}
 							</p>
@@ -346,7 +350,7 @@ export function OnboardingFlow({
 										: "No extra details needed. Browse live cases and give what moves you, then follow every case you back to its outcome."}
 							</p>
 
-							<div className="mt-8 max-w-[620px] rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)] sm:p-7">
+							<div className="mt-8 rounded-[var(--radius-card-lg)] border border-border bg-surface p-6 shadow-[var(--shadow-rest)] sm:p-7">
 								{needsJurisdiction ? (
 									<div className="flex flex-col gap-5">
 										<div className="flex flex-col gap-1.5">
@@ -375,7 +379,7 @@ export function OnboardingFlow({
 										</div>
 
 										{isAttorney && (
-											<>
+											<div className="grid gap-5 sm:grid-cols-2">
 												<div className="flex flex-col gap-1.5">
 													<label
 														htmlFor={ids.firm}
@@ -418,7 +422,7 @@ export function OnboardingFlow({
 														</p>
 													)}
 												</div>
-											</>
+											</div>
 										)}
 									</div>
 								) : (
