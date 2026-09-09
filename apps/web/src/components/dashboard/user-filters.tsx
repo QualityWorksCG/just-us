@@ -21,6 +21,14 @@ const STATUS = [
 	{ value: "no", label: "Not blocked" },
 ];
 
+// Attorney-only: which court they practise in. Shown only under the Attorneys
+// role, since it reads an attorney field and means nothing for other accounts.
+const COURT = [
+	{ value: "", label: "All courts" },
+	{ value: "federal", label: "Federal" },
+	{ value: "state", label: "State" },
+];
+
 /**
  * Plural labels for the facet row. Roles are stored singular, and "Admins" is
  * deliberately short — "Administrators" is wide enough to wrap the row on a
@@ -47,6 +55,7 @@ export function UserFilters({ counts }: { counts: UserRoleCounts }) {
 	const role = params.get("role") ?? "";
 	const verified = params.get("verified") ?? "";
 	const blocked = params.get("blocked") ?? "";
+	const jurisdiction = params.get("jurisdiction") ?? "";
 
 	const [search, setSearch] = useState(q);
 	// True from the moment a filter is applied until the server sends the new
@@ -104,7 +113,8 @@ export function UserFilters({ counts }: { counts: UserRoleCounts }) {
 					active={!activeRole}
 					onClick={() => {
 						setPressed("");
-						apply({ role: null });
+						// The court facet only lives under Attorneys, so drop it on the way out.
+						apply({ role: null, jurisdiction: null });
 					}}
 				/>
 				{ROLES.map((r) => (
@@ -115,7 +125,10 @@ export function UserFilters({ counts }: { counts: UserRoleCounts }) {
 						active={activeRole === r}
 						onClick={() => {
 							setPressed(r);
-							apply({ role: r });
+							apply({
+								role: r,
+								...(r === "attorney" ? {} : { jurisdiction: null }),
+							});
 						}}
 					/>
 				))}
@@ -155,6 +168,14 @@ export function UserFilters({ counts }: { counts: UserRoleCounts }) {
 				</form>
 
 				<div className="flex flex-wrap gap-3">
+					{activeRole === "attorney" ? (
+						<Dropdown
+							label="Court"
+							value={jurisdiction}
+							onChange={(v) => apply({ jurisdiction: v || null })}
+							options={COURT}
+						/>
+					) : null}
 					<Dropdown
 						label="Verification"
 						value={verified}

@@ -15,6 +15,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { AttorneyJurisdictionBadge } from "@/components/dashboard/attorney-jurisdiction-badge";
 import {
 	FilterPending,
 	FilterTransition,
@@ -196,22 +197,34 @@ export default async function UsersPage({
 		role?: string;
 		verified?: string;
 		blocked?: string;
+		jurisdiction?: string;
 	}>;
 }) {
 	await requireAdministrator();
 	const sp = await searchParams;
 
+	const role = isRole(sp?.role) ? sp.role : undefined;
+	// The state/federal facet only makes sense for attorneys, so it is honoured
+	// only alongside the attorney role — the control is shown there too.
+	const jurisdiction =
+		role === "attorney" &&
+		(sp?.jurisdiction === "state" || sp?.jurisdiction === "federal")
+			? sp.jurisdiction
+			: undefined;
+
 	const filter: UserListFilter = {
 		q: sp?.q?.trim() || undefined,
-		role: isRole(sp?.role) ? sp.role : undefined,
+		role,
 		verified: tri(sp?.verified),
 		blocked: tri(sp?.blocked),
+		jurisdiction,
 	};
 	const filtered =
 		filter.q !== undefined ||
 		filter.role !== undefined ||
 		filter.verified !== undefined ||
-		filter.blocked !== undefined;
+		filter.blocked !== undefined ||
+		filter.jurisdiction !== undefined;
 
 	const [counts, roleCounts, invitations, total] = await Promise.all([
 		userCounts(),
@@ -239,6 +252,7 @@ export default async function UsersPage({
 	if (filter.blocked !== undefined) {
 		base.set("blocked", filter.blocked ? "yes" : "no");
 	}
+	if (filter.jurisdiction) base.set("jurisdiction", filter.jurisdiction);
 
 	const accounts = counts.total === 1 ? "account" : "accounts";
 
@@ -365,9 +379,19 @@ export default async function UsersPage({
 												{initials(u.name)}
 											</span>
 											<span className="min-w-0">
-												<p className="truncate font-semibold text-[13.5px] text-ink group-hover:text-brass-deep">
-													{u.name}
-												</p>
+												<span className="flex items-center gap-1.5">
+													<span className="truncate font-semibold text-[13.5px] text-ink group-hover:text-brass-deep">
+														{u.name}
+													</span>
+													{u.role === "attorney" ? (
+														<AttorneyJurisdictionBadge
+															practicesFederal={
+																!!u.attorneyProfile?.practicesFederal
+															}
+															className="shrink-0"
+														/>
+													) : null}
+												</span>
 												<p className="truncate text-[11.5px] text-muted-foreground">
 													{u.email}
 												</p>
