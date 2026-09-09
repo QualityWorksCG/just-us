@@ -559,11 +559,6 @@ export function ProfileSettings({
 							</Link>
 						</div>
 					) : null}
-
-					<p className="mt-5 border-border border-t pt-5 text-[12px] text-ink-soft leading-relaxed">
-						Your email and role can’t be changed here. Changing an email
-						requires verification.
-					</p>
 				</aside>
 			</div>
 		</div>

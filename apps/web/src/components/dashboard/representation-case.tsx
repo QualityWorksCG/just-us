@@ -240,13 +240,15 @@ function AttorneyPanel({ view }: { view: RepresentationView }) {
 				</div>
 			</div>
 
-			<p className="mt-3.5 flex items-start gap-2 text-[12.5px] text-ink-soft leading-relaxed">
-				<Handshake
-					className="mt-0.5 size-3.5 shrink-0 text-brass-deep"
-					aria-hidden="true"
-				/>
-				{howMatched(view)}
-			</p>
+			{howMatched(view) ? (
+				<p className="mt-3.5 flex items-start gap-2 text-[12.5px] text-ink-soft leading-relaxed">
+					<Handshake
+						className="mt-0.5 size-3.5 shrink-0 text-brass-deep"
+						aria-hidden="true"
+					/>
+					{howMatched(view)}
+				</p>
+			) : null}
 
 			{/* One size across the row — `lg` trimmed to 40px, the same pairing the
 			    interest card uses. The message button is a Button and the other two
@@ -314,8 +316,9 @@ function AttorneyPanel({ view }: { view: RepresentationView }) {
 }
 
 /** How this attorney came to be on the case — the record `Match.origin` keeps,
- *  or the address on the case where there is no match to read. */
-function howMatched(view: RepresentationView): string {
+ *  or the address on the case where there is no match to read. Returns null when
+ *  there is nothing worth narrating, and the line is dropped rather than filled. */
+function howMatched(view: RepresentationView): string | null {
 	const when = view.matchedAt ? ` on ${formatDate(view.matchedAt)}` : "";
 	switch (view.origin) {
 		case "expressed_interest":
@@ -323,7 +326,7 @@ function howMatched(view: RepresentationView): string {
 		case "directory":
 			return `You chose them from the JustUs directory${when}.`;
 		case "bring_your_own":
-			return `You brought them to JustUs yourself${when}.`;
+			return null;
 		default:
 			return view.attorney?.userId
 				? "You named them on your case, and they have a JustUs attorney account. JustUs didn't pick them for you."
