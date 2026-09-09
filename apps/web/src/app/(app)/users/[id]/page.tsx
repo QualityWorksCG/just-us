@@ -14,6 +14,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AdmissionVerifyControl } from "@/components/dashboard/admission-verify-control";
+import { AttorneyJurisdictionBadge } from "@/components/dashboard/attorney-jurisdiction-badge";
 import { BackLink } from "@/components/dashboard/back-link";
 import { BlockUserDialog } from "@/components/dashboard/block-user-dialog";
 import { FederalVerifyControl } from "@/components/dashboard/federal-verify-control";
@@ -165,13 +166,19 @@ export default async function UserDetailPage({
 					))}
 				</div>
 				<p className="mt-1.5 text-[14.5px] text-ink-soft">{u.email}</p>
-				<div className="mt-3 flex flex-wrap gap-1.5">
+				<div className="mt-3 flex flex-wrap items-center gap-1.5">
 					<span className="rounded-[var(--radius-chip)] bg-brass-wash px-2.5 py-0.5 font-semibold text-[12px] text-brass-deep capitalize">
 						{u.role}
 					</span>
 					<span className="rounded-[var(--radius-chip)] border border-border px-2.5 py-0.5 text-[12px] text-ink-soft">
 						{u.jurisdiction || "No jurisdiction"}
 					</span>
+					{u.role === "attorney" ? (
+						<AttorneyJurisdictionBadge
+							practicesFederal={!!u.attorneyProfile?.practicesFederal}
+							long
+						/>
+					) : null}
 				</div>
 			</div>
 
