@@ -15,7 +15,6 @@ import {
 import { Switch } from "@just-us/ui/components/switch";
 import { Textarea } from "@just-us/ui/components/textarea";
 import { cn } from "@just-us/ui/lib/utils";
-import { upload } from "@vercel/blob/client";
 import {
 	ArrowRight,
 	BadgeCheck,
@@ -36,7 +35,6 @@ import {
 	Upload,
 	User as UserIcon,
 	Wallet,
-	X,
 } from "lucide-react";
 import {
 	useCallback,
@@ -74,6 +72,7 @@ import {
 	reformatPhone,
 } from "@/lib/validation";
 import { type AdmissionView, AttorneyAdmissions } from "./attorney-admissions";
+import { IdentityFields } from "./identity-fields";
 
 /**
  * The saved profile, or null when the attorney hasn't started one.
@@ -128,7 +127,7 @@ const TABS = [
 	{
 		key: "photo",
 		label: "Photo & name",
-		fields: ["legalName", "firmName", "headshotUrl"],
+		fields: ["firmName"],
 	},
 	{
 		key: "office",
@@ -178,14 +177,6 @@ function dollarsToCents(value: string): number | null {
 	return Number(digits) * 100;
 }
 
-async function uploadHeadshot(file: File): Promise<string> {
-	const blob = await upload(file.name, file, {
-		access: "public",
-		handleUploadUrl: "/api/attorneys/headshot",
-	});
-	return blob.url;
-}
-
 const INPUT_CLASS =
 	"h-11 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[14px]";
 
@@ -208,7 +199,6 @@ function buildInitial(
 ) {
 	const practiceAreas = profile?.practiceAreas ?? [];
 	return {
-		legalName: profile ? (profile.legalName ?? "") : account.name,
 		firmName: profile ? (profile.firmName ?? "") : (account.firmName ?? ""),
 		officeCity: profile?.officeCity ?? "",
 		officeState: profile
@@ -217,7 +207,6 @@ function buildInitial(
 		contactEmail: profile ? (profile.contactEmail ?? "") : account.email,
 		contactPhone: formatPhone(profile?.contactPhone ?? ""),
 		websiteUrl: profile?.websiteUrl ?? "",
-		headshotUrl: profile?.headshotUrl ?? null,
 		practiceAreas,
 		languages: profile?.languages ?? [],
 		acceptingNewCases: profile?.acceptingNewCases ?? true,
@@ -260,9 +249,11 @@ const URL_PATTERN = /^https?:\/\/\S+\.\S+/;
  * it's in. They gate *readiness*, and are mirrored by `directoryReadySchema` in
  * the action, which is the authority. Keep the two in step.
  */
-function requiredChecks(v: FormValues) {
+function requiredChecks(v: FormValues, legalName: string) {
 	return {
-		legalName: v.legalName.trim().length >= 2,
+		// The name lives on the shared identity control now, not in this form's
+		// autosave, so it is passed in rather than read off `v`.
+		legalName: legalName.trim().length >= 2,
 		officeCity: !!v.officeCity.trim(),
 		officeState: !!v.officeState,
 		contactEmail: EMAIL_PATTERN.test(v.contactEmail.trim()),
@@ -271,8 +262,8 @@ function requiredChecks(v: FormValues) {
 	};
 }
 
-function isDirectoryReady(v: FormValues): boolean {
-	return Object.values(requiredChecks(v)).every(Boolean);
+function isDirectoryReady(v: FormValues, legalName: string): boolean {
+	return Object.values(requiredChecks(v, legalName)).every(Boolean);
 }
 
 /**
@@ -285,14 +276,12 @@ function isDirectoryReady(v: FormValues): boolean {
  */
 function toPayload(v: FormValues): SaveAttorneyProfileInput {
 	return {
-		legalName: v.legalName,
 		firmName: v.firmName,
 		officeCity: v.officeCity,
 		officeState: v.officeState,
 		contactEmail: v.contactEmail,
 		contactPhone: v.contactPhone,
 		websiteUrl: v.websiteUrl,
-		headshotUrl: v.headshotUrl,
 		practiceAreas: v.practiceAreas,
 		languages: v.languages,
 		acceptingNewCases: v.acceptingNewCases,
@@ -490,7 +479,6 @@ export function AttorneyProfileForm({
 	admissions: AdmissionView[];
 }) {
 	const ids = {
-		legalName: useId(),
 		firmName: useId(),
 		officeCity: useId(),
 		officeState: useId(),
@@ -515,14 +503,22 @@ export function AttorneyProfileForm({
 	// successful save so the form settles without a page reload.
 	const [baseline, setBaseline] = useState(initial);
 
-	const [legalName, setLegalName] = useState(initial.legalName);
+	// Name and photo are edited through the shared identity control, which saves
+	// them itself (through the account, mirrored back onto this profile). They are
+	// not part of this form's autosave, so they are tracked here only so the
+	// readiness meter and the verify gate react to a save without a page reload.
+	const initialIdentityName = profile?.legalName ?? account.name;
+	const [identityName, setIdentityName] = useState(initialIdentityName);
+	const [identityAvatar, setIdentityAvatar] = useState<string | null>(
+		profile?.headshotUrl ?? null,
+	);
+
 	const [firmName, setFirmName] = useState(initial.firmName);
 	const [officeCity, setOfficeCity] = useState(initial.officeCity);
 	const [officeState, setOfficeState] = useState(initial.officeState);
 	const [contactEmail, setContactEmail] = useState(initial.contactEmail);
 	const [contactPhone, setContactPhone] = useState(initial.contactPhone);
 	const [websiteUrl, setWebsiteUrl] = useState(initial.websiteUrl);
-	const [headshotUrl, setHeadshotUrl] = useState(initial.headshotUrl);
 	const [practiceAreas, setPracticeAreas] = useState<string[]>(
 		initial.practiceAreas,
 	);
@@ -548,8 +544,6 @@ export function AttorneyProfileForm({
 	// Fields the attorney has finished with. Format errors stay hidden until then,
 	// so a half-typed email isn't flagged on the second keystroke.
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
-	const [uploading, setUploading] = useState(false);
-	const headshotInput = useRef<HTMLInputElement>(null);
 
 	const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
 		"idle",
@@ -557,14 +551,12 @@ export function AttorneyProfileForm({
 
 	const showFeeRange = feeRangeApplies(feeApproach);
 	const current: FormValues = {
-		legalName,
 		firmName,
 		officeCity,
 		officeState,
 		contactEmail,
 		contactPhone,
 		websiteUrl,
-		headshotUrl,
 		practiceAreas,
 		languages,
 		acceptingNewCases,
@@ -599,7 +591,7 @@ export function AttorneyProfileForm({
 	// Last-known flags, so the one-off toasts fire on the transition rather than
 	// on every save. Seeded from what's already stored — an already-complete
 	// profile shouldn't announce itself the first time an unrelated field changes.
-	const readyRef = useRef(isDirectoryReady(initial));
+	const readyRef = useRef(isDirectoryReady(initial, initialIdentityName));
 	const bioPendingRef = useRef(profile?.bioStatus === "pending");
 
 	const persist = useCallback(async function persist(): Promise<void> {
@@ -681,7 +673,7 @@ export function AttorneyProfileForm({
 	 * The `required: true` rows come from `requiredChecks`, so "100% of the
 	 * required items" and "directory-ready" can't disagree.
 	 */
-	const req = requiredChecks(current);
+	const req = requiredChecks(current, identityName);
 	const completion: {
 		tab: Tab;
 		label: string;
@@ -707,7 +699,7 @@ export function AttorneyProfileForm({
 			done: req.contactEmail,
 			required: true,
 		},
-		{ tab: "photo", label: "Photo", done: !!headshotUrl, required: false },
+		{ tab: "photo", label: "Photo", done: !!identityAvatar, required: false },
 		{
 			tab: "areas",
 			label: "Practice area",
@@ -737,7 +729,7 @@ export function AttorneyProfileForm({
 
 	// Directory-ready is the required fields only — a lower bar than 100%, which
 	// also counts the recommended ones.
-	const ready = isDirectoryReady(current);
+	const ready = isDirectoryReady(current, identityName);
 	const doneCount = completion.filter((c) => c.done).length;
 	const pct = Math.round((doneCount / completion.length) * 100);
 	const missing = completion.filter((c) => !c.done);
@@ -764,21 +756,6 @@ export function AttorneyProfileForm({
 		setLanguages((prev) =>
 			prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang],
 		);
-	}
-
-	async function onPickHeadshot(e: React.ChangeEvent<HTMLInputElement>) {
-		const file = e.target.files?.[0];
-		if (!file) return;
-		setUploading(true);
-		try {
-			setHeadshotUrl(await uploadHeadshot(file));
-		} catch {
-			toast.error("Couldn't upload that photo. Please try again.");
-		} finally {
-			setUploading(false);
-			// Let the same file be picked again after a failure.
-			e.target.value = "";
-		}
 	}
 
 	/**
@@ -1011,98 +988,34 @@ export function AttorneyProfileForm({
 				<Section
 					icon={UserIcon}
 					title="Photo & name"
-					sub="Your legal name must match your bar record. It's what we verify against."
+					sub="Your legal name must match your bar record. It's what we verify against. Your name and photo are shared with your account, so they stay the same everywhere."
 				>
-					<div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-						<div className="flex flex-col items-center gap-2.5">
-							{headshotUrl ? (
-								<div className="relative">
-									<img
-										src={headshotUrl}
-										alt="Your headshot"
-										className="size-[124px] rounded-full border border-border object-cover"
-									/>
-									<button
-										type="button"
-										onClick={() => setHeadshotUrl(null)}
-										className="absolute -top-1 -right-1 flex size-7 items-center justify-center rounded-full border border-border bg-surface text-danger shadow-[var(--shadow-rest)] transition-colors hover:bg-danger/10"
-										aria-label="Remove headshot"
-									>
-										<X className="size-3.5" aria-hidden="true" />
-									</button>
-								</div>
-							) : (
-								<button
-									type="button"
-									onClick={() => headshotInput.current?.click()}
-									disabled={uploading}
-									className="flex size-[124px] flex-col items-center justify-center gap-1.5 rounded-full border border-line-strong border-dashed bg-paper-alt text-muted-foreground transition-colors hover:border-brass hover:border-solid hover:text-ink disabled:opacity-70"
-								>
-									{uploading ? (
-										<Upload
-											className="size-5 animate-pulse"
-											aria-hidden="true"
-										/>
-									) : (
-										<UserIcon className="size-6" aria-hidden="true" />
-									)}
-									<span className="text-[11.5px]">
-										{uploading ? "Uploading…" : "Add photo"}
-									</span>
-								</button>
-							)}
-							{headshotUrl && (
-								<button
-									type="button"
-									onClick={() => headshotInput.current?.click()}
-									disabled={uploading}
-									className="font-semibold text-[12.5px] text-brass-deep underline-offset-2 hover:underline disabled:opacity-70"
-								>
-									{uploading ? "Uploading…" : "Replace photo"}
-								</button>
-							)}
-							<input
-								ref={headshotInput}
-								type="file"
-								accept="image/jpeg,image/png,image/webp"
-								className="hidden"
-								onChange={onPickHeadshot}
+					<div className="flex flex-col gap-6">
+						<IdentityFields
+							initialName={identityName}
+							initialAvatarUrl={identityAvatar}
+							nameLabel="Legal name"
+							nameHint="As it appears on the bar record. It's what we verify against."
+							onSaved={(saved) => {
+								setIdentityName(saved.name);
+								setIdentityAvatar(saved.avatarUrl);
+							}}
+						/>
+						<Field
+							label="Firm"
+							htmlFor={ids.firmName}
+							error={errors.firmName}
+							hint="Leave blank if you practise solo."
+						>
+							<Input
+								id={ids.firmName}
+								className={INPUT_CLASS}
+								value={firmName}
+								onChange={(e) => setFirmName(e.target.value)}
+								placeholder="Bell & Associates"
+								aria-invalid={!!errors.firmName}
 							/>
-						</div>
-
-						<div className="flex flex-1 flex-col gap-5">
-							<Field
-								label="Legal name"
-								htmlFor={ids.legalName}
-								required
-								error={errors.legalName}
-								hint="As it appears on the bar record."
-							>
-								<Input
-									id={ids.legalName}
-									className={INPUT_CLASS}
-									value={legalName}
-									onChange={(e) => setLegalName(e.target.value)}
-									placeholder="Marcus A. Bell"
-									aria-invalid={!!errors.legalName}
-								/>
-							</Field>
-							<Field
-								label="Firm"
-								htmlFor={ids.firmName}
-								error={errors.firmName}
-								hint="Leave blank if you practise solo."
-							>
-								<Input
-									id={ids.firmName}
-									className={INPUT_CLASS}
-									value={firmName}
-									onChange={(e) => setFirmName(e.target.value)}
-									placeholder="Bell & Associates"
-									aria-invalid={!!errors.firmName}
-								/>
-							</Field>
-						</div>
+						</Field>
 					</div>
 				</Section>
 			)}
@@ -1537,7 +1450,7 @@ export function AttorneyProfileForm({
 							</div>
 							<AttorneyAdmissions
 								admissions={admissions}
-								canRunChecks={!!profile?.legalName?.trim()}
+								canRunChecks={!!identityName.trim()}
 							/>
 						</div>
 

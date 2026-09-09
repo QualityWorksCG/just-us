@@ -109,14 +109,39 @@ export async function saveAttorneyProfile(
 			}
 		: {};
 
-	return prisma.attorneyProfile.upsert({
-		where: { userId },
-		create: {
-			userId,
-			...data,
-			bioStatus: fields.bio ? "pending" : "approved",
-		},
-		update: { ...data, ...moderation },
+	// The attorney's name and photo also live on the account row, and the two
+	// surfaces have to agree — a name or photo changed on the directory profile is
+	// the name and photo shown everywhere else. Mirror the same three values onto
+	// `User`. A cleared legal name is not pushed down, because `User.name` is
+	// required and an attorney blanking their directory name should not blank the
+	// account it signs in with; the photo and firm are nullable and clear on both.
+	const userMirror: {
+		name?: string;
+		firmName?: string | null;
+		image?: string | null;
+	} = {};
+	if (typeof fields.legalName === "string" && fields.legalName.trim() !== "") {
+		userMirror.name = fields.legalName;
+	}
+	if (fields.firmName !== undefined) userMirror.firmName = fields.firmName;
+	if (fields.headshotUrl !== undefined) userMirror.image = fields.headshotUrl;
+
+	return prisma.$transaction(async (tx) => {
+		const saved = await tx.attorneyProfile.upsert({
+			where: { userId },
+			create: {
+				userId,
+				...data,
+				bioStatus: fields.bio ? "pending" : "approved",
+			},
+			update: { ...data, ...moderation },
+		});
+
+		if (Object.keys(userMirror).length > 0) {
+			await tx.user.update({ where: { id: userId }, data: userMirror });
+		}
+
+		return saved;
 	});
 }
 

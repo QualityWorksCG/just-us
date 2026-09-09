@@ -1,19 +1,23 @@
 import { isBlocked, isLocked } from "@just-us/auth/user-status";
 import { listAdmissions } from "@just-us/db/admissions";
 import { getUserWithCases } from "@just-us/db/users";
+import { buttonVariants } from "@just-us/ui/components/button";
 import { cn } from "@just-us/ui/lib/utils";
 import {
 	ArrowRight,
 	BadgeCheck,
 	FolderOpen,
 	HandCoins,
+	IdCard,
 	Landmark,
+	SquareArrowOutUpRight,
 } from "lucide-react";
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AdmissionVerifyControl } from "@/components/dashboard/admission-verify-control";
+import { AttorneyJurisdictionBadge } from "@/components/dashboard/attorney-jurisdiction-badge";
 import { BackLink } from "@/components/dashboard/back-link";
 import { BlockUserDialog } from "@/components/dashboard/block-user-dialog";
 import { FederalVerifyControl } from "@/components/dashboard/federal-verify-control";
@@ -165,13 +169,19 @@ export default async function UserDetailPage({
 					))}
 				</div>
 				<p className="mt-1.5 text-[14.5px] text-ink-soft">{u.email}</p>
-				<div className="mt-3 flex flex-wrap gap-1.5">
+				<div className="mt-3 flex flex-wrap items-center gap-1.5">
 					<span className="rounded-[var(--radius-chip)] bg-brass-wash px-2.5 py-0.5 font-semibold text-[12px] text-brass-deep capitalize">
 						{u.role}
 					</span>
 					<span className="rounded-[var(--radius-chip)] border border-border px-2.5 py-0.5 text-[12px] text-ink-soft">
 						{u.jurisdiction || "No jurisdiction"}
 					</span>
+					{u.role === "attorney" ? (
+						<AttorneyJurisdictionBadge
+							practicesFederal={!!u.attorneyProfile?.practicesFederal}
+							long
+						/>
+					) : null}
 				</div>
 			</div>
 
@@ -240,6 +250,94 @@ export default async function UserDetailPage({
 					)}
 				</div>
 			</div>
+
+			{/* Directory profile — the account's public listing at a glance: firm,
+			    the one moderation signal (bio), and a way through to what plaintiffs
+			    actually see. Only a verified attorney has a reachable public page. */}
+			{u.role === "attorney" &&
+				(() => {
+					const p = u.attorneyProfile;
+					const directoryVerified =
+						p?.verificationStatus === "verified" ||
+						p?.federalVerificationStatus === "verified";
+					const bio = !p
+						? {
+								text: "No profile yet",
+								cls: "bg-surface-2 text-ink-soft",
+								dot: "bg-ink-soft",
+							}
+						: p.bioStatus === "approved"
+							? {
+									text: "Bio approved",
+									cls: "bg-green-soft text-green-deep",
+									dot: "bg-success",
+								}
+							: p.bioStatus === "rejected"
+								? {
+										text: "Bio needs changes",
+										cls: "bg-danger/10 text-danger",
+										dot: "bg-danger",
+									}
+								: {
+										text: "Bio in review",
+										cls: "bg-brass-wash text-brass-deep",
+										dot: "bg-brass-deep",
+									};
+					return (
+						<div className="rounded-[var(--radius-card-lg)] border border-border bg-surface p-5 shadow-[var(--shadow-rest)]">
+							<div className="flex flex-wrap items-start justify-between gap-4">
+								<div className="min-w-0">
+									<h2 className="flex items-center gap-2 font-bold text-[15px] text-ink">
+										<IdCard
+											className="size-4 text-brass-deep"
+											aria-hidden="true"
+										/>
+										Directory profile
+									</h2>
+									<p className="mt-1 text-[13px] text-muted-foreground leading-relaxed">
+										What plaintiffs see in the attorney directory.
+									</p>
+									<div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+										<Fact label="Firm">
+											<p className="text-[13.5px] text-ink">
+												{p?.firmName || "-"}
+											</p>
+										</Fact>
+										<Fact label="Bio">
+											<span className={cn(PILL, bio.cls)}>
+												<span
+													className={cn("size-1.5 rounded-full", bio.dot)}
+												/>
+												{bio.text}
+											</span>
+										</Fact>
+									</div>
+								</div>
+								{directoryVerified && p?.id ? (
+									<Link
+										href={`/attorneys/${p.id}` as Route}
+										target="_blank"
+										rel="noopener noreferrer"
+										className={cn(
+											buttonVariants({ variant: "outline", size: "sm" }),
+											"h-9 shrink-0",
+										)}
+									>
+										<SquareArrowOutUpRight
+											data-icon="inline-start"
+											aria-hidden="true"
+										/>
+										View directory profile
+									</Link>
+								) : (
+									<p className="max-w-[22ch] shrink-0 text-[12px] text-muted-foreground leading-relaxed">
+										The public profile appears once they're verified.
+									</p>
+								)}
+							</div>
+						</div>
+					);
+				})()}
 
 			{/* Attorney bar verification — the switch that lets an attorney
 			    represent cases and express interest (JUS-13). */}

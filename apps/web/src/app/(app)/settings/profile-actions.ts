@@ -108,6 +108,9 @@ export const saveProfileAction = withEvlog(async function saveProfileAction(
 
 		revalidatePath("/home");
 		revalidatePath("/settings");
+		// Name and photo are mirrored onto the directory profile, so refresh it too.
+		revalidatePath("/profile");
+		revalidatePath("/dashboard/profile");
 		return {
 			ok: true,
 			profile: {

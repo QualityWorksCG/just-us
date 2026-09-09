@@ -7,6 +7,11 @@ export type UserListFilter = {
 	role?: string;
 	verified?: boolean;
 	blocked?: boolean;
+	/** Attorney-only facet: "federal" for attorneys who practise in federal court,
+	 *  "state" for the rest. It reads `AttorneyProfile.practicesFederal`, so it only
+	 *  ever narrows attorney rows — the admin table exposes it under the attorney
+	 *  role. */
+	jurisdiction?: "state" | "federal";
 };
 
 /** Where-fragment for "blocked right now": banned with no expiry or a future one. */
@@ -33,25 +38,41 @@ function whereForUsers(
 	filter: UserListFilter,
 	at: Date,
 ): Prisma.UserWhereInput {
-	const where: Prisma.UserWhereInput = {};
+	// Composed as an AND of independent conditions so a facet that needs its own
+	// OR (the search across name/email, the "state" case below) can't overwrite
+	// another's.
+	const and: Prisma.UserWhereInput[] = [];
 	if (filter.q) {
-		where.OR = [
-			{ name: { contains: filter.q, mode: "insensitive" } },
-			{ email: { contains: filter.q, mode: "insensitive" } },
-		];
+		and.push({
+			OR: [
+				{ name: { contains: filter.q, mode: "insensitive" } },
+				{ email: { contains: filter.q, mode: "insensitive" } },
+			],
+		});
 	}
 	if (filter.role) {
-		where.role = filter.role;
+		and.push({ role: filter.role });
 	}
 	if (filter.verified !== undefined) {
-		where.emailVerified = filter.verified;
+		and.push({ emailVerified: filter.verified });
 	}
 	if (filter.blocked !== undefined) {
-		where.AND = [
-			filter.blocked ? activeBlockWhere(at) : notActiveBlockWhere(at),
-		];
+		and.push(filter.blocked ? activeBlockWhere(at) : notActiveBlockWhere(at));
 	}
-	return where;
+	if (filter.jurisdiction === "federal") {
+		// Practises federally — the notable, non-default case.
+		and.push({ attorneyProfile: { is: { practicesFederal: true } } });
+	} else if (filter.jurisdiction === "state") {
+		// State-only: not federal, or no directory profile started yet (a profile
+		// defaults to non-federal, and a bare attorney account has no row at all).
+		and.push({
+			OR: [
+				{ attorneyProfile: { is: { practicesFederal: false } } },
+				{ attorneyProfile: { is: null } },
+			],
+		});
+	}
+	return and.length ? { AND: and } : {};
 }
 
 export async function listUsers(
@@ -78,7 +99,16 @@ export async function listUsers(
 			lastSignInAt: true,
 			// Bar-standing badge for attorney rows — the status the admin table shows
 			// for a lawyer, distinct from `emailVerified`. Null for other roles.
-			attorneyProfile: { select: { verificationStatus: true } },
+			// `practicesFederal` drives the Federal/State jurisdiction badge, and
+			// `federalVerificationStatus` is here so that badge can say whether the
+			// federal standing has actually been checked.
+			attorneyProfile: {
+				select: {
+					verificationStatus: true,
+					practicesFederal: true,
+					federalVerificationStatus: true,
+				},
+			},
 			// States this attorney has claimed but not had checked yet. Surfaced
 			// separately because the badge above reads "verified" as soon as one
 			// licence clears, so it alone would never tell the admin a second state
@@ -114,8 +144,10 @@ export async function countUsers(filter: UserListFilter) {
  */
 export async function userRoleCounts(filter: UserListFilter) {
 	const at = new Date();
-	const { role: _ignored, ...withoutRole } = filter;
-	const where = whereForUsers(withoutRole, at);
+	// Drop the role (so each pill previews where it leads) and the attorney-only
+	// court facet (so it can't drag every other role's count to zero).
+	const { role: _ignored, jurisdiction: _court, ...rest } = filter;
+	const where = whereForUsers(rest, at);
 	const [total, byRole] = await Promise.all([
 		prisma.user.count({ where }),
 		prisma.user.groupBy({ by: ["role"], where, _count: { _all: true } }),
@@ -150,6 +182,12 @@ export async function getUserWithCases(id: string) {
 			// can show it and verify from there (JUS-13). Null for every other role.
 			attorneyProfile: {
 				select: {
+					// `id` addresses the public directory route (/attorneys/[id]); firm and
+					// bio status give the admin the directory context and the one moderation
+					// signal that lives on the profile.
+					id: true,
+					firmName: true,
+					bioStatus: true,
 					verificationStatus: true,
 					verifiedAt: true,
 					practicesFederal: true,

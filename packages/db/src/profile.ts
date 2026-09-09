@@ -104,6 +104,27 @@ export async function updateOwnProfile(input: ProfileUpdate) {
 			},
 		});
 
+		// An attorney's name and photo live in two places — the account row edited
+		// here and the directory profile edited on /profile — and the two have to
+		// agree, so a name or photo changed on either surface is the name and photo
+		// everywhere. Mirror the same two values onto the directory profile.
+		// `updateMany` is a no-op when no profile row exists yet (the directory form
+		// seeds itself from the account name the first time it is opened), so this
+		// never creates a bare profile as a side effect of an account save. The photo
+		// URL moves onto both rows together, so the managed-avatar cleanup below only
+		// ever deletes a blob nothing still points at.
+		if (current.role === "attorney") {
+			const mirrored: { legalName?: string; headshotUrl?: string | null } = {};
+			if (input.name) mirrored.legalName = input.name;
+			if (input.image !== undefined) mirrored.headshotUrl = input.image;
+			if (Object.keys(mirrored).length > 0) {
+				await tx.attorneyProfile.updateMany({
+					where: { userId: input.userId },
+					data: mirrored,
+				});
+			}
+		}
+
 		return {
 			profile,
 			previousImage: current.image,

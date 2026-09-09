@@ -179,6 +179,10 @@ export async function saveAttorneyProfileAction(
 			toDraft(parsed.data),
 		);
 		revalidatePath("/profile");
+		// The legal name and headshot are mirrored onto the account, so the settings
+		// page and the nav avatar it feeds have to be refreshed as well.
+		revalidatePath("/settings");
+		revalidatePath("/home");
 		return {
 			ok: true,
 			directoryReady: directoryReadySchema.safeParse(saved).success,
