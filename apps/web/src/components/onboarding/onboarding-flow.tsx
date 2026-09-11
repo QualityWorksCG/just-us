@@ -452,9 +452,9 @@ export function OnboardingFlow({
 				<div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4">
 					{step === 1 ? (
 						<>
-							<p className="text-[13px] text-muted-foreground">
-								You can change how you use JustUs anytime in settings.
-							</p>
+							{/* Empty left slot keeps the continue button right-aligned in the
+							    justify-between bar. */}
+							<span />
 							{/*
 								`key` is load-bearing, not cosmetic. Both branches render a
 								<Button> in this slot, so without distinct keys React reuses
