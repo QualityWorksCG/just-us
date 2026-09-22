@@ -75,7 +75,8 @@ we drop to the lowest access the client wants us to keep.**
       - `/api/stripe/connect-webhook` → `account.updated` (`STRIPE_CONNECT_WEBHOOK_SECRET`)
 - [ ] Fee config reviewed for live: `STRIPE_PLATFORM_FEE_BPS` (500 = the 5% the copy promises),
       `STRIPE_MIN_DONATION_CENTS`, `STRIPE_DONATION_PRESETS`
-- [ ] Payout schedule set; client understands **negative-balance liability sits with the platform**
+- [ ] Payout schedule set to a **7-day delay** (Connect → Settings → Payouts); client understands **negative-balance liability sits with the platform**
+- [ ] Client has read `docs/donation-refunds-plan.md` §2 — refunds are manual from the Stripe dashboard at launch; self-serve refunds are a deferred phase
 - [ ] Receipt/email copy does not imply tax deductibility
 - [ ] Radar rules and dispute notifications routed to a monitored address
 

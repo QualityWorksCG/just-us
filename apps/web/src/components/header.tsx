@@ -26,6 +26,9 @@ const CHROME_LESS_ROUTES = [
 	"/login",
 	"/reset-password",
 	"/accept-invite",
+	// The bring-your-own-attorney invitation, opened signed-out, is the same
+	// full-page card with its own brand mark — the sticky header drew over it.
+	"/case-invite",
 	"/verify-email",
 	"/onboarding",
 	"/cases/new",
