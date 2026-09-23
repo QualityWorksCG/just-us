@@ -371,7 +371,7 @@ export function AuthScreen({
 						</figcaption>
 						<p className="mt-3 flex items-center gap-2 font-bold text-[12.5px] text-brass">
 							<TrendingUp className="size-3.5" aria-hidden="true" />
-							$9,800 raised · 84 donors
+							Fee fully funded · Case underway
 						</p>
 					</figure>
 

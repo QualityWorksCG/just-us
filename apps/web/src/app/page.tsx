@@ -24,7 +24,6 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { Brandmark } from "@/components/brandmark";
-import { CountUp } from "@/components/count-up";
 import { FeaturedCases, type LandingCase } from "@/components/featured-cases";
 import { LandingFaq } from "@/components/landing-faq";
 import { Reveal } from "@/components/reveal";
@@ -64,15 +63,9 @@ const howSteps = [
 ] as const;
 
 const impactStats = [
-	{ value: 1240, label: "cases fully funded" },
-	{
-		value: 14.6,
-		prefix: "$",
-		suffix: "M",
-		decimals: 1,
-		label: "raised by donors",
-	},
-	{ value: 38000, label: "people chipped in" },
+	{ value: "Many small gifts", label: "add up to one attorney fee" },
+	{ value: "One flat fee", label: "shown to the cent before you give" },
+	{ value: "Every update", label: "posted through to the outcome" },
 ] as const;
 
 const promises = [
@@ -181,14 +174,6 @@ const startPaths = [
 	},
 ] as const;
 
-function money(n: number) {
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-		maximumFractionDigits: 0,
-	}).format(n);
-}
-
 function ProgressBar({
 	value,
 	max,
@@ -256,7 +241,7 @@ function HeroVisual() {
 							className="size-3.5 text-brass-deep"
 							aria-hidden="true"
 						/>
-						Anita just gave $50
+						Donors fund the fee
 					</span>
 				</div>
 
@@ -279,14 +264,12 @@ function HeroVisual() {
 						Reyes family · Housing · Texas
 					</span>
 					<p className="mt-1 mb-2.5 font-bold text-[15px] text-ink">
-						Fully funded in 31 days
+						Attorney fee fully funded
 					</p>
 					<ProgressBar value={100} max={100} />
 					<div className="mt-2.5 flex items-center justify-between text-[12.5px]">
-						<span className="font-bold text-ink tabular-nums">
-							{money(18600)} raised
-						</span>
-						<span className="text-muted-foreground">573 donors</span>
+						<span className="font-bold text-ink">Goal reached</span>
+						<span className="text-muted-foreground">Case underway</span>
 					</div>
 				</div>
 			</div>
@@ -326,7 +309,7 @@ export default async function Home() {
 								className="size-3.5 text-brass-deep"
 								aria-hidden="true"
 							/>
-							1,240 cases funded and counting
+							Community-funded legal help
 						</div>
 						<h1 className="max-w-[16ch] animate-[ju-rise_0.8s_var(--ease-rise)_0.14s_both] font-extrabold text-[clamp(2.5rem,5.5vw,4rem)] text-ink leading-[0.98] tracking-[-0.035em]">
 							Justice shouldn't depend on your{" "}
@@ -387,7 +370,7 @@ export default async function Home() {
 									))}
 								</div>
 								<p className="mt-1 font-semibold text-[13px] text-ink">
-									Loved by 38,000+ donors
+									Backed by a growing community of donors
 								</p>
 							</div>
 						</div>
@@ -469,13 +452,8 @@ export default async function Home() {
 						<dl className="mt-8 flex flex-wrap gap-x-12 gap-y-6">
 							{impactStats.map((stat) => (
 								<div key={stat.label}>
-									<dt className="font-display font-extrabold text-[clamp(1.75rem,3vw,2.25rem)] tabular-nums tracking-[-0.02em]">
-										<CountUp
-											value={stat.value}
-											prefix={"prefix" in stat ? stat.prefix : undefined}
-											suffix={"suffix" in stat ? stat.suffix : undefined}
-											decimals={"decimals" in stat ? stat.decimals : 0}
-										/>
+									<dt className="font-display font-extrabold text-[clamp(1.5rem,2.6vw,2rem)] leading-[1.1] tracking-[-0.02em]">
+										{stat.value}
 									</dt>
 									<dd className="mt-0.5 text-[13px] text-gold-bright-ink/70">
 										{stat.label}
