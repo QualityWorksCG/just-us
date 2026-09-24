@@ -218,7 +218,11 @@ async function DashboardBody({
 			(i) => i.status === "accepted",
 		).length;
 		const unread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
-		const payoutPending = payout.unstartedCases + payout.waitingCases;
+		// `waitingCases` already includes the unstarted ones.
+		const payoutPending = payout.waitingCases;
+		// One case waiting: send them to it — its page opens on the payouts tab.
+		// More than one: the list is the only honest place to land.
+		const onlyWaiting = payout.waiting.length === 1 ? payout.waiting[0] : null;
 
 		const attention: AttentionItem[] = [
 			...invitations.map((inv) => ({
@@ -237,9 +241,13 @@ async function DashboardBody({
 							id: "payout",
 							kind: "payout" as const,
 							title: "Finish payout setup",
-							sub: `${payoutPending} ${payoutPending === 1 ? "intake" : "intakes"} can't accept donations until set up`,
+							sub: onlyWaiting
+								? `${onlyWaiting.title || "Untitled intake"} can't accept donations until set up`
+								: `${payoutPending} intakes can't accept donations until set up`,
 							cta: "Set up",
-							href: "/my-cases" as Route,
+							href: onlyWaiting
+								? (`/my-cases/${onlyWaiting.id}` as Route)
+								: ("/my-cases" as Route),
 						},
 					]
 				: []),

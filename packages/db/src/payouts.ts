@@ -115,6 +115,11 @@ export async function attorneyPayoutReadiness(input: {
 	 * say, because it is the plaintiff's whole campaign that has not started.
 	 */
 	blockedCases: number;
+	/**
+	 * The waiting cases themselves, so a nudge can send the attorney straight to
+	 * the one case that needs them instead of to the whole list.
+	 */
+	waiting: { id: string; title: string }[];
 }> {
 	const cases = await prisma.case.findMany({
 		where: {
@@ -130,6 +135,8 @@ export async function attorneyPayoutReadiness(input: {
 			],
 		},
 		select: {
+			id: true,
+			title: true,
 			status: true,
 			payoutAccountForCase: {
 				select: {
@@ -145,6 +152,7 @@ export async function attorneyPayoutReadiness(input: {
 	let unfinishedCases = 0;
 	let inReviewCases = 0;
 	let blockedCases = 0;
+	const waiting: { id: string; title: string }[] = [];
 	for (const k of cases) {
 		const account =
 			k.payoutAccountForCase?.userId === input.userId
@@ -159,6 +167,7 @@ export async function attorneyPayoutReadiness(input: {
 			// Can already receive — not waiting on this attorney for anything.
 			continue;
 		}
+		waiting.push({ id: k.id, title: k.title });
 		if (k.status === "pending_payout") blockedCases += 1;
 	}
 	return {
@@ -167,6 +176,7 @@ export async function attorneyPayoutReadiness(input: {
 		inReviewCases,
 		waitingCases: unstartedCases + unfinishedCases,
 		blockedCases,
+		waiting,
 	};
 }
 
