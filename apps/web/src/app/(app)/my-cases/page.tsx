@@ -241,6 +241,8 @@ export default async function MyCasesPage({
 						const pct = goal > 0 ? Math.round((raised / goal) * 100) : 0;
 						const isDeleted = !!c.deletedAt;
 						const isLive = !isDeleted && c.status === "live";
+						// Live underneath, but the owner has paused the public page.
+						const isPaused = isLive && !!c.unpublishedAt;
 						const isSeeking = !isDeleted && c.status === "seeking";
 						// Finished and sent, waiting on the firm's payout account. Not a
 						// draft: there is nothing left for the plaintiff to fill in, so
@@ -256,17 +258,19 @@ export default async function MyCasesPage({
 
 						const badge = isDeleted
 							? { text: "Deleted", dot: "bg-danger" }
-							: isLive
-								? { text: "Active", dot: "bg-success" }
-								: isClosed
-									? { text: "Closed", dot: "bg-ink-soft" }
-									: invite
-										? { text: "Invitation sent", dot: "bg-gold-bright" }
-										: isSeeking
-											? { text: "Seeking", dot: "bg-brass-deep" }
-											: isPending
-												? { text: "Awaiting firm", dot: "bg-gold-bright" }
-												: { text: "Draft", dot: "bg-ink-soft" };
+							: isPaused
+								? { text: "Paused", dot: "bg-gold-bright" }
+								: isLive
+									? { text: "Active", dot: "bg-success" }
+									: isClosed
+										? { text: "Closed", dot: "bg-ink-soft" }
+										: invite
+											? { text: "Invitation sent", dot: "bg-gold-bright" }
+											: isSeeking
+												? { text: "Seeking", dot: "bg-brass-deep" }
+												: isPending
+													? { text: "Awaiting firm", dot: "bg-gold-bright" }
+													: { text: "Draft", dot: "bg-ink-soft" };
 						const hasNewUpdate = !isDeleted && casesWithNewUpdate.has(c.id);
 
 						return (

@@ -690,7 +690,12 @@ export async function caseEvidenceFile(input: {
  *  first. Includes the plaintiff's name for display. */
 export async function listLiveCases(take = 6) {
 	return prisma.case.findMany({
-		where: { status: "live", deletedAt: null, moderationStatus: "ok" },
+		where: {
+			status: "live",
+			deletedAt: null,
+			unpublishedAt: null,
+			moderationStatus: "ok",
+		},
 		orderBy: [{ raisedCents: "desc" }, { publishedAt: "desc" }],
 		take,
 		include: { owner: { select: { name: true } } },
@@ -702,7 +707,14 @@ export async function listLiveCases(take = 6) {
  *  sees the same progress the plaintiff and attorney posted (JUS-33). */
 export async function getPublicCase(id: string) {
 	return prisma.case.findFirst({
-		where: { id, status: "live", deletedAt: null, moderationStatus: "ok" },
+		where: {
+			id,
+			status: "live",
+			deletedAt: null,
+			// Paused by the plaintiff — off the public site until they resume.
+			unpublishedAt: null,
+			moderationStatus: "ok",
+		},
 		include: {
 			// `image` powers the plaintiff's avatar; the matched attorney's photo comes
 			// from their directory headshot, falling back to their account avatar.
@@ -748,6 +760,7 @@ export async function getViewableCase(id: string) {
 			id,
 			status: { in: ["live", "closed"] },
 			deletedAt: null,
+			unpublishedAt: null,
 			moderationStatus: "ok",
 		},
 		include: {
@@ -839,6 +852,8 @@ function browseWhere(opts?: BrowseFilters) {
 	return {
 		status: "live" as const,
 		deletedAt: null,
+		// Paused by its plaintiff — not in the directory until resumed.
+		unpublishedAt: null,
 		// Never surface content held or removed by moderation (Reg. & Ops §3–4).
 		moderationStatus: "ok" as const,
 		...(opts?.state ? { location: opts.state } : {}),
@@ -1027,6 +1042,82 @@ export async function softDeleteCase(id: string, ownerId: string) {
 export type CloseCaseResult =
 	| { ok: true }
 	| { ok: false; reason: "case_not_found" | "not_live" | "already_closed" };
+
+export type UnpublishCaseResult =
+	| { ok: true }
+	| { ok: false; reason: "case_not_found" | "not_live" | "already_paused" };
+
+/**
+ * Pause a live case's public page — the plaintiff's own, reversible act.
+ *
+ * The case stays `live` (its payout binding and totals are untouched) but leaves
+ * every public read: the directory, the landing page, its public URL, and the
+ * donate action all filter on `unpublishedAt: null`. Only a `live` case pauses —
+ * a draft, seeking, or pending case was never public, and `closed` is final.
+ * The status- and null-conditional `updateMany` makes a double submit pause
+ * exactly once.
+ */
+export async function unpublishCase(
+	id: string,
+	ownerId: string,
+): Promise<UnpublishCaseResult> {
+	const current = await prisma.case.findFirst({
+		where: { id, ownerId, deletedAt: null },
+		select: { status: true, unpublishedAt: true },
+	});
+	if (!current) return { ok: false, reason: "case_not_found" };
+	if (current.status !== "live") return { ok: false, reason: "not_live" };
+	if (current.unpublishedAt) return { ok: false, reason: "already_paused" };
+
+	const res = await prisma.case.updateMany({
+		where: {
+			id,
+			ownerId,
+			status: "live",
+			unpublishedAt: null,
+			deletedAt: null,
+		},
+		data: { unpublishedAt: new Date() },
+	});
+	if (res.count === 0) return { ok: false, reason: "already_paused" };
+	return { ok: true };
+}
+
+export type RepublishCaseResult =
+	| { ok: true }
+	| { ok: false; reason: "case_not_found" | "not_live" | "not_paused" };
+
+/**
+ * Resume a paused case's public page — the undo of `unpublishCase`.
+ *
+ * `publishedAt` is deliberately left alone: the directory's "newest" sort reads
+ * it, and a case that was paused for a day is not new to donors again.
+ */
+export async function republishCase(
+	id: string,
+	ownerId: string,
+): Promise<RepublishCaseResult> {
+	const current = await prisma.case.findFirst({
+		where: { id, ownerId, deletedAt: null },
+		select: { status: true, unpublishedAt: true },
+	});
+	if (!current) return { ok: false, reason: "case_not_found" };
+	if (current.status !== "live") return { ok: false, reason: "not_live" };
+	if (!current.unpublishedAt) return { ok: false, reason: "not_paused" };
+
+	const res = await prisma.case.updateMany({
+		where: {
+			id,
+			ownerId,
+			status: "live",
+			unpublishedAt: { not: null },
+			deletedAt: null,
+		},
+		data: { unpublishedAt: null },
+	});
+	if (res.count === 0) return { ok: false, reason: "not_paused" };
+	return { ok: true };
+}
 
 /**
  * Mark a live case Closed — the plaintiff's act, the counterpart to `goLiveCase`.

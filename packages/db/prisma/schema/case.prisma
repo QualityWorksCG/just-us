@@ -132,6 +132,12 @@ model Case {
   // the plaintiff files after this is "new" to them, which drives the highlight
   // and count on the attorney's case screen. Null until they first open it.
   attorneyEvidenceSeenAt DateTime?
+  // The plaintiff pausing their public page. Set while a `live` case is paused:
+  // it leaves the directory, its public URL 404s, and donations stop, but the
+  // status stays `live` so nothing money-related (payout binding, raised totals)
+  // moves. Null while public. Reversible by the owner, unlike `closed`, and
+  // distinct from `moderationStatus`, which is an administrator's call.
+  unpublishedAt DateTime?
   // Soft delete — set when the plaintiff removes a case. Rows are kept so they
   // can appear in the "Deleted" filter and be restored, not hard-deleted.
   deletedAt   DateTime?

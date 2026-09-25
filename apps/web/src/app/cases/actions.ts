@@ -19,10 +19,12 @@ import {
 	publishCase,
 	publishForAttorneys,
 	removeEvidenceFromOwnedCase,
+	republishCase,
 	revertSeekingToDraft,
 	saveDraft,
 	setCaseInvitedAttorney,
 	softDeleteCase,
+	unpublishCase,
 	updateOwnedCase,
 } from "@just-us/db/cases";
 import { getCasePayoutOptions } from "@just-us/db/payouts";
@@ -357,6 +359,78 @@ export async function closeCaseAction(id: string): Promise<DeleteCaseResult> {
 		return { ok: true };
 	} catch {
 		return { ok: false, error: "Couldn't close this case. Please try again." };
+	}
+}
+
+const UNPUBLISH_REASONS: Record<string, string> = {
+	case_not_found: "That case couldn't be found.",
+	not_live: "Only a live case can be paused.",
+	already_paused: "This case is already paused.",
+};
+
+const REPUBLISH_REASONS: Record<string, string> = {
+	case_not_found: "That case couldn't be found.",
+	not_live: "Only a live case can be resumed.",
+	not_paused: "This case is already public.",
+};
+
+/** Every surface a live case's public visibility reaches. */
+function revalidatePublicVisibility(id: string) {
+	revalidatePath(`/my-cases/${id}`);
+	revalidatePath("/my-cases");
+	revalidatePath(`/cases/${id}`);
+	revalidatePath(`/discover/${id}`);
+	revalidatePath("/discover");
+	revalidatePath("/home");
+	// The marketing landing lists live cases too.
+	revalidatePath("/");
+}
+
+/**
+ * Pause a live case's public page — the plaintiff's own, reversible act.
+ *
+ * Unlike closing, nothing fans out: no certificates, no notifications, no money
+ * moves. The case simply leaves the public site until the plaintiff resumes it.
+ */
+export async function unpublishCaseAction(
+	id: string,
+): Promise<DeleteCaseResult> {
+	const { session } = await requireRole("plaintiff");
+	try {
+		const res = await unpublishCase(id, session.user.id);
+		if (!res.ok) {
+			return {
+				ok: false,
+				error: UNPUBLISH_REASONS[res.reason] ?? "Couldn't pause this case.",
+			};
+		}
+		revalidatePublicVisibility(id);
+		return { ok: true };
+	} catch {
+		return { ok: false, error: "Couldn't pause this case. Please try again." };
+	}
+}
+
+/** Resume a paused case's public page — the undo of `unpublishCaseAction`. */
+export async function republishCaseAction(
+	id: string,
+): Promise<DeleteCaseResult> {
+	const { session } = await requireRole("plaintiff");
+	try {
+		const res = await republishCase(id, session.user.id);
+		if (!res.ok) {
+			return {
+				ok: false,
+				error: REPUBLISH_REASONS[res.reason] ?? "Couldn't resume this case.",
+			};
+		}
+		revalidatePublicVisibility(id);
+		return { ok: true };
+	} catch {
+		return {
+			ok: false,
+			error: "Couldn't resume this case. Please try again.",
+		};
 	}
 }
 

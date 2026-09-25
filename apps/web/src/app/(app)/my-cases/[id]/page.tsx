@@ -27,6 +27,7 @@ import {
 	ManageCase,
 	type ManageCaseData,
 } from "@/components/dashboard/manage-case";
+import { UnpublishCaseButton } from "@/components/dashboard/unpublish-case";
 import { requireRole } from "@/lib/auth-server";
 import { syncPendingDonationsForCase } from "@/lib/donation-sync";
 
@@ -114,8 +115,16 @@ export default async function CasePage({
 		attorneyLocation: c.attorneyLocation,
 	};
 
-	const badge =
-		c.status === "live"
+	// Live but paused by the owner: still live underneath, but off the public site.
+	const paused = c.status === "live" && !!c.unpublishedAt;
+
+	const badge = paused
+		? {
+				text: "Paused",
+				cls: "bg-gold-bright/20 text-gold-bright-ink",
+				dot: "bg-gold-bright",
+			}
+		: c.status === "live"
 			? {
 					text: "Active Case",
 					cls: "bg-green-soft text-green-deep",
@@ -169,8 +178,8 @@ export default async function CasePage({
 					{/* Once live, the case has a public fundraiser page — let the owner
 					    open it to see exactly what donors see. Opens in a new tab so the
 					    manage view stays put. Only live cases have a public page (the
-					    public route 404s otherwise). */}
-					{c.status === "live" && (
+					    public route 404s otherwise — including while paused). */}
+					{c.status === "live" && !paused && (
 						<a
 							href={`/cases/${c.id}`}
 							target="_blank"
@@ -186,11 +195,13 @@ export default async function CasePage({
 					)}
 				</div>
 				<p className="mt-1.5 text-[14.5px] text-ink-soft">
-					{c.status === "live"
-						? "Manage your case, or view how your public fundraiser page looks to donors."
-						: c.status === "pending_payout"
-							? "Your case is finished and private. It goes public as soon as your attorney's payout account can receive. Publish it below."
-							: "Manage your case: edit the details, update images, or remove it."}
+					{paused
+						? "Your case is paused: it's off the public site and not accepting donations until you resume it below."
+						: c.status === "live"
+							? "Manage your case, or view how your public fundraiser page looks to donors."
+							: c.status === "pending_payout"
+								? "Your case is finished and private. It goes public as soon as your attorney's payout account can receive. Publish it below."
+								: "Manage your case: edit the details, update images, or remove it."}
 				</p>
 			</div>
 
@@ -215,7 +226,11 @@ export default async function CasePage({
 				/>
 			)}
 
-			{/* Closing is only meaningful once the case is public and raising. */}
+			{/* Pausing and closing are only meaningful once the case is public and
+			    raising. Pause first: it's the reversible one. */}
+			{c.status === "live" && (
+				<UnpublishCaseButton caseId={c.id} title={c.title} paused={paused} />
+			)}
 			{c.status === "live" && (
 				<CloseCaseButton
 					caseId={c.id}

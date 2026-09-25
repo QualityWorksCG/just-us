@@ -63,7 +63,10 @@ export async function listFollowedCaseIds(userId: string): Promise<string[]> {
 
 export async function listFollowedCases(userId: string) {
 	const rows = await prisma.caseFollow.findMany({
-		where: { userId, case: { deletedAt: null, status: "live" } },
+		where: {
+			userId,
+			case: { deletedAt: null, unpublishedAt: null, status: "live" },
+		},
 		orderBy: { createdAt: "desc" },
 		include: { case: { include: { owner: { select: { name: true } } } } },
 	});
@@ -106,7 +109,10 @@ export type FollowerUpdateNotice = {
 /** Build the per-case "unseen updates" predicate from a user's follows. */
 async function followsWithContext(userId: string) {
 	return prisma.caseFollow.findMany({
-		where: { userId, case: { deletedAt: null, status: "live" } },
+		where: {
+			userId,
+			case: { deletedAt: null, unpublishedAt: null, status: "live" },
+		},
 		select: {
 			caseId: true,
 			updatesSeenAt: true,
